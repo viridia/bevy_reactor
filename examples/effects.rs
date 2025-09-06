@@ -6,7 +6,7 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
     ui,
 };
-use bevy_reactor::{ReactorPlugin, effect::effect};
+use bevy_reactor::{Cx, ReactorPlugin, effect::effect};
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GameState {
@@ -43,10 +43,7 @@ fn setup_view_root(mut commands: Commands) {
         }
         BorderColor::all(css::ALICE_BLUE)
         effect(
-            |cx| {
-                let state = cx.resource::<State<GameState>>();
-                *state.get()
-            },
+            |cx: &Cx| *cx.resource::<State<GameState>>().get(),
             |entity, state| {
                 entity.insert(BackgroundColor(match state {
                     GameState::Play => css::DARK_GREEN.into(),
@@ -60,10 +57,7 @@ fn setup_view_root(mut commands: Commands) {
             (
                 Text("")
                 effect(
-                    |cx| {
-                        let state = cx.resource::<State<GameState>>();
-                        *state.get()
-                    },
+                    |cx: &Cx| *cx.resource::<State<GameState>>().get(),
                     |entity, state| {
                         if let Some(mut text) = entity.get_mut::<Text>() {
                             text.0 = match state {
