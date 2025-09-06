@@ -84,9 +84,9 @@ impl<
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
 > Effect<D, Deps, EffectFn>
 {
-    pub fn new(deps_fn: Deps, effect_fn: EffectFn) -> Self {
+    pub fn new(deps: Deps, effect_fn: EffectFn) -> Self {
         Self {
-            deps: deps_fn,
+            deps,
             effect: effect_fn,
             marker: std::marker::PhantomData,
         }
@@ -222,10 +222,10 @@ impl<
     Factory: Fn(D) -> C + Send + Sync + 'static,
 > InsertDyn<D, Deps, C, Factory>
 {
-    pub fn new(deps_fn: Deps, effect_fn: Factory) -> Self {
+    pub fn new(deps: Deps, factory: Factory) -> Self {
         Self {
-            deps: deps_fn,
-            factory: effect_fn,
+            deps,
+            factory,
             marker: std::marker::PhantomData,
         }
     }
@@ -305,4 +305,132 @@ pub fn insert_dyn<
         factory,
         marker: std::marker::PhantomData,
     }
+}
+
+/// A reaction which inserts or removes a component from a target entity whenever the condition
+/// changes.
+pub struct InsertWhenReaction<Condition: DepsFn<bool>, C: Component, Factory: Fn() -> C> {
+    target: Entity,
+    condition: Condition,
+    factory: Factory,
+}
+
+impl<
+    Condition: DepsFn<bool> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Send + Sync + 'static,
+> InsertWhenReaction<Condition, C, Factory>
+{
+    fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        let cx = Cx::new(world, self.target, tracking);
+        let cond = self.condition.call(&cx);
+
+        let mut target = world.entity_mut(self.target);
+        if cond {
+            target.insert((self.factory)());
+        } else {
+            target.remove::<C>();
+        }
+    }
+}
+
+impl<
+    Condition: DepsFn<bool> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Send + Sync + 'static,
+> Reaction for InsertWhenReaction<Condition, C, Factory>
+{
+    fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        self.apply(owner, world, tracking);
+    }
+}
+
+/// Scene element for creating [`insert_when`] reactions.
+#[derive(Clone)]
+pub struct InsertWhen<
+    Condition: DepsFn<bool> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Send + Sync + 'static,
+> {
+    condition: Condition,
+    factory: Factory,
+}
+
+impl<
+    Condition: DepsFn<bool> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Send + Sync + 'static,
+> InsertWhen<Condition, C, Factory>
+{
+    pub fn new(condition: Condition, factory: Factory) -> Self {
+        Self { condition, factory }
+    }
+}
+
+impl<
+    Condition: DepsFn<bool> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Clone + Send + Sync + 'static,
+> Template for InsertWhen<Condition, C, Factory>
+{
+    type Output = ();
+
+    fn build(&mut self, target: &mut EntityWorldMut) -> Result<Self::Output> {
+        let target_id = target.id();
+        target.world_scope(|world| {
+            // Create the reaction
+            let ticks = world.change_tick();
+            let scope = TrackingScope::new(ticks);
+            let reaction = world
+                .spawn((
+                    ReactionCell::new(InsertWhenReaction {
+                        target: target_id,
+                        condition: self.condition.clone(),
+                        factory: self.factory.clone(),
+                        // marker: PhantomData,
+                    }),
+                    scope,
+                ))
+                .id();
+
+            // Add the reaction to the target entity
+            world
+                .entity_mut(target_id)
+                .add_one_related::<OwnedBy>(reaction);
+
+            // Set up to run the reaction after creation.
+            world.commands().queue(InitialReactionCommand(reaction));
+        });
+        Ok(())
+    }
+}
+
+impl<
+    Condition: DepsFn<bool> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Clone + Send + Sync + 'static,
+> Scene for InsertWhen<Condition, C, Factory>
+{
+    fn patch(
+        &self,
+        _assets: &AssetServer,
+        _patches: &Assets<bevy::scene2::ScenePatch>,
+        scene: &mut bevy::scene2::ResolvedScene,
+    ) {
+        scene.push_template(InsertWhen {
+            condition: self.condition.clone(),
+            factory: self.factory.clone(),
+        });
+    }
+}
+
+pub fn insert_when<
+    Condition: DepsFn<bool> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Clone + Send + Sync + 'static,
+>(
+    condition: Condition,
+    factory: Factory,
+) -> impl Scene {
+    InsertWhen { condition, factory }
 }
