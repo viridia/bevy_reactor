@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bevy::{
     asset::{AssetServer, Assets},
-    ecs::template::Template,
+    ecs::{component::Component, template::Template},
     prelude::{Entity, EntityWorldMut, Result, World},
     scene2::Scene,
 };
@@ -33,11 +33,10 @@ impl<D: Copy + Send + Sync + 'static> DepsFn<D> for Signal<D> {
 /// A reaction which runs an arbitrary computation. There are two phases: the deps phase, which
 /// gathers reactive inputs, and the effect phase, which applies the computed deps value to
 /// the target entity.
-/// TODO: we want to be able to pass a signal instance as well as a function here.
-pub struct EffectCell<D, Deps: DepsFn<D>, EffectFn: Fn(&mut EntityWorldMut, D)> {
+pub struct EffectReaction<D, Deps: DepsFn<D>, EffectFn: Fn(&mut EntityWorldMut, D)> {
     target: Entity,
-    deps_fn: Deps,
-    effect_fn: EffectFn,
+    deps: Deps,
+    effect: EffectFn,
     marker: PhantomData<D>,
 }
 
@@ -45,14 +44,14 @@ impl<
     D,
     Deps: DepsFn<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
-> EffectCell<D, Deps, EffectFn>
+> EffectReaction<D, Deps, EffectFn>
 {
     fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
-        let val = self.deps_fn.call(&cx);
+        let val = self.deps.call(&cx);
 
         let mut target = world.entity_mut(self.target);
-        (self.effect_fn)(&mut target, val);
+        (self.effect)(&mut target, val);
     }
 }
 
@@ -60,22 +59,22 @@ impl<
     D,
     Deps: DepsFn<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
-> Reaction for EffectCell<D, Deps, EffectFn>
+> Reaction for EffectReaction<D, Deps, EffectFn>
 {
     fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         self.apply(owner, world, tracking);
     }
 }
 
-/// Scene element for creating [`Effect`] reactions.
+/// Scene element for creating [`effect`] reactions.
 #[derive(Clone)]
 pub struct Effect<
     D,
     Deps: DepsFn<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
 > {
-    deps_fn: Deps,
-    effect_fn: EffectFn,
+    deps: Deps,
+    effect: EffectFn,
     marker: std::marker::PhantomData<D>,
 }
 
@@ -87,8 +86,8 @@ impl<
 {
     pub fn new(deps_fn: Deps, effect_fn: EffectFn) -> Self {
         Self {
-            deps_fn,
-            effect_fn,
+            deps: deps_fn,
+            effect: effect_fn,
             marker: std::marker::PhantomData,
         }
     }
@@ -110,10 +109,10 @@ impl<
             let scope = TrackingScope::new(ticks);
             let reaction = world
                 .spawn((
-                    ReactionCell::new(EffectCell {
+                    ReactionCell::new(EffectReaction {
                         target: target_id,
-                        deps_fn: self.deps_fn.clone(),
-                        effect_fn: self.effect_fn.clone(),
+                        deps: self.deps.clone(),
+                        effect: self.effect.clone(),
                         marker: PhantomData,
                     }),
                     scope,
@@ -145,8 +144,8 @@ impl<
         scene: &mut bevy::scene2::ResolvedScene,
     ) {
         scene.push_template(Effect {
-            deps_fn: self.deps_fn.clone(),
-            effect_fn: self.effect_fn.clone(),
+            deps: self.deps.clone(),
+            effect: self.effect.clone(),
             marker: std::marker::PhantomData,
         });
     }
@@ -157,12 +156,153 @@ pub fn effect<
     Deps: DepsFn<D> + Clone + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Clone + Send + Sync + 'static,
 >(
-    deps_fn: Deps,
-    effect_fn: EffectFn,
+    deps: Deps,
+    effect: EffectFn,
 ) -> impl Scene {
     Effect {
-        deps_fn,
-        effect_fn,
+        deps,
+        effect,
+        marker: std::marker::PhantomData,
+    }
+}
+
+/// A reaction which inserts a dynamic component into the target entity.
+pub struct InsertDynReaction<D, Deps: DepsFn<D>, C: Component, Factory: Fn(D) -> C> {
+    target: Entity,
+    deps: Deps,
+    factory: Factory,
+    marker: PhantomData<D>,
+}
+
+impl<
+    D,
+    Deps: DepsFn<D> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> InsertDynReaction<D, Deps, C, Factory>
+{
+    fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        let cx = Cx::new(world, self.target, tracking);
+        let val = self.deps.call(&cx);
+
+        let mut target = world.entity_mut(self.target);
+        target.insert((self.factory)(val));
+    }
+}
+
+impl<
+    D,
+    Deps: DepsFn<D> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> Reaction for InsertDynReaction<D, Deps, C, Factory>
+{
+    fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        self.apply(owner, world, tracking);
+    }
+}
+
+/// Scene element for creating [`insert_when`] reactions.
+#[derive(Clone)]
+pub struct InsertDyn<
+    D,
+    Deps: DepsFn<D> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> {
+    deps: Deps,
+    factory: Factory,
+    marker: std::marker::PhantomData<D>,
+}
+
+impl<
+    D,
+    Deps: DepsFn<D> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> InsertDyn<D, Deps, C, Factory>
+{
+    pub fn new(deps_fn: Deps, effect_fn: Factory) -> Self {
+        Self {
+            deps: deps_fn,
+            factory: effect_fn,
+            marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<
+    D: Send + Sync + 'static,
+    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
+> Template for InsertDyn<D, Deps, C, Factory>
+{
+    type Output = ();
+
+    fn build(&mut self, target: &mut EntityWorldMut) -> Result<Self::Output> {
+        let target_id = target.id();
+        target.world_scope(|world| {
+            // Create the reaction
+            let ticks = world.change_tick();
+            let scope = TrackingScope::new(ticks);
+            let reaction = world
+                .spawn((
+                    ReactionCell::new(InsertDynReaction {
+                        target: target_id,
+                        deps: self.deps.clone(),
+                        factory: self.factory.clone(),
+                        marker: PhantomData,
+                    }),
+                    scope,
+                ))
+                .id();
+
+            // Add the reaction to the target entity
+            world
+                .entity_mut(target_id)
+                .add_one_related::<OwnedBy>(reaction);
+
+            // Set up to run the reaction after creation.
+            world.commands().queue(InitialReactionCommand(reaction));
+        });
+        Ok(())
+    }
+}
+
+impl<
+    D: Send + Sync + 'static,
+    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
+> Scene for InsertDyn<D, Deps, C, Factory>
+{
+    fn patch(
+        &self,
+        _assets: &AssetServer,
+        _patches: &Assets<bevy::scene2::ScenePatch>,
+        scene: &mut bevy::scene2::ResolvedScene,
+    ) {
+        scene.push_template(InsertDyn {
+            deps: self.deps.clone(),
+            factory: self.factory.clone(),
+            marker: std::marker::PhantomData,
+        });
+    }
+}
+
+pub fn insert_dyn<
+    D: Send + Sync + 'static,
+    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
+>(
+    deps: Deps,
+    factory: Factory,
+) -> impl Scene {
+    InsertDyn {
+        deps,
+        factory,
         marker: std::marker::PhantomData,
     }
 }

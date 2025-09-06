@@ -6,7 +6,10 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
     ui,
 };
-use bevy_reactor::{Cx, ReactorPlugin, effect::effect};
+use bevy_reactor::{
+    Cx, ReactorPlugin,
+    effect::{effect, insert_dyn},
+};
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GameState {
@@ -42,15 +45,13 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
-        effect(
+        insert_dyn(
             |cx: &Cx| *cx.resource::<State<GameState>>().get(),
-            |entity, state| {
-                entity.insert(BackgroundColor(match state {
-                    GameState::Play => css::DARK_GREEN.into(),
-                    GameState::Pause => css::DARK_GRAY.into(),
-                    GameState::Intro => css::BLUE.into(),
-                }));
-            }
+            |state| BackgroundColor(match state {
+                GameState::Play => css::DARK_GREEN.into(),
+                GameState::Pause => css::DARK_GRAY.into(),
+                GameState::Intro => css::BLUE.into(),
+            })
         )
         [
             Text("Game State: "),
