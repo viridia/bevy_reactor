@@ -26,7 +26,7 @@ impl<R> DerivedCell<R> {
 }
 
 /// A [`Derived`] is a readonly value that is computed from other signals.
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Derived<R> {
     pub(crate) id: Entity,
     pub(crate) marker: std::marker::PhantomData<R>,

@@ -1066,6 +1066,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_reactor_gizmoids"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_reactor",
+]
+
+[[package]]
 name = "bevy_reflect"
 version = "0.17.0-dev"
 source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
@@ -2161,6 +2169,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_reactor",
+ "bevy_reactor_gizmoids",
 ]
 
 [[package]]

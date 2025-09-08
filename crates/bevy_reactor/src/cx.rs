@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::{
-    Derived, Mutable, ReadDerived, ReadMutable, TrackingScope, derived::ReadDerivedInternal,
+    Derived, Mutable, ReadDerived, ReadMutable, Signal, TrackingScope, derived::ReadDerivedInternal,
 };
 
 /// Immutable reactive context, used for reactive closures such as derived signals.
@@ -143,5 +143,23 @@ impl<'p, 'w> ReadDerived for Cx<'p, 'w> {
     {
         self.world
             .read_derived_map_with_scope(derived.id, &mut self.tracking.borrow_mut(), f)
+    }
+}
+
+/// A [`Lens`] is a function or callable object which accepts a reactive context, and returns
+/// a value distilled or summarized from that context.
+pub trait Lens<D> {
+    fn call(&self, cx: &Cx) -> D;
+}
+
+impl<D, F: Fn(&Cx) -> D> Lens<D> for F {
+    fn call(&self, cx: &Cx) -> D {
+        (self)(cx)
+    }
+}
+
+impl<D: Copy + Send + Sync + 'static> Lens<D> for Signal<D> {
+    fn call(&self, cx: &Cx) -> D {
+        self.get(cx)
     }
 }

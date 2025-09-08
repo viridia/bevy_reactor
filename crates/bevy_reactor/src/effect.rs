@@ -9,31 +9,15 @@ use bevy::{
 
 use crate::{
     Cx, TrackingScope,
+    cx::Lens,
     owner::OwnedBy,
     reaction::{InitialReactionCommand, Reaction, ReactionCell},
-    signal::Signal,
 };
-
-pub trait DepsFn<D> {
-    fn call(&self, cx: &Cx) -> D;
-}
-
-impl<D, F: Fn(&Cx) -> D> DepsFn<D> for F {
-    fn call(&self, cx: &Cx) -> D {
-        (self)(cx)
-    }
-}
-
-impl<D: Copy + Send + Sync + 'static> DepsFn<D> for Signal<D> {
-    fn call(&self, cx: &Cx) -> D {
-        self.get(cx)
-    }
-}
 
 /// A reaction which runs an arbitrary computation. There are two phases: the deps phase, which
 /// gathers reactive inputs, and the effect phase, which applies the computed deps value to
 /// the target entity.
-pub struct EffectReaction<D, Deps: DepsFn<D>, EffectFn: Fn(&mut EntityWorldMut, D)> {
+pub struct EffectReaction<D, Deps: Lens<D>, EffectFn: Fn(&mut EntityWorldMut, D)> {
     target: Entity,
     deps: Deps,
     effect: EffectFn,
@@ -42,7 +26,7 @@ pub struct EffectReaction<D, Deps: DepsFn<D>, EffectFn: Fn(&mut EntityWorldMut, 
 
 impl<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
 > EffectReaction<D, Deps, EffectFn>
 {
@@ -57,7 +41,7 @@ impl<
 
 impl<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
 > Reaction for EffectReaction<D, Deps, EffectFn>
 {
@@ -70,7 +54,7 @@ impl<
 #[derive(Clone)]
 pub struct Effect<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
 > {
     deps: Deps,
@@ -80,7 +64,7 @@ pub struct Effect<
 
 impl<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
 > Effect<D, Deps, EffectFn>
 {
@@ -95,7 +79,7 @@ impl<
 
 impl<
     D: Send + Sync + 'static,
-    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    Deps: Lens<D> + Clone + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Clone + Send + Sync + 'static,
 > Template for Effect<D, Deps, EffectFn>
 {
@@ -133,7 +117,7 @@ impl<
 
 impl<
     D: Send + Sync + 'static,
-    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    Deps: Lens<D> + Clone + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Clone + Send + Sync + 'static,
 > Scene for Effect<D, Deps, EffectFn>
 {
@@ -153,7 +137,7 @@ impl<
 
 pub fn effect<
     D: Send + Sync + 'static,
-    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    Deps: Lens<D> + Clone + Send + Sync + 'static,
     EffectFn: Fn(&mut EntityWorldMut, D) + Clone + Send + Sync + 'static,
 >(
     deps: Deps,
@@ -167,7 +151,7 @@ pub fn effect<
 }
 
 /// A reaction which inserts a dynamic component into the target entity.
-pub struct InsertDynReaction<D, Deps: DepsFn<D>, C: Component, Factory: Fn(D) -> C> {
+pub struct InsertDynReaction<D, Deps: Lens<D>, C: Component, Factory: Fn(D) -> C> {
     target: Entity,
     deps: Deps,
     factory: Factory,
@@ -176,7 +160,7 @@ pub struct InsertDynReaction<D, Deps: DepsFn<D>, C: Component, Factory: Fn(D) ->
 
 impl<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
 > InsertDynReaction<D, Deps, C, Factory>
@@ -192,7 +176,7 @@ impl<
 
 impl<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
 > Reaction for InsertDynReaction<D, Deps, C, Factory>
@@ -206,7 +190,7 @@ impl<
 #[derive(Clone)]
 pub struct InsertDyn<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
 > {
@@ -217,7 +201,7 @@ pub struct InsertDyn<
 
 impl<
     D,
-    Deps: DepsFn<D> + Send + Sync + 'static,
+    Deps: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
 > InsertDyn<D, Deps, C, Factory>
@@ -233,7 +217,7 @@ impl<
 
 impl<
     D: Send + Sync + 'static,
-    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    Deps: Lens<D> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
 > Template for InsertDyn<D, Deps, C, Factory>
@@ -272,7 +256,7 @@ impl<
 
 impl<
     D: Send + Sync + 'static,
-    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    Deps: Lens<D> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
 > Scene for InsertDyn<D, Deps, C, Factory>
@@ -293,7 +277,7 @@ impl<
 
 pub fn insert_dyn<
     D: Send + Sync + 'static,
-    Deps: DepsFn<D> + Clone + Send + Sync + 'static,
+    Deps: Lens<D> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
 >(
@@ -309,14 +293,14 @@ pub fn insert_dyn<
 
 /// A reaction which inserts or removes a component from a target entity whenever the condition
 /// changes.
-pub struct InsertWhenReaction<Condition: DepsFn<bool>, C: Component, Factory: Fn() -> C> {
+pub struct InsertWhenReaction<Condition: Lens<bool>, C: Component, Factory: Fn() -> C> {
     target: Entity,
     condition: Condition,
     factory: Factory,
 }
 
 impl<
-    Condition: DepsFn<bool> + Send + Sync + 'static,
+    Condition: Lens<bool> + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Send + Sync + 'static,
 > InsertWhenReaction<Condition, C, Factory>
@@ -335,7 +319,7 @@ impl<
 }
 
 impl<
-    Condition: DepsFn<bool> + Send + Sync + 'static,
+    Condition: Lens<bool> + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Send + Sync + 'static,
 > Reaction for InsertWhenReaction<Condition, C, Factory>
@@ -348,7 +332,7 @@ impl<
 /// Scene element for creating [`insert_when`] reactions.
 #[derive(Clone)]
 pub struct InsertWhen<
-    Condition: DepsFn<bool> + Send + Sync + 'static,
+    Condition: Lens<bool> + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Send + Sync + 'static,
 > {
@@ -357,7 +341,7 @@ pub struct InsertWhen<
 }
 
 impl<
-    Condition: DepsFn<bool> + Send + Sync + 'static,
+    Condition: Lens<bool> + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Send + Sync + 'static,
 > InsertWhen<Condition, C, Factory>
@@ -368,7 +352,7 @@ impl<
 }
 
 impl<
-    Condition: DepsFn<bool> + Clone + Send + Sync + 'static,
+    Condition: Lens<bool> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Clone + Send + Sync + 'static,
 > Template for InsertWhen<Condition, C, Factory>
@@ -406,7 +390,7 @@ impl<
 }
 
 impl<
-    Condition: DepsFn<bool> + Clone + Send + Sync + 'static,
+    Condition: Lens<bool> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Clone + Send + Sync + 'static,
 > Scene for InsertWhen<Condition, C, Factory>
@@ -425,7 +409,7 @@ impl<
 }
 
 pub fn insert_when<
-    Condition: DepsFn<bool> + Clone + Send + Sync + 'static,
+    Condition: Lens<bool> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn() -> C + Clone + Send + Sync + 'static,
 >(

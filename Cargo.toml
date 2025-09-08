@@ -15,10 +15,12 @@ bevy = { git = "https://github.com/cart/bevy.git", version = "0.17.0-dev", branc
   "experimental_bevy_feathers",
 ] }
 bevy_reactor = { path = "crates/bevy_reactor" }
+bevy_reactor_gizmoids = { path = "crates/bevy_reactor_gizmoids" }
 
 [dependencies]
 bevy = { workspace = true }
 bevy_reactor = { workspace = true }
+bevy_reactor_gizmoids = { workspace = true }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

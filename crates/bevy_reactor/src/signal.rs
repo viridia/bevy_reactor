@@ -1,9 +1,9 @@
-use crate::{derived::ReadDerived, mutable::ReadMutable, Derived, Mutable};
+use crate::{Derived, Mutable, derived::ReadDerived, mutable::ReadMutable};
 
 /// What type of reactive node underlies this signal. "Signals" in this framework represent
 /// any kind of reactive data source, including mutable variables, derived signals, and memoized
 /// computations.
-#[derive(Copy)]
+#[derive(Copy, Debug)]
 pub enum Signal<T> {
     /// A mutable variable that can be read and written to.
     Mutable(Mutable<T>),

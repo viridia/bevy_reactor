@@ -3,12 +3,13 @@
 use bevy::{
     color::palettes::css,
     prelude::*,
-    scene2::{CommandsSpawnScene, bsn},
+    scene2::{CommandsSpawnScene, bsn, bsn_list},
     ui,
 };
 use bevy_reactor::{
     Cx, ReactorPlugin,
     effect::{effect, insert_dyn},
+    switch,
 };
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -68,7 +69,11 @@ fn setup_view_root(mut commands: Commands) {
                             }.into()
                         }
                     })
-            )
+            ),
+            switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
+                cases.case(GameState::Play, bsn_list!(Text("Playing")))
+                    .fallback(bsn_list!(Text("Not Playing")));
+            })
         ]
     ));
 }
