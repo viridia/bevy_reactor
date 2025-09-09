@@ -426,7 +426,7 @@ impl ShapeBuilder {
     #[inline]
     fn push_vec2_index(&mut self, v: Vec2) -> u32 {
         let index = self.vertices.len() as u32;
-        self.vertices.push(Vec3::new(v.x, v.y, 0.));
+        self.push_vertex(v.x, v.y, 0.);
         index
     }
 

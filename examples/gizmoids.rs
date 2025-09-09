@@ -10,7 +10,9 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
 };
 use bevy_reactor::{Cx, ReactorPlugin, effect};
-use bevy_reactor_gizmoids::{DrawPlane, GizmoidsPlugin, OverlayColor, ShapeBuilder, gizmoid};
+use bevy_reactor_gizmoids::{
+    DrawPlane, GizmoidsPlugin, OverlayColor, PolygonOptions, ShapeBuilder, gizmoid,
+};
 
 fn main() {
     App::new()
@@ -74,10 +76,46 @@ fn setup(
         :gizmoid(|cx: &Cx, builder: &mut ShapeBuilder| {
             let time = cx.resource::<Time>().elapsed_secs().rem_euclid(TAU);
             let size = time.sin() * 2.0 + 4.0;
+            let mut vertices: Vec<Vec2> = Vec::with_capacity(14);
+            for i in 0..7 {
+                let angle = TAU * (i as f32) / 7.0;
+                vertices.push(Vec2::new(angle.sin() * size, angle.cos() * size));
+                let angle2 = angle + TAU / 14.0;
+                vertices.push(Vec2::new(angle2.sin() * 3.0, angle2.cos() * 3.0));
+            }
             builder
-                .with_stroke_width(0.5)
+                .with_stroke_width(0.3)
                 .with_draw_plane(DrawPlane::XZ)
                 .with_offset(0.1)
+                .stroke_polygon(&vertices, PolygonOptions {
+                    closed: true,
+                    // dash_length: 0.5,
+                    // gap_length: 0.1,
+                    ..default()
+                });
+        })
+        OverlayColor {
+            base: Color::srgba(1.0, 1.0, 0.0, 0.7),
+            underlay: 0.15,
+        }
+
+        // Transform rotation animation
+        effect::effect(|cx: &Cx| {
+            // `Time` resource is always changed.
+            (cx.resource::<Time>().elapsed_secs() * 0.27).rem_euclid(TAU)
+        }, |entity, angle| {
+            if let Some(mut transform) = entity.get_mut::<Transform>() {
+                transform.rotation = Quat::from_axis_angle(Vec3::Y, angle);
+            }
+        })
+    });
+
+    commands.spawn_scene(bsn! {
+        :gizmoid(|cx: &Cx, builder: &mut ShapeBuilder| {
+            let time = cx.resource::<Time>().elapsed_secs().rem_euclid(TAU);
+            let size = time.sin() * 2.0 + 4.0;
+            builder
+                .with_stroke_width(0.5)
                 .stroke_rect(Rect::new(-size, -size, size, size));
         })
         OverlayColor {
