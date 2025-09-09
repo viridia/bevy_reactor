@@ -27,10 +27,10 @@ pub struct PolygonOptions {
     /// Whether the polygon should be closed.
     pub closed: bool,
 
-    /// Line style: length of the dash.
+    /// Line style: length of the dash. The default is f32::MAX, which means the line is solid.
     pub dash_length: f32,
 
-    /// Line style: length of the gap between dashes.
+    /// Line style: length of the gap between dashes. The default is 0.
     pub gap_length: f32,
 
     /// Marker at the start of the polyline.
@@ -88,10 +88,8 @@ pub struct ShapeBuilder {
     offset: f32,
 }
 
-// TODO: Add configuration to allow adjusting the plane in which the strokes are drawn.
-// This would be a choice of XY, XZ, YX, YZ, ZX, ZY
 impl ShapeBuilder {
-    /// Create a new `ShapeBuilder`.
+    /// Create a new [`ShapeBuilder`].
     pub fn new() -> Self {
         Self {
             vertices: Vec::new(),
@@ -345,7 +343,6 @@ impl ShapeBuilder {
                     ]);
                     v0_index = v2_index;
                     v1_index = v3_index;
-                    // todo!();
                 } else {
                     // Draw start marker and update position.
                     let marker_length = self.marker_length(options.start_marker).min(length * 0.4);

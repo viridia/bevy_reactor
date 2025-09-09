@@ -2,6 +2,7 @@ use std::f32::consts::{PI, TAU};
 
 use bevy::{
     color::palettes::{basic::SILVER, css},
+    math::VectorSpace,
     prelude::*,
     render::{
         render_asset::RenderAssetUsages,
@@ -11,7 +12,7 @@ use bevy::{
 };
 use bevy_reactor::{Cx, ReactorPlugin, effect};
 use bevy_reactor_gizmoids::{
-    DrawPlane, GizmoidsPlugin, OverlayColor, PolygonOptions, ShapeBuilder, gizmoid,
+    DrawPlane, GizmoidsPlugin, Line3dBuilder, OverlayColor, PolygonOptions, ShapeBuilder, gizmoid,
 };
 
 fn main() {
@@ -121,6 +122,28 @@ fn setup(
         OverlayColor {
             base: {css::LIME.with_alpha(0.7)},
             underlay: 0.15,
+        }
+
+        // Transform rotation animation
+        effect::effect(|cx: &Cx| {
+            // `Time` resource is always changed.
+            (cx.resource::<Time>().elapsed_secs() * 0.5).rem_euclid(TAU)
+        }, |entity, angle| {
+            if let Some(mut transform) = entity.get_mut::<Transform>() {
+                transform.rotation = Quat::from_axis_angle(Vec3::Y, angle);
+            }
+        })
+    });
+
+    commands.spawn_scene(bsn! {
+        :gizmoid(|cx: &Cx, builder: &mut Line3dBuilder| {
+            let time = cx.resource::<Time>().elapsed_secs().rem_euclid(TAU);
+            let size = time.sin() * 2.0 + 4.0;
+            builder.draw_cuboid(Vec3::ZERO, Cuboid::new(size, size, size));
+        })
+        OverlayColor {
+            base: Color::srgba(1.0, 0.0, 0.0, 0.7),
+            underlay: 0.3,
         }
 
         // Transform rotation animation

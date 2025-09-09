@@ -1,6 +1,7 @@
 //! Gizmoids: Gizmo-like dynamic meshes, but reatained and reactive.
 
 mod gizmoid;
+mod line3_builder;
 mod material;
 mod mesh_builder;
 mod shape_builder;
@@ -15,6 +16,7 @@ use bevy::{
     pbr::MaterialPlugin,
 };
 pub use gizmoid::{OverlayColor, gizmoid};
+pub use line3_builder::Line3dBuilder;
 pub use mesh_builder::MeshBuilder;
 pub use shape_builder::{DrawPlane, PolygonOptions, ShapeBuilder, StrokeMarker};
 
