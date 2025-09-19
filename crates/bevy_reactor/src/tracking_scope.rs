@@ -14,8 +14,9 @@ use crate::reaction::ReactionCell;
 /// A component that tracks the dependencies of a reactive task.
 #[derive(Component)]
 pub struct TrackingScope {
-    /// Set of components that we are currently subscribed to.
-    component_deps: HashSet<(Entity, ComponentId)>,
+    /// Set of components that we are currently subscribed to. The boolean flag indicates whether
+    /// the component was present (true) or missing (false).
+    component_deps: HashSet<(Entity, ComponentId, bool)>,
 
     /// Set of resources that we are currently subscribed to.
     resource_deps: HashSet<ComponentId>,
@@ -77,19 +78,30 @@ impl TrackingScope {
     }
 
     /// Convenience method for adding a component dependency.
-    pub(crate) fn track_component<C: Component>(&mut self, entity: Entity, world: &World) {
+    pub(crate) fn track_component<C: Component>(
+        &mut self,
+        entity: Entity,
+        world: &World,
+        present: bool,
+    ) {
         self.track_component_id(
             entity,
             world
                 .components()
                 .component_id::<C>()
                 .expect("Unknown component type"),
+            present,
         );
     }
 
     /// Convenience method for adding a component dependency by component id.
-    pub(crate) fn track_component_id(&mut self, entity: Entity, component: ComponentId) {
-        self.component_deps.insert((entity, component));
+    pub(crate) fn track_component_id(
+        &mut self,
+        entity: Entity,
+        component: ComponentId,
+        present: bool,
+    ) {
+        self.component_deps.insert((entity, component, present));
     }
 
     /// Mark the scope as changed for reasons other than a component or resource dependency.
@@ -107,12 +119,15 @@ impl TrackingScope {
     }
 
     fn components_changed(&self, world: &World, tick: Tick) -> bool {
-        self.component_deps.iter().any(|(e, c)| {
-            world.get_entity(*e).is_ok_and(|e| {
-                e.get_change_ticks_by_id(*c)
-                    .map(|ct| ct.is_changed(self.tick, tick))
-                    .unwrap_or(false)
-            })
+        self.component_deps.iter().any(|(e, c, present)| {
+            // If the entity doesn't exist, use the present value as the result
+            match world.get_entity(*e) {
+                Ok(entity) => entity
+                    .get_change_ticks_by_id(*c)
+                    .map(|ct| ct.is_changed(self.tick, tick) || !present)
+                    .unwrap_or(*present),
+                Err(_) => *present,
+            }
         })
     }
 

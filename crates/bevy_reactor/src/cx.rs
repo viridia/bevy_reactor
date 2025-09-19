@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 
 use bevy::{
-    ecs::{hierarchy::ChildOf, world::DeferredWorld},
+    ecs::{
+        hierarchy::ChildOf,
+        world::{DeferredWorld, EntityRef},
+    },
     prelude::{Component, Entity, Resource, World},
 };
 
@@ -10,8 +13,6 @@ use crate::{
 };
 
 /// Immutable reactive context, used for reactive closures such as derived signals.
-/// This is a stripped down version of [`Cx`] that does not allow creating new reactions,
-/// and which has no parameters.
 pub struct Cx<'p, 'w> {
     /// Bevy World
     pub(crate) world: &'w World,
@@ -33,6 +34,22 @@ impl<'p, 'w> Cx<'p, 'w> {
         }
     }
 
+    /// Return an [`EntityRefTracked`] for the owner or target of the current reaction.
+    pub fn owner<'a>(&'a self) -> EntityRefTracked<'a, 'p, 'w> {
+        EntityRefTracked {
+            entity: self.world.entity(self.owner),
+            cx: self,
+        }
+    }
+
+    /// Return an [`EntityRefTracked`] for the given entity.
+    pub fn entity<'a>(&'a self, entity: Entity) -> EntityRefTracked<'a, 'p, 'w> {
+        EntityRefTracked {
+            entity: self.world.entity(entity),
+            cx: self,
+        }
+    }
+
     /// Access to immutable world from reactive context.
     pub fn world(&self) -> &World {
         self.world
@@ -48,10 +65,11 @@ impl<'p, 'w> Cx<'p, 'w> {
     /// Return a reference to the Component `C` on the given entity. Calling this function
     /// adds the component as a dependency of the current tracking scope.
     pub fn component<C: Component>(&self, entity: Entity) -> Option<&C> {
+        let comp = self.world.entity(entity).get::<C>();
         self.tracking
             .borrow_mut()
-            .track_component::<C>(entity, self.world);
-        self.world.entity(entity).get::<C>()
+            .track_component::<C>(entity, self.world, comp.is_some());
+        comp
     }
 
     /// Return a reference to the Component `C` on the owner entity of the current
@@ -85,7 +103,7 @@ impl<'p, 'w> ReadMutable for Cx<'p, 'w> {
     {
         self.tracking
             .borrow_mut()
-            .track_component_id(mutable.cell, mutable.component);
+            .track_component_id(mutable.cell, mutable.component, true);
         self.world.read_mutable(mutable)
     }
 
@@ -95,7 +113,7 @@ impl<'p, 'w> ReadMutable for Cx<'p, 'w> {
     {
         self.tracking
             .borrow_mut()
-            .track_component_id(mutable.cell, mutable.component);
+            .track_component_id(mutable.cell, mutable.component, true);
         self.world.read_mutable_clone(mutable)
     }
 
@@ -105,7 +123,7 @@ impl<'p, 'w> ReadMutable for Cx<'p, 'w> {
     {
         self.tracking
             .borrow_mut()
-            .track_component_id(mutable.cell, mutable.component);
+            .track_component_id(mutable.cell, mutable.component, true);
         self.world.read_mutable_as_ref(mutable)
     }
 
@@ -115,7 +133,7 @@ impl<'p, 'w> ReadMutable for Cx<'p, 'w> {
     {
         self.tracking
             .borrow_mut()
-            .track_component_id(mutable.cell, mutable.component);
+            .track_component_id(mutable.cell, mutable.component, true);
         self.world.read_mutable_map(mutable, f)
     }
 }
@@ -161,5 +179,36 @@ impl<D, F: Fn(&Cx) -> D> Lens<D> for F {
 impl<D: Copy + Send + Sync + 'static> Lens<D> for Signal<D> {
     fn call(&self, cx: &Cx) -> D {
         self.get(cx)
+    }
+}
+
+/// Similar to [`EntityRef`], except that it also records accesses in the tracking scope.
+pub struct EntityRefTracked<'a, 'p, 'w> {
+    entity: EntityRef<'w>,
+    cx: &'a Cx<'p, 'w>,
+}
+
+impl<'a, 'p, 'w> EntityRefTracked<'a, 'p, 'w> {
+    /// Return a reference to the Component `C` on the given entity. Calling this function
+    /// adds the component as a dependency of the current tracking scope.
+    pub fn get<C: Component>(&self) -> Option<&C> {
+        let comp = self.entity.get::<C>();
+        self.cx.tracking.borrow_mut().track_component::<C>(
+            self.entity.id(),
+            self.cx.world,
+            comp.is_some(),
+        );
+        comp
+    }
+
+    /// Returns true if the entity has the given component.
+    pub fn contains<C: Component>(&self) -> bool {
+        let present = self.entity.contains::<C>();
+        self.cx.tracking.borrow_mut().track_component::<C>(
+            self.entity.id(),
+            self.cx.world,
+            present,
+        );
+        present
     }
 }

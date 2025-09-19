@@ -2,7 +2,6 @@ use std::f32::consts::{PI, TAU};
 
 use bevy::{
     color::palettes::{basic::SILVER, css},
-    math::VectorSpace,
     prelude::*,
     render::{
         render_asset::RenderAssetUsages,

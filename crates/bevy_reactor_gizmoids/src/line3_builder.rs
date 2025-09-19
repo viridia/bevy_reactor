@@ -1,9 +1,5 @@
 use bevy::{
-    math::{
-        Vec3,
-        primitives::{Cuboid, Sphere},
-    },
-    mesh::Meshable,
+    math::{Vec3, primitives::Cuboid},
     render::{
         mesh::{Indices, Mesh, PrimitiveTopology},
         primitives::MeshAabb,
@@ -182,6 +178,7 @@ impl Line3dBuilder {
     // * Cylinder
     // * Cone (possibly truncated)
     // * Tetra
+    // * HeightMap
 
     // /// Draw a stroke in the shape of a rectangle.
     // ///
