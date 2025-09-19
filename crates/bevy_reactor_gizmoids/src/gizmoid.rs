@@ -1,45 +1,13 @@
 use bevy::{
     asset::RenderAssetUsages,
-    ecs::{
-        component::Component, reflect::ReflectComponent, relationship::Relationship,
-        template::template,
-    },
+    ecs::template::template,
     pbr::{NotShadowCaster, NotShadowReceiver},
     prelude::*,
-    reflect::{Reflect, prelude::ReflectDefault},
     scene2::{Scene, bsn},
 };
 use bevy_reactor::{Cx, effect};
 
-use crate::material::{OverlayMaterial, UnderlayMaterial};
-
-/// Component that determines the fill color of the gizmoid.
-#[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
-#[reflect(Component, Default)]
-#[component(immutable)]
-pub struct OverlayColor {
-    /// Base color of gizmoid
-    pub base: Color,
-    /// Occlusion opacity, 0.0 to 1.0. This represents the opacity of the gizmoid when it is
-    /// occluded by other objects. If not present, then the gizmoid will be completely occluded
-    /// by other objects.
-    pub underlay: f32,
-}
-
-impl Default for OverlayColor {
-    fn default() -> Self {
-        Self {
-            base: Srgba::RED.into(),
-            underlay: 0.3,
-        }
-    }
-}
-
-#[derive(Component, Default, Clone, Copy)]
-pub(crate) struct GizmoidOverlay;
-
-#[derive(Component, Default, Clone, Copy)]
-pub(crate) struct GizmoidUnderlay;
+use crate::material::{HasOverlay, HasUnderlay, OverlayColor, OverlayMaterial, UnderlayMaterial};
 
 pub fn gizmoid<
     MB: crate::MeshBuilder + Default + Send + Sync + 'static,
@@ -48,12 +16,12 @@ pub fn gizmoid<
     draw: F,
 ) -> impl Scene {
     bsn! {(
-        GizmoidOverlay
+        HasOverlay
         template(|context| {
             Ok(MeshMaterial3d::<OverlayMaterial>(
                 context
                     .resource_mut::<Assets<OverlayMaterial>>()
-                    .add(OverlayMaterial { color: default() }),
+                    .add(OverlayMaterial::default()),
             ))
         })
         // This used to work.
@@ -100,57 +68,16 @@ pub fn gizmoid<
         })
 
         [
-            GizmoidUnderlay
+            HasUnderlay
             NotShadowCaster
             template(|_| Ok(NotShadowReceiver))
             template(|context| {
                 Ok(MeshMaterial3d::<UnderlayMaterial>(
                     context
                         .resource_mut::<Assets<UnderlayMaterial>>()
-                        .add(UnderlayMaterial { color: default() }),
+                        .add(UnderlayMaterial::default()),
                 ))
             })
         ]
     )}
-}
-
-#[allow(clippy::type_complexity)]
-pub(crate) fn sync_gizmoid_underlay(
-    q_overlay: Query<
-        (&Mesh3d, Ref<OverlayColor>, &MeshMaterial3d<OverlayMaterial>),
-        With<GizmoidOverlay>,
-    >,
-    q_underlay: Query<
-        (
-            Entity,
-            Option<&Mesh3d>,
-            &MeshMaterial3d<UnderlayMaterial>,
-            &ChildOf,
-        ),
-        With<GizmoidUnderlay>,
-    >,
-    mut r_overlay: ResMut<Assets<OverlayMaterial>>,
-    mut r_underlay: ResMut<Assets<UnderlayMaterial>>,
-    mut commands: Commands,
-) {
-    for (underlay_id, mesh, underlay_material, parent) in q_underlay {
-        if let Ok((parent_mesh, color, overlay_material)) = q_overlay.get(parent.get()) {
-            if mesh.is_none() {
-                commands.entity(underlay_id).insert(parent_mesh.clone());
-            }
-
-            if color.is_changed() {
-                if let Some(material) = r_overlay.get_mut(overlay_material) {
-                    material.color = color.base.into();
-                }
-
-                if let Some(material) = r_underlay.get_mut(underlay_material) {
-                    material.color = color
-                        .base
-                        .with_alpha(color.base.alpha() * color.underlay)
-                        .into();
-                }
-            }
-        }
-    }
 }

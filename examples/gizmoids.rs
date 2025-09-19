@@ -141,8 +141,9 @@ fn setup(
             builder.draw_cuboid(Vec3::ZERO, Cuboid::new(size, size, size));
         })
         OverlayColor {
-            base: Color::srgba(1.0, 0.0, 0.0, 0.7),
+            base: Color::srgba(0.1, 0.1, 0.0, 1.0),
             underlay: 0.3,
+            alpha_mode: AlphaMode::Add,
         }
 
         // Transform rotation animation

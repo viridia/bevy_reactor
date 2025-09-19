@@ -6,17 +6,15 @@ mod material;
 mod mesh_builder;
 mod shape_builder;
 
-use crate::{
-    gizmoid::sync_gizmoid_underlay,
-    material::{OverlayMaterial, UnderlayMaterial},
-};
+use crate::material::{OverlayMaterial, UnderlayMaterial};
 use bevy::{
     app::{Plugin, PostUpdate},
     asset::embedded_asset,
     pbr::MaterialPlugin,
 };
-pub use gizmoid::{OverlayColor, gizmoid};
+pub use gizmoid::gizmoid;
 pub use line3_builder::Line3dBuilder;
+pub use material::OverlayColor;
 pub use mesh_builder::MeshBuilder;
 pub use shape_builder::{DrawPlane, PolygonOptions, ShapeBuilder, StrokeMarker};
 
@@ -30,6 +28,6 @@ impl Plugin for GizmoidsPlugin {
             MaterialPlugin::<OverlayMaterial>::default(),
             MaterialPlugin::<UnderlayMaterial>::default(),
         ));
-        app.add_systems(PostUpdate, sync_gizmoid_underlay);
+        app.add_systems(PostUpdate, material::sync_underlay);
     }
 }
