@@ -1,7 +1,7 @@
 use bevy::{
     asset::RenderAssetUsages,
     ecs::template::template,
-    pbr::{NotShadowCaster, NotShadowReceiver},
+    light::{NotShadowCaster, NotShadowReceiver},
     prelude::*,
     scene2::{Scene, bsn},
 };

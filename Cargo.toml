@@ -9,18 +9,20 @@ members = ["crates/*"]
 
 [workspace.dependencies]
 # bevy = { version = "0.15.0-dev", features = ["ghost_nodes"] }
-bevy = { git = "https://github.com/cart/bevy.git", version = "0.17.0-dev", branch = "next-gen-scenes", features = [
+bevy = { git = "https://github.com/cart/bevy.git", version = "0.17.0", branch = "next-gen-scenes", features = [
   "dynamic_linking",
   "ghost_nodes",
   "experimental_bevy_feathers",
 ] }
 bevy_reactor = { path = "crates/bevy_reactor" }
 bevy_reactor_gizmoids = { path = "crates/bevy_reactor_gizmoids" }
+bevy_reactor_nodegraph = { path = "crates/bevy_reactor_nodegraph" }
 
 [dependencies]
 bevy = { workspace = true }
 bevy_reactor = { workspace = true }
 bevy_reactor_gizmoids = { workspace = true }
+bevy_reactor_nodegraph = { workspace = true }
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

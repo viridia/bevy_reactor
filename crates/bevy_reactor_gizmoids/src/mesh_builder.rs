@@ -1,4 +1,4 @@
-use bevy::render::mesh::{Mesh, PrimitiveTopology};
+use bevy::mesh::{Mesh, PrimitiveTopology};
 
 /// Trait that abstracts the construction of a mesh.
 pub trait MeshBuilder {

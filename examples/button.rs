@@ -2,12 +2,12 @@
 
 use bevy::{
     color::palettes::css,
-    core_widgets::{Activate, CallbackTemplate, CoreButton, CoreWidgetsPlugins, callback},
     input_focus::tab_navigation::TabIndex,
     picking::hover::Hovered,
     prelude::*,
     scene2::{CommandsSpawnScene, Scene, bsn},
     ui::{self, InteractionDisabled, Pressed},
+    ui_widgets::UiWidgetsPlugins,
 };
 use bevy_reactor::{Cx, ReactorPlugin, effect::insert_dyn};
 
@@ -15,7 +15,7 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(ImagePlugin::default_nearest()),
-            CoreWidgetsPlugins,
+            UiWidgetsPlugins,
             ReactorPlugin,
         ))
         .add_systems(Startup, setup_view_root)
@@ -49,9 +49,7 @@ fn setup_view_root(mut commands: Commands) {
         //     })
         // )
         [
-            (:button(callback(|_: In<Activate>| {
-                info!("Left button clicked!");
-            }))
+            (:button()
             [
                 Text("Foo")
 
@@ -68,7 +66,7 @@ const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::srgb(0.25, 0.25, 0.25);
 const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
-fn button(on_activate: CallbackTemplate<In<Activate>>) -> impl Scene {
+fn button() -> impl Scene {
     bsn! {
         Node {
             width: Val::Px(150.0),
@@ -77,9 +75,7 @@ fn button(on_activate: CallbackTemplate<In<Activate>>) -> impl Scene {
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
         }
-        CoreButton {
-            on_activate: {on_activate.clone()},
-        }
+        Button
         Hovered::default()
         TabIndex(0)
         BorderColor::all(Color::BLACK)
@@ -105,7 +101,7 @@ fn button(on_activate: CallbackTemplate<In<Activate>>) -> impl Scene {
     }
 }
 
-pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: EventWriter<AppExit>) {
+pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if input.just_pressed(KeyCode::Escape) {
         exit.write(AppExit::Success);
     }

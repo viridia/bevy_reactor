@@ -92,7 +92,7 @@ fn handle_key_input(
     }
 }
 
-pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: EventWriter<AppExit>) {
+pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if input.just_pressed(KeyCode::Escape) {
         exit.write(AppExit::Success);
     }

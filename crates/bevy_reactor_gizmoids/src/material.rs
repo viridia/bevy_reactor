@@ -12,17 +12,16 @@ use bevy::{
         system::{Commands, Query, ResMut},
         world::Ref,
     },
-    mesh::Mesh3d,
+    mesh::{Mesh3d, MeshVertexBufferLayoutRef},
     pbr::{Material, MaterialPipeline, MaterialPipelineKey, MeshMaterial3d},
     reflect::{Reflect, TypePath, prelude::ReflectDefault},
     render::{
         alpha::AlphaMode,
-        mesh::MeshVertexBufferLayoutRef,
         render_resource::{
-            AsBindGroup, CompareFunction, RenderPipelineDescriptor, ShaderRef,
-            SpecializedMeshPipelineError,
+            AsBindGroup, CompareFunction, RenderPipelineDescriptor, SpecializedMeshPipelineError,
         },
     },
+    shader::ShaderRef,
 };
 
 /// Component that determines the fill color of the gizmoid.

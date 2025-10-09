@@ -31,7 +31,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec27574c1baeb7747c802a194566b46b602461e81dc4957949580ea8da695038"
 dependencies = [
  "accesskit",
- "hashbrown",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -42,7 +42,7 @@ checksum = "bf962bfd305aed21133d06128ab3f4a6412031a5b8505534d55af869788af272"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
- "hashbrown",
+ "hashbrown 0.15.5",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -56,7 +56,7 @@ checksum = "e4cd727229c389e32c1a78fe9f74dc62d7c9fb6eac98cfa1a17efde254fb2d98"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
- "hashbrown",
+ "hashbrown 0.15.5",
  "static_assertions",
  "windows 0.61.3",
  "windows-core 0.61.2",
@@ -322,8 +322,8 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bevy"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_dylib",
  "bevy_internal",
@@ -331,8 +331,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_a11y"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "accesskit",
  "bevy_app",
@@ -343,17 +343,18 @@ dependencies = [
 
 [[package]]
 name = "bevy_android"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "android-activity",
 ]
 
 [[package]]
 name = "bevy_animation"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
+ "bevy_animation_macros",
  "bevy_app",
  "bevy_asset",
  "bevy_color",
@@ -367,7 +368,7 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "blake3",
- "derive_more 2.0.1",
+ "derive_more",
  "downcast-rs 2.0.2",
  "either",
  "petgraph",
@@ -381,12 +382,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_anti_aliasing"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+name = "bevy_animation_macros"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
+dependencies = [
+ "bevy_macro_utils",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "bevy_anti_alias"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
+ "bevy_camera",
  "bevy_core_pipeline",
  "bevy_derive",
  "bevy_diagnostic",
@@ -395,14 +407,15 @@ dependencies = [
  "bevy_math",
  "bevy_reflect",
  "bevy_render",
+ "bevy_shader",
  "bevy_utils",
  "tracing",
 ]
 
 [[package]]
 name = "bevy_app"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_derive",
  "bevy_ecs",
@@ -423,8 +436,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_asset"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "async-broadcast",
  "async-fs",
@@ -441,7 +454,7 @@ dependencies = [
  "bitflags 2.9.4",
  "blake3",
  "crossbeam-channel",
- "derive_more 2.0.1",
+ "derive_more",
  "disqualified",
  "downcast-rs 2.0.2",
  "either",
@@ -462,8 +475,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_asset_macros"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -473,8 +486,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_audio"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -490,8 +503,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_camera"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -505,7 +518,7 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "bevy_window",
- "derive_more 2.0.1",
+ "derive_more",
  "downcast-rs 2.0.2",
  "serde",
  "smallvec",
@@ -515,13 +528,13 @@ dependencies = [
 
 [[package]]
 name = "bevy_color"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_math",
  "bevy_reflect",
  "bytemuck",
- "derive_more 2.0.1",
+ "derive_more",
  "encase",
  "serde",
  "thiserror 2.0.16",
@@ -530,8 +543,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_core_pipeline"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -544,6 +557,7 @@ dependencies = [
  "bevy_platform",
  "bevy_reflect",
  "bevy_render",
+ "bevy_shader",
  "bevy_transform",
  "bevy_utils",
  "bevy_window",
@@ -556,27 +570,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_core_widgets"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
-dependencies = [
- "accesskit",
- "bevy_a11y",
- "bevy_app",
- "bevy_ecs",
- "bevy_input",
- "bevy_input_focus",
- "bevy_log",
- "bevy_math",
- "bevy_picking",
- "bevy_reflect",
- "bevy_ui",
-]
-
-[[package]]
 name = "bevy_derive"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -585,9 +581,10 @@ dependencies = [
 
 [[package]]
 name = "bevy_diagnostic"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
+ "atomic-waker",
  "bevy_app",
  "bevy_ecs",
  "bevy_platform",
@@ -601,16 +598,16 @@ dependencies = [
 
 [[package]]
 name = "bevy_dylib"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_internal",
 ]
 
 [[package]]
 name = "bevy_ecs"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "arrayvec",
  "bevy_ecs_macros",
@@ -622,7 +619,7 @@ dependencies = [
  "bitflags 2.9.4",
  "bumpalo",
  "concurrent-queue",
- "derive_more 2.0.1",
+ "derive_more",
  "downcast-rs 2.0.2",
  "fixedbitset",
  "indexmap",
@@ -637,8 +634,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_ecs_macros"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -648,8 +645,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_encase_derive"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "encase_derive_impl",
@@ -657,15 +654,15 @@ dependencies = [
 
 [[package]]
 name = "bevy_feathers"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "accesskit",
  "bevy_a11y",
  "bevy_app",
  "bevy_asset",
+ "bevy_camera",
  "bevy_color",
- "bevy_core_widgets",
  "bevy_ecs",
  "bevy_input_focus",
  "bevy_log",
@@ -675,16 +672,19 @@ dependencies = [
  "bevy_reflect",
  "bevy_render",
  "bevy_scene2",
+ "bevy_shader",
  "bevy_text",
  "bevy_ui",
  "bevy_ui_render",
+ "bevy_ui_widgets",
  "bevy_window",
+ "smol_str",
 ]
 
 [[package]]
 name = "bevy_gilrs"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -698,22 +698,25 @@ dependencies = [
 
 [[package]]
 name = "bevy_gizmos"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
+ "bevy_camera",
  "bevy_color",
  "bevy_core_pipeline",
  "bevy_ecs",
  "bevy_gizmos_macros",
  "bevy_image",
+ "bevy_light",
  "bevy_math",
  "bevy_mesh",
  "bevy_pbr",
  "bevy_reflect",
  "bevy_render",
- "bevy_sprite",
+ "bevy_shader",
+ "bevy_sprite_render",
  "bevy_time",
  "bevy_transform",
  "bevy_utils",
@@ -723,8 +726,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_gizmos_macros"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -733,8 +736,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_gltf"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "base64",
  "bevy_animation",
@@ -742,11 +745,9 @@ dependencies = [
  "bevy_asset",
  "bevy_camera",
  "bevy_color",
- "bevy_core_pipeline",
  "bevy_ecs",
  "bevy_image",
  "bevy_light",
- "bevy_log",
  "bevy_math",
  "bevy_mesh",
  "bevy_pbr",
@@ -769,8 +770,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_image"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -797,15 +798,15 @@ dependencies = [
 
 [[package]]
 name = "bevy_input"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
  "bevy_math",
  "bevy_platform",
  "bevy_reflect",
- "derive_more 2.0.1",
+ "derive_more",
  "log",
  "smol_str",
  "thiserror 2.0.16",
@@ -813,8 +814,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_input_focus"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -829,20 +830,19 @@ dependencies = [
 
 [[package]]
 name = "bevy_internal"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_a11y",
  "bevy_android",
  "bevy_animation",
- "bevy_anti_aliasing",
+ "bevy_anti_alias",
  "bevy_app",
  "bevy_asset",
  "bevy_audio",
  "bevy_camera",
  "bevy_color",
  "bevy_core_pipeline",
- "bevy_core_widgets",
  "bevy_derive",
  "bevy_diagnostic",
  "bevy_ecs",
@@ -860,6 +860,7 @@ dependencies = [
  "bevy_pbr",
  "bevy_picking",
  "bevy_platform",
+ "bevy_post_process",
  "bevy_ptr",
  "bevy_reflect",
  "bevy_render",
@@ -867,6 +868,7 @@ dependencies = [
  "bevy_scene2",
  "bevy_shader",
  "bevy_sprite",
+ "bevy_sprite_render",
  "bevy_state",
  "bevy_tasks",
  "bevy_text",
@@ -874,6 +876,7 @@ dependencies = [
  "bevy_transform",
  "bevy_ui",
  "bevy_ui_render",
+ "bevy_ui_widgets",
  "bevy_utils",
  "bevy_window",
  "bevy_winit",
@@ -881,8 +884,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_light"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -901,8 +904,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_log"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "android_log-sys",
  "bevy_app",
@@ -918,8 +921,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_macro_utils"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "parking_lot",
  "proc-macro2",
@@ -930,12 +933,12 @@ dependencies = [
 
 [[package]]
 name = "bevy_math"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "approx",
  "bevy_reflect",
- "derive_more 2.0.1",
+ "derive_more",
  "glam",
  "itertools 0.14.0",
  "libm",
@@ -949,9 +952,10 @@ dependencies = [
 
 [[package]]
 name = "bevy_mesh"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
+ "bevy_app",
  "bevy_asset",
  "bevy_derive",
  "bevy_ecs",
@@ -963,7 +967,7 @@ dependencies = [
  "bevy_transform",
  "bitflags 2.9.4",
  "bytemuck",
- "derive_more 2.0.1",
+ "derive_more",
  "hexasphere",
  "thiserror 2.0.16",
  "tracing",
@@ -978,8 +982,8 @@ checksum = "7ef8e4b7e61dfe7719bb03c884dc270cd46a82efb40f93e9933b990c5c190c59"
 
 [[package]]
 name = "bevy_pbr"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -996,11 +1000,12 @@ dependencies = [
  "bevy_platform",
  "bevy_reflect",
  "bevy_render",
+ "bevy_shader",
  "bevy_transform",
  "bevy_utils",
  "bitflags 2.9.4",
  "bytemuck",
- "derive_more 2.0.1",
+ "derive_more",
  "fixedbitset",
  "nonmax",
  "offset-allocator",
@@ -1012,8 +1017,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_picking"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1035,14 +1040,14 @@ dependencies = [
 
 [[package]]
 name = "bevy_platform"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "critical-section",
- "foldhash",
+ "foldhash 0.2.0",
  "futures-channel",
  "getrandom",
- "hashbrown",
+ "hashbrown 0.16.0",
  "js-sys",
  "portable-atomic",
  "portable-atomic-util",
@@ -1054,9 +1059,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_post_process"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
+dependencies = [
+ "bevy_app",
+ "bevy_asset",
+ "bevy_camera",
+ "bevy_color",
+ "bevy_core_pipeline",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_image",
+ "bevy_math",
+ "bevy_platform",
+ "bevy_reflect",
+ "bevy_render",
+ "bevy_shader",
+ "bevy_transform",
+ "bevy_utils",
+ "bevy_window",
+ "bitflags 2.9.4",
+ "nonmax",
+ "radsort",
+ "smallvec",
+ "thiserror 2.0.16",
+ "tracing",
+]
+
+[[package]]
 name = "bevy_ptr"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 
 [[package]]
 name = "bevy_reactor"
@@ -1074,20 +1108,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_reactor_nodegraph"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_reactor",
+]
+
+[[package]]
 name = "bevy_reflect"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "assert_type_match",
  "bevy_platform",
  "bevy_ptr",
  "bevy_reflect_derive",
  "bevy_utils",
- "derive_more 2.0.1",
+ "derive_more",
  "disqualified",
  "downcast-rs 2.0.2",
  "erased-serde",
- "foldhash",
+ "foldhash 0.2.0",
  "glam",
  "inventory",
  "petgraph",
@@ -1102,8 +1144,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_reflect_derive"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "indexmap",
@@ -1115,8 +1157,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_render"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "async-channel",
  "bevy_app",
@@ -1128,7 +1170,6 @@ dependencies = [
  "bevy_ecs",
  "bevy_encase_derive",
  "bevy_image",
- "bevy_light",
  "bevy_math",
  "bevy_mesh",
  "bevy_platform",
@@ -1142,11 +1183,10 @@ dependencies = [
  "bevy_window",
  "bitflags 2.9.4",
  "bytemuck",
- "derive_more 2.0.1",
+ "derive_more",
  "downcast-rs 2.0.2",
  "encase",
  "fixedbitset",
- "futures-lite",
  "image",
  "indexmap",
  "js-sys",
@@ -1165,8 +1205,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_render_macros"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -1176,8 +1216,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_scene"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1188,7 +1228,7 @@ dependencies = [
  "bevy_reflect",
  "bevy_transform",
  "bevy_utils",
- "derive_more 2.0.1",
+ "derive_more",
  "serde",
  "thiserror 2.0.16",
  "uuid",
@@ -1196,8 +1236,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_scene2"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1214,7 +1254,7 @@ dependencies = [
 [[package]]
 name = "bevy_scene2_macros"
 version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -1224,10 +1264,9 @@ dependencies = [
 
 [[package]]
 name = "bevy_shader"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
- "bevy_app",
  "bevy_asset",
  "bevy_platform",
  "bevy_reflect",
@@ -1241,11 +1280,36 @@ dependencies = [
 
 [[package]]
 name = "bevy_sprite"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
+ "bevy_camera",
+ "bevy_color",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_image",
+ "bevy_math",
+ "bevy_mesh",
+ "bevy_picking",
+ "bevy_reflect",
+ "bevy_text",
+ "bevy_transform",
+ "bevy_window",
+ "radsort",
+ "tracing",
+ "wgpu-types",
+]
+
+[[package]]
+name = "bevy_sprite_render"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
+dependencies = [
+ "bevy_app",
+ "bevy_asset",
+ "bevy_camera",
  "bevy_color",
  "bevy_core_pipeline",
  "bevy_derive",
@@ -1253,26 +1317,26 @@ dependencies = [
  "bevy_image",
  "bevy_math",
  "bevy_mesh",
- "bevy_picking",
  "bevy_platform",
  "bevy_reflect",
  "bevy_render",
+ "bevy_shader",
+ "bevy_sprite",
+ "bevy_text",
  "bevy_transform",
  "bevy_utils",
- "bevy_window",
  "bitflags 2.9.4",
  "bytemuck",
- "derive_more 2.0.1",
+ "derive_more",
  "fixedbitset",
  "nonmax",
- "radsort",
  "tracing",
 ]
 
 [[package]]
 name = "bevy_state"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1286,8 +1350,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_state_macros"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_macro_utils",
  "quote",
@@ -1296,8 +1360,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_tasks"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -1306,8 +1370,7 @@ dependencies = [
  "bevy_platform",
  "concurrent-queue",
  "crossbeam-queue",
- "derive_more 2.0.1",
- "futures-channel",
+ "derive_more",
  "futures-lite",
  "heapless",
  "pin-project",
@@ -1315,8 +1378,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_text"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1328,23 +1391,20 @@ dependencies = [
  "bevy_math",
  "bevy_platform",
  "bevy_reflect",
- "bevy_render",
- "bevy_sprite",
- "bevy_transform",
  "bevy_utils",
- "bevy_window",
  "cosmic-text",
  "serde",
  "smallvec",
  "sys-locale",
  "thiserror 2.0.16",
  "tracing",
+ "wgpu-types",
 ]
 
 [[package]]
 name = "bevy_time"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1357,8 +1417,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_transform"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -1367,22 +1427,22 @@ dependencies = [
  "bevy_reflect",
  "bevy_tasks",
  "bevy_utils",
- "derive_more 2.0.1",
+ "derive_more",
  "serde",
  "thiserror 2.0.16",
 ]
 
 [[package]]
 name = "bevy_ui"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "accesskit",
  "bevy_a11y",
  "bevy_app",
  "bevy_asset",
+ "bevy_camera",
  "bevy_color",
- "bevy_core_pipeline",
  "bevy_derive",
  "bevy_ecs",
  "bevy_image",
@@ -1391,13 +1451,12 @@ dependencies = [
  "bevy_picking",
  "bevy_platform",
  "bevy_reflect",
- "bevy_render",
  "bevy_sprite",
  "bevy_text",
  "bevy_transform",
  "bevy_utils",
  "bevy_window",
- "derive_more 2.0.1",
+ "derive_more",
  "smallvec",
  "taffy",
  "thiserror 2.0.16",
@@ -1407,11 +1466,12 @@ dependencies = [
 
 [[package]]
 name = "bevy_ui_render"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
+ "bevy_camera",
  "bevy_color",
  "bevy_core_pipeline",
  "bevy_derive",
@@ -1422,20 +1482,40 @@ dependencies = [
  "bevy_platform",
  "bevy_reflect",
  "bevy_render",
+ "bevy_shader",
  "bevy_sprite",
+ "bevy_sprite_render",
  "bevy_text",
  "bevy_transform",
  "bevy_ui",
  "bevy_utils",
  "bytemuck",
- "derive_more 1.0.0",
+ "derive_more",
  "tracing",
 ]
 
 [[package]]
+name = "bevy_ui_widgets"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
+dependencies = [
+ "accesskit",
+ "bevy_a11y",
+ "bevy_app",
+ "bevy_ecs",
+ "bevy_input",
+ "bevy_input_focus",
+ "bevy_log",
+ "bevy_math",
+ "bevy_picking",
+ "bevy_reflect",
+ "bevy_ui",
+]
+
+[[package]]
 name = "bevy_utils"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_platform",
  "disqualified",
@@ -1444,8 +1524,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_window"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "bevy_app",
  "bevy_asset",
@@ -1462,8 +1542,8 @@ dependencies = [
 
 [[package]]
 name = "bevy_winit"
-version = "0.17.0-dev"
-source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#05b79c229a070224c007994e5c2be8b67439d7d9"
+version = "0.17.1"
+source = "git+https://github.com/cart/bevy.git?branch=next-gen-scenes#696f4a223337270524584c9758f15b049057da8b"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -1485,7 +1565,6 @@ dependencies = [
  "bevy_window",
  "bytemuck",
  "cfg-if",
- "raw-window-handle",
  "tracing",
  "wasm-bindgen",
  "web-sys",
@@ -1982,31 +2061,11 @@ checksum = "2a2330da5de22e8a3cb63252ce2abb30116bf5265e89c0e01bc17015ce30a476"
 
 [[package]]
 name = "derive_more"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
-dependencies = [
- "derive_more-impl 1.0.0",
-]
-
-[[package]]
-name = "derive_more"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
 dependencies = [
- "derive_more-impl 2.0.1",
-]
-
-[[package]]
-name = "derive_more-impl"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "derive_more-impl",
 ]
 
 [[package]]
@@ -2170,6 +2229,7 @@ dependencies = [
  "bevy",
  "bevy_reactor",
  "bevy_reactor_gizmoids",
+ "bevy_reactor_nodegraph",
 ]
 
 [[package]]
@@ -2220,6 +2280,12 @@ name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
+
+[[package]]
+name = "foldhash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "font-types"
@@ -2497,7 +2563,7 @@ checksum = "b89c83349105e3732062a895becfc71a8f921bb71ecbbdd8ff99263e3b53a0ca"
 dependencies = [
  "bitflags 2.9.4",
  "gpu-descriptor-types",
- "hashbrown",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -2553,7 +2619,16 @@ checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
  "allocator-api2",
  "equivalent",
- "foldhash",
+ "foldhash 0.1.5",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+dependencies = [
+ "equivalent",
  "serde",
 ]
 
@@ -2611,7 +2686,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2481980430f9f78649238835720ddccc57e52df14ffce1c6f37391d61b563e9"
 dependencies = [
  "equivalent",
- "hashbrown",
+ "hashbrown 0.15.5",
  "serde",
 ]
 
@@ -2942,7 +3017,7 @@ dependencies = [
  "cfg_aliases",
  "codespan-reporting",
  "half",
- "hashbrown",
+ "hashbrown 0.15.5",
  "hexf-parse",
  "indexmap",
  "libm",
@@ -3484,7 +3559,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54acf3a685220b533e437e264e4d932cfbdc4cc7ec0cd232ed73c08d03b8a7ca"
 dependencies = [
  "fixedbitset",
- "hashbrown",
+ "hashbrown 0.15.5",
  "indexmap",
  "serde",
  "serde_derive",
@@ -4138,9 +4213,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.36.1"
+version = "0.37.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "252800745060e7b9ffb7b2badbd8b31cfa4aa2e61af879d0a3bf2a317c20217d"
+checksum = "16607d5caffd1c07ce073528f9ed972d88db15dd44023fa57142963be3feb11f"
 dependencies = [
  "libc",
  "memchr",
@@ -4758,7 +4833,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "document-features",
- "hashbrown",
+ "hashbrown 0.15.5",
  "js-sys",
  "log",
  "naga",
@@ -4786,7 +4861,7 @@ dependencies = [
  "bitflags 2.9.4",
  "cfg_aliases",
  "document-features",
- "hashbrown",
+ "hashbrown 0.15.5",
  "indexmap",
  "log",
  "naga",
@@ -4799,7 +4874,6 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.16",
  "wgpu-core-deps-apple",
- "wgpu-core-deps-emscripten",
  "wgpu-core-deps-wasm",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
@@ -4811,15 +4885,6 @@ name = "wgpu-core-deps-apple"
 version = "26.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18ae5fbde6a4cbebae38358aa73fcd6e0f15c6144b67ef5dc91ded0db125dbdf"
-dependencies = [
- "wgpu-hal",
-]
-
-[[package]]
-name = "wgpu-core-deps-emscripten"
-version = "26.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7670e390f416006f746b4600fdd9136455e3627f5bd763abf9a65daa216dd2d"
 dependencies = [
  "wgpu-hal",
 ]
@@ -4863,7 +4928,7 @@ dependencies = [
  "gpu-alloc",
  "gpu-allocator",
  "gpu-descriptor",
- "hashbrown",
+ "hashbrown 0.15.5",
  "js-sys",
  "khronos-egl",
  "libc",

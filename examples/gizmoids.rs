@@ -1,12 +1,10 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::{
+    asset::RenderAssetUsages,
     color::palettes::{basic::SILVER, css},
     prelude::*,
-    render::{
-        render_asset::RenderAssetUsages,
-        render_resource::{Extent3d, TextureDimension, TextureFormat},
-    },
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat},
     scene2::{CommandsSpawnScene, bsn},
 };
 use bevy_reactor::{Cx, ReactorPlugin, effect};

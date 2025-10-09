@@ -1,9 +1,7 @@
 use bevy::{
+    camera::primitives::MeshAabb as _,
     math::{Rect, Vec2, Vec3},
-    render::{
-        mesh::{Indices, Mesh, PrimitiveTopology},
-        primitives::MeshAabb,
-    },
+    mesh::{Indices, Mesh, PrimitiveTopology},
     utils::default,
 };
 
