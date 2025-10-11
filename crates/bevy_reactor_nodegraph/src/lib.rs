@@ -1,4 +1,10 @@
-use bevy::{app::Plugin, asset::embedded_asset, ui_render::UiMaterialPlugin};
+use bevy::{
+    app::{Plugin, PostUpdate},
+    asset::embedded_asset,
+    ecs::schedule::IntoScheduleConfigs,
+    ui::UiSystems,
+    ui_render::UiMaterialPlugin,
+};
 
 mod display;
 mod draw_path;
@@ -7,6 +13,10 @@ pub use display::EdgeDisplay;
 pub use draw_path::{DrawPathMaterial, DrawablePath, DrawablePathSegment};
 
 use display::on_insert_edge;
+
+use crate::display::update_edge_shader;
+
+// use crate::display::update_edge_shader;
 
 // use crate::display::on_add_edge;
 
@@ -19,5 +29,6 @@ impl Plugin for ReactorNodeGraphPlugin {
         app.add_plugins(UiMaterialPlugin::<DrawPathMaterial>::default());
         // app.add_observer(on_add_edge);
         app.add_observer(on_insert_edge);
+        app.add_systems(PostUpdate, update_edge_shader.after(UiSystems::Stack));
     }
 }

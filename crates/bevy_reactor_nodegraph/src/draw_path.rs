@@ -92,8 +92,12 @@ pub struct DrawPathMaterial {
     #[uniform(1)]
     pub(crate) width: f32,
 
+    /// UI Scale
+    #[uniform(2)]
+    pub(crate) scale: f32,
+
     /// Path command buffer
-    #[storage(2, read_only)]
+    #[storage(3, read_only)]
     pub(crate) path_commands: Handle<ShaderStorageBuffer>,
     // pub(crate) commands: Vec<PathCommand>,
 }
@@ -103,6 +107,7 @@ impl DrawPathMaterial {
         Self {
             color: Default::default(),
             width: 1.0,
+            scale: 1.0,
             path_commands: path_commands.clone(),
         }
     }
@@ -150,6 +155,7 @@ impl Default for DrawPathMaterial {
         Self {
             color: Default::default(),
             width: Default::default(),
+            scale: 1.0,
             path_commands: Handle::default(),
         }
     }

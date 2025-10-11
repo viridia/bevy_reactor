@@ -7,12 +7,12 @@ use bevy::{
         component::Component,
         lifecycle::Insert,
         observer::On,
+        query::{Changed, Or},
         system::{Commands, Query, ResMut},
     },
-    log::info,
     math::Vec2,
     render::storage::ShaderStorageBuffer,
-    ui::{BorderColor, Node, PositionType, UiRect, Val, px},
+    ui::{ComputedNode, ComputedUiRenderTargetInfo, Node, PositionType, Val},
     ui_render::prelude::MaterialNode,
 };
 
@@ -33,7 +33,7 @@ pub struct EdgeDisplay {
     pub color: Color,
 }
 
-pub fn on_insert_edge(
+pub(crate) fn on_insert_edge(
     insert: On<Insert, EdgeDisplay>,
     mut q_node: Query<(
         &EdgeDisplay,
@@ -71,12 +71,16 @@ pub fn on_insert_edge(
         node.top = Val::Px(bounds.min.y);
         node.width = Val::Px(bounds.width());
         node.height = Val::Px(bounds.height());
+        node.right = Val::Auto;
+        node.bottom = Val::Auto;
         node.position_type = PositionType::Absolute;
 
         match material_node {
-            Some(material_handle) => todo!(),
+            Some(material_handle) => {
+                let material = r_materials.get_mut(material_handle).unwrap();
+                material.update(&path, &mut r_bindings);
+            }
             None => {
-                info!("Adding material node {bounds:?}");
                 let buffer = r_bindings.add(ShaderStorageBuffer::default());
                 let mut material = DrawPathMaterial::new(buffer);
                 material.update(&path, &mut r_bindings);
@@ -85,14 +89,18 @@ pub fn on_insert_edge(
                     .insert(MaterialNode(r_materials.add(material)));
             }
         };
+    }
+}
 
-        // let material_id = material_node.0.id();
-        // let material = r_materials.get_mut(material_id).unwrap();
-        // material.update(&path);
-        // info!("Entity inserted");
-        node.border = UiRect::all(px(2));
-        commands
-            .entity(insert.entity)
-            .insert(BorderColor::all(Color::srgb(0.1, 0.1, 0.2)));
+pub(crate) fn update_edge_shader(
+    mut q_node: Query<
+        (&ComputedUiRenderTargetInfo, &MaterialNode<DrawPathMaterial>),
+        Or<(Changed<EdgeDisplay>, Changed<ComputedNode>)>,
+    >,
+    mut r_materials: ResMut<Assets<DrawPathMaterial>>,
+) {
+    for (render_target, material_node) in q_node.iter_mut() {
+        let material = r_materials.get_mut(material_node).unwrap();
+        material.scale = 1.0 / render_target.scale_factor();
     }
 }

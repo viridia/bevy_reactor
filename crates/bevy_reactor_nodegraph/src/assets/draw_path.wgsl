@@ -17,11 +17,14 @@ var<uniform> color: vec4<f32>;
 var<uniform> width: f32;
 
 @group(1) @binding(2)
+var<uniform> scale: f32;
+
+@group(1) @binding(3)
 var<storage> commands: array<PathCommand>;
 
 @fragment
 fn fragment(in: UiVertexOutput) -> @location(0) vec4<f32> {
-    let pt = in.size * in.uv;
+    let pt = in.size * scale * in.uv;
     let d = distance_to_path(pt);
     let a = 1.0 - smoothstep(width * 0.5 - 0.3, width * 0.5 + 0.3, d);
     return vec4<f32>(color.rgb, color.a * a);
