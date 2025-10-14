@@ -71,8 +71,9 @@ fn setup_view_root(mut commands: Commands) {
                     })
             ),
             switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
-                cases.case(GameState::Play, bsn_list!(Text("Playing")))
-                    .fallback(bsn_list!(Text("Not Playing")));
+                cases
+                    .case(GameState::Play, || bsn_list!(Text("Playing")))
+                    .fallback(|| bsn_list!(Text("Not Playing")));
             })
         ]
     ));

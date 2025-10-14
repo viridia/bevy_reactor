@@ -6,15 +6,15 @@ use bevy::{
     ui_render::UiMaterialPlugin,
 };
 
-mod display;
 mod draw_path;
+mod gesture;
+mod graph;
 
-pub use display::EdgeDisplay;
 pub use draw_path::{DrawPathMaterial, DrawablePath, DrawablePathSegment};
+pub use gesture::*;
+pub use graph::*;
 
-use display::on_insert_edge;
-
-use crate::display::update_edge_shader;
+use crate::graph::update_edge_shader;
 
 // use crate::display::update_edge_shader;
 
@@ -26,6 +26,7 @@ impl Plugin for ReactorNodeGraphPlugin {
     fn build(&self, app: &mut bevy::app::App) {
         embedded_asset!(app, "assets/draw_path.wgsl");
 
+        app.init_resource::<GestureState>();
         app.add_plugins(UiMaterialPlugin::<DrawPathMaterial>::default());
         // app.add_observer(on_add_edge);
         app.add_observer(on_insert_edge);

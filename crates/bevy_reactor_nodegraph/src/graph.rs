@@ -5,6 +5,7 @@ use bevy::{
     color::Color,
     ecs::{
         component::Component,
+        entity::Entity,
         lifecycle::Insert,
         observer::On,
         query::{Changed, Or},
@@ -18,11 +19,61 @@ use bevy::{
 
 use crate::{DrawPathMaterial, DrawablePath};
 
+/// A node graph.
+#[derive(Component, Default)]
+pub struct Graph;
+
+/// A node within a node graph.
+#[derive(Component, Default)]
+pub struct GraphNode {
+    /// The coordinates of the node's upper-left corner.
+    pub position: Vec2,
+}
+
+/// Displayed title of a graph node.
+#[derive(Component, Default)]
+pub struct GraphNodeTitle(pub String);
+
+/// Identifies the entity containing the node's content, such as widgets.
+#[derive(Component, Default)]
+pub struct GraphNodeBody;
+
+/// Marker that indicates whether this node is selected.
+#[derive(Component, Default)]
+pub struct GraphNodeSelected;
+
+/// An input terminal where connections can attach to.
+#[derive(Component, Default)]
+pub struct InputTerminal {
+    /// Color of the input terminal, which is typically used to indicate the data type of
+    /// the connector.
+    pub color: Color,
+
+    /// The name of this input. This will be displayed unless the control widget has a label
+    /// and is visible.
+    pub label: String,
+
+    /// Control to be rendered when input is not connected. Typically a slider, checkbox or
+    /// color picker.
+    pub control: Option<Entity>,
+}
+
+/// An input terminal where connections can attach to.
+#[derive(Component, Default)]
+pub struct OutputTerminal {
+    /// Color of the input terminal, which is typically used to indicate the data type of
+    /// the connector.
+    pub color: Color,
+
+    /// The name of this output.
+    pub label: String,
+}
+
 /// Displays a stroked path between two nodes.
 #[derive(Component, Clone, Default)]
 #[component(immutable)]
 #[require(Node)]
-pub struct EdgeDisplay {
+pub struct GraphEdge {
     /// Pixel position of the source terminal.
     pub src_pos: Vec2,
 
@@ -34,9 +85,9 @@ pub struct EdgeDisplay {
 }
 
 pub(crate) fn on_insert_edge(
-    insert: On<Insert, EdgeDisplay>,
+    insert: On<Insert, GraphEdge>,
     mut q_node: Query<(
-        &EdgeDisplay,
+        &GraphEdge,
         &mut Node,
         Option<&MaterialNode<DrawPathMaterial>>,
     )>,
@@ -95,7 +146,7 @@ pub(crate) fn on_insert_edge(
 pub(crate) fn update_edge_shader(
     mut q_node: Query<
         (&ComputedUiRenderTargetInfo, &MaterialNode<DrawPathMaterial>),
-        Or<(Changed<EdgeDisplay>, Changed<ComputedNode>)>,
+        Or<(Changed<GraphEdge>, Changed<ComputedNode>)>,
     >,
     mut r_materials: ResMut<Assets<DrawPathMaterial>>,
 ) {

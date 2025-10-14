@@ -6,7 +6,7 @@ use std::{
 
 use bevy::{
     prelude::*,
-    scene2::{Scene, SceneList, SpawnScene, bsn},
+    scene2::{Scene, SceneList, SpawnRelatedScenes},
     ui::experimental::GhostNode,
 };
 
@@ -17,17 +17,16 @@ use crate::{
     reaction::{InitialReactionCommand, Reaction, ReactionCell},
 };
 
-/// Trait that represents a function that can produce a [`SpawnableList`].
+/// Trait that represents a function that can produce a [`SceneList`].
 pub trait SceneListFn: Send + Sync {
     fn spawn(&self, world: &mut World, entity: Entity);
 }
 
-impl<S: SceneList> SceneListFn for S {
+impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
     fn spawn(&self, world: &mut World, entity: Entity) {
-        let parent = world.entity_mut(entity);
-        // let scene_list = world.spawn_scene(bsn!(self));
-        warn!("Scene list spawning not implemented!");
-        // self().spawn(world, entity);
+        world
+            .entity_mut(entity)
+            .spawn_related_scenes::<Children>((self)());
     }
 }
 

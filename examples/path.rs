@@ -5,7 +5,7 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
 };
 use bevy_reactor::ReactorPlugin;
-use bevy_reactor_nodegraph::{EdgeDisplay, ReactorNodeGraphPlugin};
+use bevy_reactor_nodegraph::{GraphEdge, ReactorNodeGraphPlugin};
 
 fn main() {
     App::new()
@@ -22,7 +22,7 @@ fn main() {
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
 
-    commands.spawn_scene(bsn!(EdgeDisplay {
+    commands.spawn_scene(bsn!(GraphEdge {
         src_pos: Vec2::new(10.0, 10.0),
         dst_pos: Vec2::new(180.0, 135.0),
         color: Color::srgb(1.0, 0.0, 0.0),
