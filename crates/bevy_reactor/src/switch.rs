@@ -19,14 +19,12 @@ use crate::{
 
 /// Trait that represents a function that can produce a [`SceneList`].
 pub trait SceneListFn: Send + Sync {
-    fn spawn(&self, world: &mut World, entity: Entity);
+    fn spawn(&self, parent: EntityCommands);
 }
 
 impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
-    fn spawn(&self, world: &mut World, entity: Entity) {
-        world
-            .entity_mut(entity)
-            .spawn_related_scenes::<Children>((self)());
+    fn spawn(&self, parent: EntityCommands) {
+        parent.spawn_related_scenes::<Children>((self)());
     }
 }
 
@@ -84,9 +82,9 @@ impl<Value: PartialEq + Send + Sync + 'static, SelectorFn: Lens<Value>> Reaction
             entt.despawn_related::<Children>();
             // entt.despawn_related::<Owned>();
             if index < cases.cases.len() {
-                cases.cases[index].1.spawn(world, owner);
+                cases.cases[index].1.spawn(entt);
             } else if let Some(fallback) = cases.fallback.as_mut() {
-                fallback.spawn(world, owner);
+                fallback.spawn(entt);
             };
         }
     }
