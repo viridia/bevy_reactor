@@ -1,7 +1,7 @@
 use bevy::{
     camera::primitives::MeshAabb,
     math::{Vec3, primitives::Cuboid},
-    mesh::{Indices, Mesh, Meshable, PrimitiveTopology},
+    mesh::{Indices, Mesh, PrimitiveTopology},
 };
 
 use super::mesh_builder::MeshBuilder;

@@ -74,13 +74,11 @@ impl<Value: PartialEq + Send + Sync + 'static, SelectorFn: Lens<Value>> Reaction
             .find_map(|(i, f)| if f.0 == value { Some(i) } else { None })
             .unwrap_or(usize::MAX);
 
-        // popup.insert(Node::default());
         if self.switch_index != index {
             self.switch_index = index;
             let mut commands = world.commands();
             let mut entt = commands.entity(owner);
             entt.despawn_related::<Children>();
-            // entt.despawn_related::<Owned>();
             if index < cases.cases.len() {
                 cases.cases[index].1.spawn(entt);
             } else if let Some(fallback) = cases.fallback.as_mut() {

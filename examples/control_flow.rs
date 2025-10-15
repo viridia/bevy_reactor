@@ -6,7 +6,7 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn, bsn_list},
     ui,
 };
-use bevy_reactor::{Cx, ReactorPlugin, effect::insert_dyn, switch};
+use bevy_reactor::{Cx, ReactorPlugin, switch};
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GameState {
@@ -42,19 +42,11 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
-        insert_dyn(
-            |cx: &Cx| *cx.resource::<State<GameState>>().get(),
-            |state| BackgroundColor(match state {
-                GameState::Play => css::DARK_GREEN.into(),
-                GameState::Pause => css::DARK_GRAY.into(),
-                GameState::Intro => css::BLUE.into(),
-            })
-        )
         [
             switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
                 cases
-                    .case(GameState::Play, || bsn_list!(Text("Playing")))
-                    .fallback(|| bsn_list!(Text("Not Playing")));
+                    .case(GameState::Play, || bsn_list![Text("Playing")])
+                    .fallback(|| bsn_list![Text("Not Playing")]);
             })
         ]
     ));

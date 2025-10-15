@@ -3,9 +3,10 @@ use bevy::{
     math::{Rect, Vec2},
 };
 
-/// TODO: document
+/// Where we are in the lifecycle of a drag gesture: at the start, the end, or somewhere
+/// in the middle.
 #[derive(Clone, Copy, Default, Debug, PartialEq)]
-pub enum DragAction {
+pub enum DragPhase {
     /// Indicates that we just started dragging.
     #[default]
     Start,
@@ -15,7 +16,7 @@ pub enum DragAction {
     Finish,
 }
 
-/// For a connection drag, where we are dragging from.
+/// For a connection drag gesture, where we are dragging from.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConnectionAnchor {
     /// Drag from an input terminal
@@ -28,8 +29,8 @@ pub enum ConnectionAnchor {
     EdgeSink(Entity),
 }
 
-/// For a connection drag, the current drag location.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+/// For a connection drag gesture, the current drag location - what we are hovering over.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConnectionTarget {
     /// Drag from an input terminal
     InputTerminal(Entity),
@@ -37,30 +38,29 @@ pub enum ConnectionTarget {
     OutputTerminal(Entity),
     /// Dragging the source end (connected to an output) of an existing edge.
     Location(Vec2),
-    /// Not dragging
-    #[default]
-    None,
 }
 
-/// A gesture is an object that describes the current in-progress interaction that the user
-/// is engaging in.
+/// A gesture describes the current user interaction currently in progress. A gesture typically
+/// represents some kind of drag operation, such as rectangle selection, node movement, connecting
+/// edges, or scrolling. However, this can also represent a click action, such as selecting a
+/// node or clearing the current selection.
 #[derive(Clone, Debug)]
 pub enum Gesture {
     /// Drag one or more nodes (ones that are currently selected).
     /// The arguments are the drag vector, and whether this is the final drag value.
-    Move(Vec2, DragAction),
+    Move(Vec2, DragPhase),
 
     /// Drag a node onto the graph to create it.
     Create(Vec2),
 
     /// Event sent when dragging a connection.
-    Connect(ConnectionAnchor, ConnectionTarget, DragAction),
+    Connect(ConnectionAnchor, ConnectionTarget, DragPhase),
 
-    /// Option-click to scroll the view.
+    /// Alt-click / Option-click to scroll the view.
     Scroll(Vec2),
 
     /// Select a rectangular region
-    SelectRect(Rect, DragAction),
+    SelectRect(Rect, DragPhase),
 
     /// Select the given node. If the node is already selected, does nothing. If the node is
     /// not selected, clears the selection and selects only the given node.
@@ -93,6 +93,7 @@ pub struct GraphEvent {
 }
 
 #[derive(Resource, Default)]
+#[allow(dead_code)]
 pub(crate) struct GestureState {
     /// The type of gesture currently in effect.
     // pub(crate) mode: DragMode,
@@ -100,9 +101,12 @@ pub(crate) struct GestureState {
     /// The graph we are interacting with.
     pub(crate) graph: Option<Entity>,
 
-    /// The anchor of the current drag operation.
+    /// The anchor of the current drag operation, or `None` if there's no connection drag operation
+    /// in progress.
     pub(crate) anchor: Option<ConnectionAnchor>,
 
-    /// The target of the current drag operation.
-    pub(crate) target: ConnectionTarget,
+    /// The target of the current drag operation. This will be the entity that the pointer
+    /// is hovering over, or the current pointer location coordinates if not hovering. If no
+    /// drag operation is in progress, then it's `None`.
+    pub(crate) target: Option<ConnectionTarget>,
 }

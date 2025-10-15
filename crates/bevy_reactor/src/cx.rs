@@ -166,6 +166,8 @@ impl<'p, 'w> ReadDerived for Cx<'p, 'w> {
 
 /// A [`Lens`] is a function or callable object which accepts a reactive context, and returns
 /// a value distilled or summarized from that context.
+///
+/// This trait allows us to abstract both anonymous functions and signals as reactive data sources.
 pub trait Lens<D> {
     fn call(&self, cx: &Cx) -> D;
 }

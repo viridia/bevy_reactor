@@ -12,8 +12,13 @@ use bevy::{
         system::{Commands, Query, ResMut},
     },
     math::Vec2,
+    picking::hover::Hovered,
     render::storage::ShaderStorageBuffer,
-    ui::{ComputedNode, ComputedUiRenderTargetInfo, Node, PositionType, Val},
+    scene2::{Scene, bsn},
+    ui::{
+        AlignItems, BorderColor, BorderRadius, ComputedNode, ComputedUiRenderTargetInfo, Display,
+        FlexDirection, JustifyContent, Node, PositionType, UiRect, Val, px,
+    },
     ui_render::prelude::MaterialNode,
 };
 
@@ -30,13 +35,59 @@ pub struct GraphNode {
     pub position: Vec2,
 }
 
+pub fn display_graph_node() -> impl Scene {
+    bsn! {
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            border: UiRect::all(Val::Px(5.0)),
+            justify_content: JustifyContent::Start,
+            align_items: AlignItems::Stretch,
+        }
+        // GraphNode
+        Hovered::default()
+        // TabIndex(0)
+        BorderColor::all(Color::WHITE)
+        BorderRadius::all(px(3))
+    }
+}
+
 /// Displayed title of a graph node.
-#[derive(Component, Default)]
-pub struct GraphNodeTitle(pub String);
+#[derive(Component, Default, Clone)]
+pub struct GraphNodeTitle;
+
+pub fn display_graph_node_title() -> impl Scene {
+    bsn! {
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            min_height: px(24),
+            border: {UiRect::ZERO.with_bottom(px(1.0))},
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            padding: UiRect::axes(px(4.0), px(2.0)),
+        }
+        GraphNodeTitle
+        BorderColor::all(Color::WHITE)
+    }
+}
 
 /// Identifies the entity containing the node's content, such as widgets.
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub struct GraphNodeBody;
+
+pub fn display_graph_node_body() -> impl Scene {
+    bsn! {
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Start,
+            align_items: AlignItems::Start,
+            padding: UiRect::all(px(4.0)),
+        }
+        GraphNodeBody
+    }
+}
 
 /// Marker that indicates whether this node is selected.
 #[derive(Component, Default)]
