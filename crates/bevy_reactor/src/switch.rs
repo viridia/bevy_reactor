@@ -5,6 +5,7 @@ use std::{
 };
 
 use bevy::{
+    ecs::template::TemplateContext,
     prelude::*,
     scene2::{Scene, SceneList, SpawnRelatedScenes},
     ui::experimental::GhostNode,
@@ -117,9 +118,9 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, parent: &mut EntityWorldMut) -> Result<Self::Output> {
-        let parent_id = parent.id();
-        parent.world_scope(|world| {
+    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+        let parent_id = context.entity.id();
+        context.entity.world_scope(|world| {
             let ticks = world.change_tick();
             let scope = TrackingScope::new(ticks);
             let reaction = world
@@ -154,8 +155,7 @@ impl<
 {
     fn patch(
         &self,
-        _assets: &AssetServer,
-        _patches: &Assets<bevy::scene2::ScenePatch>,
+        _context: &mut bevy::scene2::PatchContext,
         scene: &mut bevy::scene2::ResolvedScene,
     ) {
         scene.push_template(Switch {

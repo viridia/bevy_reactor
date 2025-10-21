@@ -194,6 +194,7 @@ pub(crate) fn on_insert_edge(
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn update_edge_shader(
     mut q_node: Query<
         (&ComputedUiRenderTargetInfo, &MaterialNode<DrawPathMaterial>),

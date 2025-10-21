@@ -20,7 +20,7 @@ pub fn gizmoid<
         template(|context| {
             Ok(MeshMaterial3d::<OverlayMaterial>(
                 context
-                    .resource_mut::<Assets<OverlayMaterial>>()
+                    .entity.resource_mut::<Assets<OverlayMaterial>>()
                     .add(OverlayMaterial::default()),
             ))
         })
@@ -73,7 +73,7 @@ pub fn gizmoid<
             template(|_| Ok(NotShadowReceiver))
             template(|context| {
                 Ok(MeshMaterial3d::<UnderlayMaterial>(
-                    context
+                    context.entity
                         .resource_mut::<Assets<UnderlayMaterial>>()
                         .add(UnderlayMaterial::default()),
                 ))

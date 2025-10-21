@@ -1,10 +1,12 @@
 use std::marker::PhantomData;
 
 use bevy::{
-    asset::{AssetServer, Assets},
-    ecs::{component::Component, template::Template},
+    ecs::{
+        component::Component,
+        template::{Template, TemplateContext},
+    },
     prelude::{Entity, EntityWorldMut, Result, World},
-    scene2::Scene,
+    scene2::{PatchContext, Scene},
 };
 
 use crate::{
@@ -85,9 +87,9 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut EntityWorldMut) -> Result<Self::Output> {
-        let target_id = target.id();
-        target.world_scope(|world| {
+    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+        let target_id = target.entity.id();
+        target.entity.world_scope(|world| {
             // Create the reaction
             let ticks = world.change_tick();
             let scope = TrackingScope::new(ticks);
@@ -121,12 +123,7 @@ impl<
     EffectFn: Fn(&mut EntityWorldMut, D) + Clone + Send + Sync + 'static,
 > Scene for Effect<D, Deps, EffectFn>
 {
-    fn patch(
-        &self,
-        _assets: &AssetServer,
-        _patches: &Assets<bevy::scene2::ScenePatch>,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
         scene.push_template(Effect {
             deps: self.deps.clone(),
             effect: self.effect.clone(),
@@ -224,9 +221,9 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut EntityWorldMut) -> Result<Self::Output> {
-        let target_id = target.id();
-        target.world_scope(|world| {
+    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+        let target_id = target.entity.id();
+        target.entity.world_scope(|world| {
             // Create the reaction
             let ticks = world.change_tick();
             let scope = TrackingScope::new(ticks);
@@ -261,12 +258,7 @@ impl<
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
 > Scene for InsertDyn<D, Deps, C, Factory>
 {
-    fn patch(
-        &self,
-        _assets: &AssetServer,
-        _patches: &Assets<bevy::scene2::ScenePatch>,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
         scene.push_template(InsertDyn {
             deps: self.deps.clone(),
             factory: self.factory.clone(),
@@ -359,9 +351,9 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut EntityWorldMut) -> Result<Self::Output> {
-        let target_id = target.id();
-        target.world_scope(|world| {
+    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+        let target_id = target.entity.id();
+        target.entity.world_scope(|world| {
             // Create the reaction
             let ticks = world.change_tick();
             let scope = TrackingScope::new(ticks);
@@ -395,12 +387,7 @@ impl<
     Factory: Fn() -> C + Clone + Send + Sync + 'static,
 > Scene for InsertWhen<Condition, C, Factory>
 {
-    fn patch(
-        &self,
-        _assets: &AssetServer,
-        _patches: &Assets<bevy::scene2::ScenePatch>,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
         scene.push_template(InsertWhen {
             condition: self.condition.clone(),
             factory: self.factory.clone(),
