@@ -6,7 +6,7 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn, bsn_list},
     ui,
 };
-use bevy_reactor::{Cx, ReactorPlugin, switch};
+use bevy_reactor::{Cx, ReactorPlugin, if_then_else, switch};
 
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GameState {
@@ -38,16 +38,23 @@ fn setup_view_root(mut commands: Commands) {
             right: ui::Val::Px(0.),
             position_type: ui::PositionType::Absolute,
             display: ui::Display::Flex,
-            flex_direction: ui::FlexDirection::Row,
+            flex_direction: ui::FlexDirection::Column,
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
         [
+            Text("State: "),
             switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
                 cases
                     .case(GameState::Play, || bsn_list![Text("Playing")])
                     .fallback(|| bsn_list![Text("Not Playing")]);
-            })
+            }),
+            Text(" - "),
+            if_then_else(
+                |cx: &Cx| *cx.resource::<State<GameState>>().get() == GameState::Play,
+                || bsn_list![Text("Yes: Playing")],
+                || bsn_list![Text("No: Not Playing")]
+            )
         ]
     ));
 }

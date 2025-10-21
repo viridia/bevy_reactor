@@ -14,7 +14,6 @@ use bevy::{
 use crate::{
     Cx, TrackingScope,
     cx::Lens,
-    owner::OwnedBy,
     reaction::{InitialReactionCommand, Reaction, ReactionCell},
 };
 
@@ -27,6 +26,152 @@ impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
     fn spawn(&self, parent: EntityCommands) {
         parent.spawn_related_scenes::<Children>((self)());
     }
+}
+
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
+enum IfState {
+    #[default]
+    Unset,
+    True,
+    False,
+}
+
+impl From<bool> for IfState {
+    fn from(value: bool) -> Self {
+        if value { Self::True } else { Self::False }
+    }
+}
+
+/// Conditional control-flow node that implements a C-like "if" statement.
+struct IfReaction<ConditionFn: Lens<bool>> {
+    state: IfState,
+    condition_fn: ConditionFn,
+    then_branch: Arc<dyn SceneListFn + Send + Sync>,
+    else_branch: Option<Arc<dyn SceneListFn + Send + Sync>>,
+}
+
+impl<ConditionFn: Lens<bool>> Reaction for IfReaction<ConditionFn> {
+    fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        // Run the condition and see if the result changed.
+        let cx = Cx::new(world, owner, tracking);
+        let state: IfState = self.condition_fn.call(&cx).into();
+        if self.state != state {
+            self.state = state;
+            let mut commands = world.commands();
+            let mut entt = commands.entity(owner);
+            entt.despawn_related::<Children>();
+            match state {
+                IfState::Unset => unreachable!(),
+                IfState::True => self.then_branch.spawn(entt),
+                IfState::False => {
+                    if let Some(br) = self.else_branch.as_ref() {
+                        br.spawn(entt)
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub struct IfThenElse<ConditionFn: Lens<bool>> {
+    condition_fn: ConditionFn,
+    then_branch: Arc<dyn SceneListFn + Send + Sync>,
+    else_branch: Option<Arc<dyn SceneListFn + Send + Sync>>,
+}
+
+impl<ConditionFn: Lens<bool>> IfThenElse<ConditionFn> {
+    pub fn new<
+        ThenBranch: SceneListFn + Send + Sync + 'static,
+        ElseBranch: SceneListFn + Send + Sync + 'static,
+    >(
+        condition_fn: ConditionFn,
+        then_branch: ThenBranch,
+        else_branch: Option<ElseBranch>,
+    ) -> Self {
+        Self {
+            condition_fn,
+            then_branch: Arc::new(then_branch),
+            else_branch: else_branch
+                .map(|branch| Arc::new(branch) as Arc<dyn SceneListFn + Send + Sync>),
+        }
+    }
+
+    pub fn if_only<ThenBranch: SceneListFn + Send + Sync + 'static>(
+        condition_fn: ConditionFn,
+        then_branch: ThenBranch,
+    ) -> Self {
+        Self {
+            condition_fn,
+            then_branch: Arc::new(then_branch),
+            else_branch: None,
+        }
+    }
+}
+
+impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Template for IfThenElse<ConditionFn> {
+    type Output = ();
+
+    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+        let parent_id = context.entity.id();
+        context.entity.world_scope(|world| {
+            let ticks = world.change_tick();
+            let scope = TrackingScope::new(ticks);
+            let reaction = world
+                .entity_mut(parent_id)
+                .insert((
+                    ReactionCell::new(IfReaction {
+                        state: IfState::Unset,
+                        condition_fn: self.condition_fn.clone(),
+                        then_branch: self.then_branch.clone(),
+                        else_branch: self.else_branch.clone(),
+                    }),
+                    scope,
+                    GhostNode,
+                ))
+                .id();
+
+            // Set up to run the reaction after creation.
+            world.commands().queue(InitialReactionCommand(reaction));
+        });
+
+        Ok(())
+    }
+}
+
+impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Scene for IfThenElse<ConditionFn> {
+    fn patch(
+        &self,
+        _context: &mut bevy::scene2::PatchContext,
+        scene: &mut bevy::scene2::ResolvedScene,
+    ) {
+        scene.push_template(IfThenElse {
+            condition_fn: self.condition_fn.clone(),
+            then_branch: self.then_branch.clone(),
+            else_branch: self.else_branch.clone(),
+        });
+    }
+}
+
+pub fn if_then_else<
+    ConditionFn: Lens<bool> + Clone + Send + Sync + 'static,
+    ThenBranch: SceneListFn + 'static,
+    ElseBranch: SceneListFn + 'static,
+>(
+    condition_fn: ConditionFn,
+    then_branch: ThenBranch,
+    else_branch: ElseBranch,
+) -> impl Scene {
+    IfThenElse::<ConditionFn>::new(condition_fn, then_branch, Some(else_branch))
+}
+
+pub fn if_then<
+    ConditionFn: Lens<bool> + Clone + Send + Sync + 'static,
+    ThenBranch: SceneListFn + 'static,
+>(
+    condition_fn: ConditionFn,
+    then_branch: ThenBranch,
+) -> impl Scene {
+    IfThenElse::<ConditionFn>::if_only(condition_fn, then_branch)
 }
 
 pub struct CaseBuilder<Value: Send + Sync> {
@@ -65,8 +210,8 @@ impl<Value: PartialEq + Send + Sync + 'static, SelectorFn: Lens<Value>> Reaction
 {
     fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         // Run the condition and see if the result changed.
-        let re = Cx::new(world, owner, tracking);
-        let value: Value = self.selector_fn.call(&re);
+        let cx = Cx::new(world, owner, tracking);
+        let value: Value = self.selector_fn.call(&cx);
         let mut cases = self.cases.lock().unwrap();
         let index = cases
             .cases
@@ -124,7 +269,8 @@ impl<
             let ticks = world.change_tick();
             let scope = TrackingScope::new(ticks);
             let reaction = world
-                .spawn((
+                .entity_mut(parent_id)
+                .insert((
                     ReactionCell::new(SwitchReaction {
                         cases: self.cases.clone(),
                         selector_fn: self.selector_fn.clone(),
@@ -134,11 +280,6 @@ impl<
                     GhostNode,
                 ))
                 .id();
-
-            // Add the reaction to the target entity
-            world
-                .entity_mut(parent_id)
-                .add_one_related::<OwnedBy>(reaction);
 
             // Set up to run the reaction after creation.
             world.commands().queue(InitialReactionCommand(reaction));
