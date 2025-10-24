@@ -5,28 +5,14 @@ use std::{
 };
 
 use bevy::{
-    ecs::template::TemplateContext,
-    prelude::*,
-    scene2::{Scene, SceneList, SpawnRelatedScenes},
-    ui::experimental::GhostNode,
+    ecs::template::TemplateContext, prelude::*, scene2::Scene, ui::experimental::GhostNode,
 };
 
 use crate::{
-    Cx, TrackingScope,
+    Cx, SceneListFn, TrackingScope,
     cx::Lens,
     reaction::{InitialReactionCommand, Reaction, ReactionCell},
 };
-
-/// Trait that represents a function that can produce a [`SceneList`].
-pub trait SceneListFn: Send + Sync {
-    fn spawn(&self, parent: EntityCommands);
-}
-
-impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
-    fn spawn(&self, parent: EntityCommands) {
-        parent.spawn_related_scenes::<Children>((self)());
-    }
-}
 
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 enum IfState {
