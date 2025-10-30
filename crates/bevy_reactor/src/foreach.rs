@@ -4,7 +4,7 @@ use std::{marker::PhantomData, ops::Range, sync::Arc};
 use bevy::{
     ecs::template::TemplateContext,
     prelude::*,
-    scene2::{Scene, SceneList, SpawnRelatedScenes as _},
+    scene2::{Scene, SceneList},
     ui::experimental::GhostNode,
 };
 
@@ -21,9 +21,11 @@ pub trait LoopBodyFn<Item>: Send + Sync {
     fn spawn(&self, parent: EntityWorldMut, item: &Item, index: usize);
 }
 
-impl<S: SceneList, Item, F: Fn(&Item, usize) -> S + Send + Sync + 'static> LoopBodyFn<Item> for F {
+impl<S: SceneList, Item, F: Fn(EntityWorldMut, &Item, usize) -> S + Send + Sync + 'static>
+    LoopBodyFn<Item> for F
+{
     fn spawn(&self, parent: EntityWorldMut, item: &Item, index: usize) {
-        parent.spawn_related_scenes::<Children>((self)(item, index));
+        (self)(parent, item, index);
     }
 }
 
@@ -338,8 +340,7 @@ impl<
 pub fn for_each<
     Item: Clone + PartialEq + Send + Sync + 'static,
     ItemFn: Lens<Vec<Item>> + Clone + Send + Sync + 'static,
-    S: SceneList,
-    EachFn: Fn(&Item, usize) -> S + Send + Sync + Clone + 'static,
+    EachFn: Fn(EntityWorldMut, &Item, usize) + Send + Sync + Clone + 'static,
     Fallback: SceneListFn + 'static,
 >(
     item_fn: ItemFn,
@@ -353,8 +354,7 @@ pub fn for_each_cmp<
     Item: Clone + PartialEq + Send + Sync + 'static,
     ItemFn: Lens<Vec<Item>> + Clone + Send + Sync + 'static,
     CmpFn: Fn(&Item, &Item) -> bool + Clone + Send + Sync + 'static,
-    S: SceneList,
-    EachFn: Fn(&Item, usize) -> S + Send + Sync + Clone + 'static,
+    EachFn: Fn(EntityWorldMut, &Item, usize) + Send + Sync + Clone + 'static,
     Fallback: SceneListFn + 'static,
 >(
     item_fn: ItemFn,

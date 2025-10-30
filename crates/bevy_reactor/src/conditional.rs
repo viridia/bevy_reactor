@@ -303,3 +303,125 @@ pub fn switch<
 ) -> impl Scene {
     Switch::<Value, SelectorFn>::new(selector_fn, case_fn)
 }
+
+/// Conditional control-flow node that implements a C-like "switch" statement.
+struct DynSceneReaction<
+    Value: Send + Sync + 'static,
+    ValueFn: Lens<Value>,
+    BuilderFn: Fn(EntityWorldMut, &Value),
+> {
+    value: Option<Value>,
+    value_fn: ValueFn,
+    builder_fn: BuilderFn,
+}
+
+impl<
+    Value: PartialEq + Send + Sync + 'static,
+    ValueFn: Lens<Value>,
+    BuilderFn: Fn(EntityWorldMut, &Value),
+> Reaction for DynSceneReaction<Value, ValueFn, BuilderFn>
+{
+    fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        // Run the condition and see if the result changed.
+        let cx = Cx::new(world, owner, tracking);
+        let value: Value = self.value_fn.call(&cx);
+        if let Some(ref prev_value) = self.value
+            && *prev_value == value
+        {
+            return;
+        }
+        let mut entt = world.entity_mut(owner);
+        entt.despawn_related::<Children>();
+        (self.builder_fn)(entt, &value);
+        self.value = Some(value);
+    }
+}
+
+pub struct DynScene<
+    Value: PartialEq + Send + Sync + 'static,
+    ValueFn: Lens<Value>,
+    BuilderFn: Fn(EntityWorldMut, &Value) + Clone + Send + Sync + 'static,
+> {
+    value_fn: ValueFn,
+    builder_fn: BuilderFn,
+    marker: std::marker::PhantomData<Value>,
+}
+
+impl<
+    Value: PartialEq + Send + Sync + 'static,
+    ValueFn: Lens<Value>,
+    BuilderFn: Fn(EntityWorldMut, &Value) + Clone + Send + Sync,
+> DynScene<Value, ValueFn, BuilderFn>
+{
+    pub fn new(value_fn: ValueFn, builder_fn: BuilderFn) -> Self {
+        Self {
+            value_fn,
+            builder_fn,
+            marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<
+    Value: PartialEq + Send + Sync + 'static,
+    ValueFn: Lens<Value> + Clone + Send + Sync + 'static,
+    BuilderFn: Fn(EntityWorldMut, &Value) + Clone + Send + Sync + 'static,
+> Template for DynScene<Value, ValueFn, BuilderFn>
+{
+    type Output = ();
+
+    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+        let parent_id = context.entity.id();
+        context.entity.world_scope(|world| {
+            let ticks = world.change_tick();
+            let scope = TrackingScope::new(ticks);
+            let reaction = world
+                .entity_mut(parent_id)
+                .insert((
+                    ReactionCell::new(DynSceneReaction {
+                        value: None,
+                        value_fn: self.value_fn.clone(),
+                        builder_fn: self.builder_fn.clone(),
+                    }),
+                    scope,
+                    GhostNode,
+                ))
+                .id();
+
+            // Set up to run the reaction after creation.
+            world.commands().queue(InitialReactionCommand(reaction));
+        });
+
+        Ok(())
+    }
+}
+
+impl<
+    Value: PartialEq + Send + Sync + 'static,
+    ValueFn: Lens<Value> + Clone + Send + Sync + 'static,
+    BuilderFn: Fn(EntityWorldMut, &Value) + Clone + Send + Sync + 'static,
+> Scene for DynScene<Value, ValueFn, BuilderFn>
+{
+    fn patch(
+        &self,
+        _context: &mut bevy::scene2::PatchContext,
+        scene: &mut bevy::scene2::ResolvedScene,
+    ) {
+        scene.push_template(DynScene {
+            value_fn: self.value_fn.clone(),
+            builder_fn: self.builder_fn.clone(),
+            marker: PhantomData,
+        });
+    }
+}
+
+pub fn dyn_scene<
+    Value: PartialEq + Send + Sync + 'static,
+    ValueFn: Lens<Value> + Clone + Send + Sync + 'static,
+    BuilderFn: Fn(EntityWorldMut, &Value) + Clone + Send + Sync + 'static,
+>(
+    value_fn: ValueFn,
+    builder_fn: BuilderFn,
+) -> impl Scene {
+    DynScene::<Value, ValueFn, BuilderFn>::new(value_fn, builder_fn)
+}

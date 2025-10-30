@@ -3,7 +3,7 @@
 use bevy::{
     color::palettes::css,
     prelude::*,
-    scene2::{CommandsSpawnScene, bsn, bsn_list},
+    scene2::{CommandsSpawnScene, SpawnRelatedScenes, bsn, bsn_list},
     ui,
 };
 use bevy_reactor::{Cx, ReactorPlugin, for_each};
@@ -47,19 +47,20 @@ fn setup_view_root(mut commands: Commands) {
                 |cx: &Cx| {
                     cx.resource::<List>().items.clone()
                 },
-                move |suit: &String, _index| {
+                move |parent, suit: &String, _index| {
                     let suit = suit.clone();
-                    bsn_list![
-                        (
-                            Node {
-                                border: ui::UiRect::all(ui::Val::Px(3.)),
-                            }
-                            BorderColor::all(css::GREEN)
-                            [
-                                Text::new(suit.clone()),
-                            ]
-                        )
-                    ]
+                    parent.spawn_related_scenes::<Children>(
+                        bsn_list![
+                            (
+                                Node {
+                                    border: ui::UiRect::all(ui::Val::Px(3.)),
+                                }
+                                BorderColor::all(css::GREEN)
+                                [
+                                    Text::new(suit.clone()),
+                                ]
+                            )
+                        ]);
                 },
                 || bsn_list![Text::new("No items")]
             )
