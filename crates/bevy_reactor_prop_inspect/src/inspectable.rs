@@ -176,7 +176,7 @@ impl<T: Component<Mutability = Mutable> + Reflect> InspectableRoot for Inspectab
     }
 }
 
-/// A reference to a field within an `Inspectable`. This contains information needed to
+/// A reference to a field within an `InspectableRoot`. This contains information needed to
 /// get and set the field as well as query it's type.
 #[derive(Clone)]
 pub struct Inspectable {
