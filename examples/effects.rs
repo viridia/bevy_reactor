@@ -8,7 +8,7 @@ use bevy::{
 };
 use bevy_reactor::{
     Cx, ReactorPlugin,
-    effect::{effect, insert_dyn},
+    effect::{effect, insert_computed},
     switch,
 };
 
@@ -46,7 +46,7 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
-        insert_dyn(
+        insert_computed(
             |cx: &Cx| *cx.resource::<State<GameState>>().get(),
             |state| BackgroundColor(match state {
                 GameState::Play => css::DARK_GREEN.into(),

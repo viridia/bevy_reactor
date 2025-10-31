@@ -9,7 +9,7 @@ use bevy::{
     ui::{self, InteractionDisabled, Pressed},
     ui_widgets::UiWidgetsPlugins,
 };
-use bevy_reactor::{Cx, ReactorPlugin, effect::insert_dyn};
+use bevy_reactor::{Cx, ReactorPlugin, effect::insert_computed};
 
 fn main() {
     App::new()
@@ -80,7 +80,7 @@ fn button() -> impl Scene {
         TabIndex(0)
         BorderColor::all(Color::BLACK)
         BorderRadius::MAX
-        insert_dyn(|cx: &Cx| {
+        insert_computed(|cx: &Cx| {
             let entity = cx.owner();
             match (
                 entity.contains::<InteractionDisabled>(),

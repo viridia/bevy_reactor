@@ -17,7 +17,7 @@ pub struct ValueRange<T>(pub Range<T>);
 /// This attribute can be applied to numeric fields. It can also be applied to aggregate types
 /// that have a numeric type parameter, such as an `Option<f32>` or `Vec<i8>`.
 #[derive(Debug, Clone, Reflect)]
-pub struct Precision(pub usize);
+pub struct Precision(pub i32);
 
 /// An attribute that specifies the increment and decrement step size for a numeric field.
 /// If not present, the step size will be determined from the precision. If the precision is

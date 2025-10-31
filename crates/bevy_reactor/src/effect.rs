@@ -266,7 +266,7 @@ pub fn memo_effect<
 }
 
 /// A reaction which inserts a dynamic component into the target entity.
-pub struct InsertDynReaction<D, DepsFn: Lens<D>, C: Component, Factory: Fn(D) -> C> {
+pub struct InsertComputedReaction<D, DepsFn: Lens<D>, C: Component, Factory: Fn(D) -> C> {
     target: Entity,
     deps: DepsFn,
     factory: Factory,
@@ -278,7 +278,7 @@ impl<
     DepsFn: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
-> InsertDynReaction<D, DepsFn, C, Factory>
+> InsertComputedReaction<D, DepsFn, C, Factory>
 {
     fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
@@ -294,7 +294,7 @@ impl<
     DepsFn: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
-> Reaction for InsertDynReaction<D, DepsFn, C, Factory>
+> Reaction for InsertComputedReaction<D, DepsFn, C, Factory>
 {
     fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         self.apply(owner, world, tracking);
@@ -303,7 +303,7 @@ impl<
 
 /// Scene element for creating [`insert_when`] reactions.
 #[derive(Clone)]
-pub struct InsertDyn<
+pub struct InsertComputed<
     D,
     DepsFn: Lens<D> + Send + Sync + 'static,
     C: Component,
@@ -319,7 +319,7 @@ impl<
     DepsFn: Lens<D> + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Send + Sync + 'static,
-> InsertDyn<D, DepsFn, C, Factory>
+> InsertComputed<D, DepsFn, C, Factory>
 {
     pub fn new(deps: DepsFn, factory: Factory) -> Self {
         Self {
@@ -335,7 +335,7 @@ impl<
     DepsFn: Lens<D> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
-> Template for InsertDyn<D, DepsFn, C, Factory>
+> Template for InsertComputed<D, DepsFn, C, Factory>
 {
     type Output = ();
 
@@ -347,7 +347,7 @@ impl<
             let scope = TrackingScope::new(ticks);
             let reaction = world
                 .spawn((
-                    ReactionCell::new(InsertDynReaction {
+                    ReactionCell::new(InsertComputedReaction {
                         target: target_id,
                         deps: self.deps.clone(),
                         factory: self.factory.clone(),
@@ -374,10 +374,10 @@ impl<
     DepsFn: Lens<D> + Clone + Send + Sync + 'static,
     C: Component,
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
-> Scene for InsertDyn<D, DepsFn, C, Factory>
+> Scene for InsertComputed<D, DepsFn, C, Factory>
 {
     fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
-        scene.push_template(InsertDyn {
+        scene.push_template(InsertComputed {
             deps: self.deps.clone(),
             factory: self.factory.clone(),
             marker: std::marker::PhantomData,
@@ -385,7 +385,7 @@ impl<
     }
 }
 
-pub fn insert_dyn<
+pub fn insert_computed<
     D: Send + Sync + 'static,
     DepsFn: Lens<D> + Clone + Send + Sync + 'static,
     C: Component,
@@ -394,7 +394,148 @@ pub fn insert_dyn<
     deps: DepsFn,
     factory: Factory,
 ) -> impl Scene {
-    InsertDyn {
+    InsertComputed {
+        deps,
+        factory,
+        marker: std::marker::PhantomData,
+    }
+}
+
+/// A reaction which inserts a dynamic component into the target entity.
+pub struct InsertComputedWhenReaction<D, DepsFn: Lens<Option<D>>, C: Component, Factory: Fn(D) -> C>
+{
+    target: Entity,
+    deps: DepsFn,
+    factory: Factory,
+    marker: PhantomData<D>,
+}
+
+impl<
+    D,
+    DepsFn: Lens<Option<D>> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> InsertComputedWhenReaction<D, DepsFn, C, Factory>
+{
+    fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        let cx = Cx::new(world, self.target, tracking);
+        let val = self.deps.call(&cx);
+
+        let mut target = world.entity_mut(self.target);
+        if let Some(v) = val {
+            target.insert((self.factory)(v));
+        } else {
+            target.remove::<C>();
+        }
+    }
+}
+
+impl<
+    D,
+    DepsFn: Lens<Option<D>> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> Reaction for InsertComputedWhenReaction<D, DepsFn, C, Factory>
+{
+    fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
+        self.apply(owner, world, tracking);
+    }
+}
+
+/// Scene element for creating [`insert_when`] reactions.
+#[derive(Clone)]
+pub struct InsertComputedWhen<
+    D,
+    DepsFn: Lens<Option<D>> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> {
+    deps: DepsFn,
+    factory: Factory,
+    marker: std::marker::PhantomData<D>,
+}
+
+impl<
+    D,
+    DepsFn: Lens<Option<D>> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> InsertComputedWhen<D, DepsFn, C, Factory>
+{
+    pub fn new(deps: DepsFn, factory: Factory) -> Self {
+        Self {
+            deps,
+            factory,
+            marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<
+    D: Send + Sync + 'static,
+    DepsFn: Lens<Option<D>> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
+> Template for InsertComputedWhen<D, DepsFn, C, Factory>
+{
+    type Output = ();
+
+    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+        let target_id = target.entity.id();
+        target.entity.world_scope(|world| {
+            // Create the reaction
+            let ticks = world.change_tick();
+            let scope = TrackingScope::new(ticks);
+            let reaction = world
+                .spawn((
+                    ReactionCell::new(InsertComputedWhenReaction {
+                        target: target_id,
+                        deps: self.deps.clone(),
+                        factory: self.factory.clone(),
+                        marker: PhantomData,
+                    }),
+                    scope,
+                ))
+                .id();
+
+            // Add the reaction to the target entity
+            world
+                .entity_mut(target_id)
+                .add_one_related::<OwnedBy>(reaction);
+
+            // Set up to run the reaction after creation.
+            world.commands().queue(InitialReactionCommand(reaction));
+        });
+        Ok(())
+    }
+}
+
+impl<
+    D: Send + Sync + 'static,
+    DepsFn: Lens<Option<D>> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
+> Scene for InsertComputedWhen<D, DepsFn, C, Factory>
+{
+    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
+        scene.push_template(InsertComputedWhen {
+            deps: self.deps.clone(),
+            factory: self.factory.clone(),
+            marker: std::marker::PhantomData,
+        });
+    }
+}
+
+pub fn insert_computed_when<
+    D: Send + Sync + 'static,
+    DepsFn: Lens<Option<D>> + Clone + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
+>(
+    deps: DepsFn,
+    factory: Factory,
+) -> impl Scene {
+    InsertComputedWhen {
         deps,
         factory,
         marker: std::marker::PhantomData,

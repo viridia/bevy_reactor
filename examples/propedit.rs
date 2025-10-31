@@ -13,7 +13,6 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
     ui,
 };
-// use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_prop_inspect::{
     InspectableResource, Precision, PropertyInspectorPlugin, ValueRange, property_inspector,
@@ -22,12 +21,11 @@ use bevy_reactor_prop_inspect::{
 fn main() {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(ImagePlugin::default_nearest()),
+            DefaultPlugins,
             FeathersPlugins,
             ReactorPlugin,
             PropertyInspectorPlugin,
         ))
-        // .add_plugins(WorldInspectorPlugin::new())
         .insert_resource(UiTheme(create_dark_theme()))
         .insert_resource(TestStruct {
             unlit: Some(true),
@@ -59,7 +57,7 @@ pub enum TestEnum {
 pub struct TestStruct {
     pub selected: bool,
 
-    #[reflect(@ValueRange::<f32>(0.0..1.0))]
+    #[reflect(@ValueRange::<f32>(0.0..1.0), @Precision(2))]
     pub scale: f32,
 
     pub color: Srgba,
@@ -85,24 +83,6 @@ pub struct TestStruct2 {
 #[derive(Resource, Debug, Reflect, Clone, Default)]
 pub struct TestStruct3(pub bool);
 
-// pub struct ResourcePropertyInspector<T: Resource> {
-//     marker: std::marker::PhantomData<T>,
-// }
-
-// impl<T: Resource> ResourcePropertyInspector<T> {
-//     pub fn new() -> Self {
-//         Self {
-//             marker: std::marker::PhantomData,
-//         }
-//     }
-// }
-
-// impl<T: Resource + Reflect> ViewTemplate for ResourcePropertyInspector<T> {
-//     fn create(&self, _cx: &mut Cx) -> impl IntoView {
-//         Inspector::new(Arc::<InspectableResource<T>>::default())
-//     }
-// }
-
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
     let root = Arc::new(InspectableResource::<TestStruct>::default());
@@ -121,9 +101,7 @@ fn setup_view_root(mut commands: Commands) {
         }
         ThemeBackgroundColor(tokens::WINDOW_BG)
         [
-            (
-                :property_inspector(root)
-            )
+            :property_inspector(root)
         ]
     ));
 }

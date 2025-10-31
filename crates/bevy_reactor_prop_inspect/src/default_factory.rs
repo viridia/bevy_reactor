@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
-use crate::types::{bool_editor, f32_editor};
+use crate::property_inspector::field_label;
+use crate::types::{bool_field, f32_field, f32_range_field};
 use crate::{
     Inspectable,
     InspectorFactory,
+    ValueRange,
     // inspectors::{
     //     bool::BooleanFieldInspector, color::SrgbaInspector, r#enum::EnumInspector,
     //     f32::F32FieldInspector, fallback::FallbackInspector, list::ListInspector,
@@ -27,52 +29,85 @@ impl InspectorFactory for DefaultInspectorFactory {
             return false;
         };
         match reflect.reflect_ref() {
-            ReflectRef::Struct(_) => {
-                world
-                    .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("Struct")));
-                true
-            }
+            ReflectRef::Struct(s) => match s.reflect_type_path() {
+                "bevy_color::srgba::Srgba" => {
+                    world
+                        .entity_mut(parent)
+                        .spawn_related_scenes::<Children>(bsn_list![
+                            :field_label(field),
+                            Text::new("TODO:Srgba")
+                        ]);
+                    true
+                }
+                "glam::Vec3" => {
+                    world
+                        .entity_mut(parent)
+                        .spawn_related_scenes::<Children>(bsn_list![
+                            :field_label(field),
+                            Text::new("TODO:Vec3")
+                        ]);
+                    true
+                }
+                _ => {
+                    world
+                        .entity_mut(parent)
+                        .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Struct")));
+                    true
+                }
+            },
+            //     ReflectRef::Struct(s) => match s.reflect_type_path() {
+            //         "bevy_color::srgba::Srgba" => Some(SrgbaInspector(field.clone()).into_view()),
+            //         "glam::Vec3" => Some(Vec3FieldInspector(field.clone()).into_view()),
+            //         _ => Some(NestedStruct(field.clone()).into_view()),
+            //     },
             ReflectRef::TupleStruct(_tuple_struct) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TupleStruct")));
+                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:TupleStruct")));
                 true
             }
             ReflectRef::Tuple(_tuple) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("Tuple")));
+                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Tuple")));
                 true
             }
             ReflectRef::List(_list) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("List")));
+                    .spawn_related_scenes::<Children>(bsn_list![
+                        :field_label(field),
+                        Text::new("TODO:List")
+                    ]);
                 true
             }
             ReflectRef::Array(_array) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("Array")));
+                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Array")));
                 true
             }
             ReflectRef::Map(_map) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("Map")));
+                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Map")));
                 true
             }
             ReflectRef::Set(_set) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("Set")));
+                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Set")));
                 true
             }
-            ReflectRef::Enum(_) => {
+            ReflectRef::Enum(_e) => {
+                // info!("Enum: {}", e.reflect_type_path());
+                // core::option::Option<bool>
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("Enum")));
+                    .spawn_related_scenes::<Children>(bsn_list![
+                        :field_label(field),
+                        Text::new("TODO:Enum")
+                    ]);
                 true
             }
             ReflectRef::Opaque(partial_reflect) => {
@@ -80,17 +115,29 @@ impl InspectorFactory for DefaultInspectorFactory {
                     "bool" => {
                         world
                             .entity_mut(parent)
-                            .spawn_related_scenes::<Children>(bool_editor(field));
+                            .spawn_related_scenes::<Children>(bool_field(field));
                     }
                     "f32" => {
+                        if let Some(attrs) = field.attributes {
+                            if let Some(range) = attrs.get::<ValueRange<f32>>() {
+                                world.entity_mut(parent).spawn_related_scenes::<Children>(
+                                    f32_range_field(field, range),
+                                );
+                                return true;
+                            }
+                        }
+
                         world
                             .entity_mut(parent)
-                            .spawn_related_scenes::<Children>(f32_editor(field));
+                            .spawn_related_scenes::<Children>(f32_field(field));
                     }
                     _ => {
                         world
                             .entity_mut(parent)
-                            .spawn_related_scenes::<Children>(bsn_list!(Text::new("Opaque")));
+                            .spawn_related_scenes::<Children>(bsn_list![
+                                :field_label(field),
+                                Text::new("TODO:Opaque")
+                            ]);
                     }
                 }
                 true

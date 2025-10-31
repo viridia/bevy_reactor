@@ -1,10 +1,18 @@
 use std::sync::Arc;
 
 use bevy::{
-    ecs::template::template,
+    ecs::{template::template, world::DeferredWorld},
+    feathers::{
+        constants::fonts,
+        controls::{ButtonProps, ButtonVariant, tool_button},
+        font_styles::InheritableFont,
+        theme::{ThemeFontColor, ThemedText},
+        tokens,
+    },
     prelude::*,
     reflect::{OffsetAccess, ParsedPath, ReflectKind, ReflectRef, TypeInfo},
-    scene2::{Scene, SceneList, SpawnRelatedScenes, bsn, bsn_list},
+    scene2::{Scene, SceneList, SpawnRelatedScenes, bsn, bsn_list, on},
+    ui_widgets::Activate,
 };
 use bevy_reactor::*;
 
@@ -12,7 +20,6 @@ use crate::{Inspectable, InspectableRoot, InspectorFactoryRegistry};
 
 pub fn property_inspector(subject: Arc<dyn InspectableRoot>) -> impl Scene {
     let subject_copy = subject.clone();
-    let subject_copy2 = subject.clone();
     bsn! {
         Node {
             display: Display::Flex,
@@ -40,22 +47,24 @@ pub fn property_inspector(subject: Arc<dyn InspectableRoot>) -> impl Scene {
                             tuple_members(Inspectable::from_root(subject_copy.clone())));
                     },
                     ReflectKind::List => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("List")));
+                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:List")));
                     },
                     ReflectKind::Array => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Array")));
+                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Array")));
                     },
                     ReflectKind::Map => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Map")));
+                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Map")));
                     },
                     ReflectKind::Set => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Set")));
+                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Set")));
                     },
                     ReflectKind::Enum => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Enum")));
+                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Enum")));
                     },
                     ReflectKind::Opaque => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Opaque")));
+                        builder.spawn_related_scenes::<Children>(bsn_list!(
+                            Text("Root:Opaque"))
+                        );
                     },
                 }
             })
@@ -69,7 +78,8 @@ fn struct_members(inspectable: Arc<Inspectable>) -> impl SceneList {
     fields.push(Box::new(for_each(
         move |cx: &Cx| {
             // Note: this will re-run whenever the root inspectable changes.
-            // However, the output will be memoized.
+            // However, the output will be memoized. It does mean that the list of
+            // field names is regenerated with every keystroke...
             let reflect = inspectable.reflect_tracked(cx).unwrap();
             // let info = reflect.get_represented_type_info().unwrap();
             let ReflectRef::Struct(st) = reflect.reflect_ref() else {
@@ -144,6 +154,38 @@ pub fn field_inspector(field: Arc<Inspectable>) -> impl Scene {
         move |mut builder, _value| {
             let parent = builder.id();
             let world = unsafe { builder.world_mut() };
+
+            // Unwrap `Option`
+            if let Some(reflect) = field_copy.reflect(world)
+                && let ReflectRef::Enum(enum_ref) = reflect.reflect_ref()
+                && enum_ref
+                    .reflect_type_path()
+                    .starts_with("core::option::Option")
+                && enum_ref.variant_name() != "None"
+            {
+                let mut path = field_copy.value_path.clone();
+                path.0.push(OffsetAccess {
+                    access: bevy::reflect::Access::TupleIndex(0),
+                    offset: None,
+                });
+
+                // Create a new Inspectable for the inner value.
+                let access = Arc::new(Inspectable {
+                    root: field_copy.root.clone(),
+                    name: field_copy.name.clone(),
+                    value_path: path,
+                    field_path: field_copy.value_path.clone(),
+                    can_remove: true,
+                    attributes: field_copy.attributes,
+                });
+
+                if world.resource_scope(|world, registry: Mut<InspectorFactoryRegistry>| {
+                    registry.spawn_inspector(world, parent, access)
+                }) {
+                    return;
+                }
+            };
+
             world.resource_scope(|world, registry: Mut<InspectorFactoryRegistry>| {
                 registry.spawn_inspector(world, parent, field_copy.clone());
             });
@@ -151,61 +193,54 @@ pub fn field_inspector(field: Arc<Inspectable>) -> impl Scene {
     )
 }
 
-// / Displays a inspector panel card with a title and a body.
-// #[derive(Clone, Default)]
-// pub struct PropertyInspector<Title: SceneList> {
-//     /// The content of the title section.
-//     pub title: ChildArray,
-//     /// The content of the body section.
-//     pub body: ChildArray,
-//     /// Whether the panel is expanded or not. When collapsed, only the title is shown.
-//     pub expanded: Signal<bool>,
-// }
+pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
+    let name = field.name.clone();
+    let can_remove = field.can_remove;
+    bsn! {
+        Node
+        InheritableFont {
+            font: fonts::REGULAR,
+            font_size: 14.0,
+        }
+        // ThemeFontColor(tokens::TEXT_DIM)
+        ThemeFontColor(tokens::CHECKBOX_TEXT_DISABLED)
+        [
+            if_then(move |_: &Cx| can_remove, {
+                let field = field.clone();
+                move || bsn_list![:remove_button(field.clone())]
+            }),
+            Text({name.clone()})
+            ThemedText
+        ]
+    }
+}
 
-// impl PropertyInspector {
-//     /// Create a new inspector panel with the given title and body.
-//     pub fn new() -> Self {
-//         Self::default()
-//     }
+pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
+    bsn! {
+        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        Node {
+            flex_grow: 0.0,
+            height: px(16),
+            padding: UiRect::axes(px(4), px(0)),
+        }
+        on(move |_: On<Activate>, mut world: DeferredWorld| {
+            field.remove(&mut world);
+        })
+        [
+            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")
+        ]
+    }
+}
 
-//     /// Set the title of the inspector panel.
-//     pub fn title<V: ChildViewTuple>(mut self, title: V) -> Self {
-//         self.title = title.to_child_array();
-//         self
-//     }
-
-//     /// Set the body of the inspector panel.
-//     pub fn body<V: ChildViewTuple>(mut self, body: V) -> Self {
-//         self.body = body.to_child_array();
-//         self
-//     }
-
-//     /// Set the expanded signal of the inspector panel.
-//     pub fn expanded(mut self, expanded: impl IntoSignal<bool>) -> Self {
-//         self.expanded = expanded.into_signal();
-//         self
-//     }
-// }
-
-// impl ViewTemplate for PropertyInspector {
-//     fn create(&self, _cx: &mut Cx) -> impl IntoView {
-//         let expanded = self.expanded;
-//         let body = self.body.clone();
-//         Element::<Node>::new()
-//             .style(style_inspector_panel)
-//             .children((
-//                 Element::<Node>::new()
-//                     .style((typography::text_default, style_inspector_panel_header))
-//                     .children(self.title.clone()),
-//                 Cond::new(
-//                     expanded,
-//                     move || {
-//                         Element::<Node>::new()
-//                             .style(style_inspector_panel_body)
-//                             .children(body.clone())
-//                     },
-//                     || (),
-//                 ),
-//             ))
-//     }
-// }
+/// Template which displays an icon.
+pub fn icon(image: &'static str) -> impl Scene {
+    bsn! {
+        Node {
+            height: Val::Px(14.0),
+        }
+        template(move |entity| {
+            let handle = entity.resource::<AssetServer>().load(image);
+            Ok(ImageNode::new(handle))
+        })
+    }
+}
