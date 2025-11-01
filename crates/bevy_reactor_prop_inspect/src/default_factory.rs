@@ -1,18 +1,8 @@
 use std::sync::Arc;
 
-use crate::property_inspector::field_label;
-use crate::types::{bool_field, f32_field, f32_range_field};
-use crate::{
-    Inspectable,
-    InspectorFactory,
-    ValueRange,
-    // inspectors::{
-    //     bool::BooleanFieldInspector, color::SrgbaInspector, r#enum::EnumInspector,
-    //     f32::F32FieldInspector, fallback::FallbackInspector, list::ListInspector,
-    //     r#struct::NestedStruct, tuple_struct::NestedTupleStruct, vec3::Vec3FieldInspector,
-    // },
-    // templates::{field_label::FieldLabel, field_readonly_value::FieldReadonlyValue},
-};
+use crate::property_inspector::{field_group, field_label};
+use crate::types::{bool_field, f32_field, f32_range_field, srgba_field, vec3_field};
+use crate::{Inspectable, InspectorFactory, ValueRange};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::world::World;
@@ -33,19 +23,13 @@ impl InspectorFactory for DefaultInspectorFactory {
                 "bevy_color::srgba::Srgba" => {
                     world
                         .entity_mut(parent)
-                        .spawn_related_scenes::<Children>(bsn_list![
-                            :field_label(field),
-                            Text::new("TODO:Srgba")
-                        ]);
+                        .spawn_related_scenes::<Children>(srgba_field(field));
                     true
                 }
                 "glam::Vec3" => {
                     world
                         .entity_mut(parent)
-                        .spawn_related_scenes::<Children>(bsn_list![
-                            :field_label(field),
-                            Text::new("TODO:Vec3")
-                        ]);
+                        .spawn_related_scenes::<Children>(vec3_field(field));
                     true
                 }
                 _ => {
@@ -76,8 +60,11 @@ impl InspectorFactory for DefaultInspectorFactory {
                 world
                     .entity_mut(parent)
                     .spawn_related_scenes::<Children>(bsn_list![
-                        :field_label(field),
-                        Text::new("TODO:List")
+                        :field_group
+                        [
+                            :field_label(field),
+                            Text::new("TODO:List")
+                        ]
                     ]);
                 true
             }
@@ -105,8 +92,11 @@ impl InspectorFactory for DefaultInspectorFactory {
                 world
                     .entity_mut(parent)
                     .spawn_related_scenes::<Children>(bsn_list![
-                        :field_label(field),
-                        Text::new("TODO:Enum")
+                        :field_group
+                        [
+                            :field_label(field),
+                            Text::new("TODO:Enum")
+                        ]
                     ]);
                 true
             }
@@ -135,8 +125,11 @@ impl InspectorFactory for DefaultInspectorFactory {
                         world
                             .entity_mut(parent)
                             .spawn_related_scenes::<Children>(bsn_list![
-                                :field_label(field),
-                                Text::new("TODO:Opaque")
+                                :field_group
+                                [
+                                    :field_label(field),
+                                    Text::new("TODO:Opaque")
+                                ]
                             ]);
                     }
                 }

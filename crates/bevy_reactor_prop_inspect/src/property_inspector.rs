@@ -24,7 +24,7 @@ pub fn property_inspector(subject: Arc<dyn InspectableRoot>) -> impl Scene {
         Node {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
-            row_gap: px(2),
+            row_gap: px(4),
             min_height: px(10),
             min_width: px(10)
         }
@@ -191,6 +191,17 @@ pub fn field_inspector(field: Arc<Inspectable>) -> impl Scene {
             });
         },
     )
+}
+
+pub fn field_group() -> impl Scene {
+    bsn! {
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Stretch,
+            row_gap: px(0),
+        }
+    }
 }
 
 pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
