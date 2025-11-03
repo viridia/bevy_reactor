@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bevy::reflect::{Access, DynamicList, List as _, OffsetAccess, ReflectMut};
 use bevy::{
     ecs::{
         component::{Component, Mutable},
@@ -7,6 +8,7 @@ use bevy::{
         resource::Resource,
         world::{DeferredWorld, World},
     },
+    log::info,
     reflect::{
         DynamicEnum, DynamicVariant, GetPath, ParsedPath, PartialReflect, Reflect,
         ReflectPathError, attributes::CustomAttributes,
@@ -192,6 +194,8 @@ pub struct Inspectable {
     pub(crate) value_path: ParsedPath,
     /// If true, then the field can be removed from it's parent.
     pub(crate) can_remove: bool,
+    /// If true, then the field can be moved up and down relative to its siblings.
+    pub(crate) can_move: bool,
     /// Custom attributes for the field
     pub(crate) attributes: Option<&'static CustomAttributes>,
 }
@@ -204,6 +208,7 @@ impl Inspectable {
             field_path: ParsedPath(Vec::default()),
             value_path: ParsedPath(Vec::default()),
             can_remove: false,
+            can_move: false,
             attributes: None,
         })
     }
@@ -250,7 +255,21 @@ impl Inspectable {
             bevy::reflect::TypeInfo::Struct(_) => todo!(),
             bevy::reflect::TypeInfo::TupleStruct(_) => todo!(),
             bevy::reflect::TypeInfo::Tuple(_) => todo!(),
-            bevy::reflect::TypeInfo::List(_) => todo!(),
+            bevy::reflect::TypeInfo::List(_) => {
+                if let Some(access) = self.value_path.0.last()
+                    && let Access::ListIndex(idx) = access.access
+                {
+                    self.root.update_value(world, &self.field_path, &|list| {
+                        if let ReflectMut::List(list_data) = list.reflect_mut() {
+                            list_data.remove(idx);
+                        } else {
+                            panic!("Can't mutate list");
+                        }
+                    });
+                }
+                // if let Some(dyn_list) = list.dyn
+                // info!("Remove from list");
+            }
             bevy::reflect::TypeInfo::Array(_) => todo!(),
             bevy::reflect::TypeInfo::Map(_) => todo!(),
             bevy::reflect::TypeInfo::Set(_) => todo!(),

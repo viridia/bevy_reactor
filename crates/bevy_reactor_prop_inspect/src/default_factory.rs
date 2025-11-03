@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::property_inspector::{field_group, field_label};
-use crate::types::{bool_field, f32_field, f32_range_field, srgba_field, vec3_field};
+use crate::types::{bool_field, f32_field, f32_range_field, list_field, srgba_field, vec3_field};
 use crate::{Inspectable, InspectorFactory, ValueRange};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
@@ -56,16 +56,10 @@ impl InspectorFactory for DefaultInspectorFactory {
                     .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Tuple")));
                 true
             }
-            ReflectRef::List(_list) => {
+            ReflectRef::List(_) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list![
-                        :field_group
-                        [
-                            :field_label(field),
-                            Text::new("TODO:List")
-                        ]
-                    ]);
+                    .spawn_related_scenes::<Children>(list_field(field));
                 true
             }
             ReflectRef::Array(_array) => {

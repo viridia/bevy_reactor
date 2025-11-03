@@ -65,9 +65,9 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
                         return value.y;
                     }
                     0.0
-                }, |entity, x| {
+                }, |entity, y| {
                     if let Some(mut text) = entity.get_mut::<Text>() {
-                        text.0 = format!("{x}");
+                        text.0 = format!("{y}");
                     }
                 }),
 
@@ -80,9 +80,9 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
                         return value.z;
                     }
                     0.0
-                }, |entity, x| {
+                }, |entity, z| {
                     if let Some(mut text) = entity.get_mut::<Text>() {
-                        text.0 = format!("{x}");
+                        text.0 = format!("{z}");
                     }
                 }),
             ]

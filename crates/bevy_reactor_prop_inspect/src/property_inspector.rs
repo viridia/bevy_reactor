@@ -128,6 +128,7 @@ fn struct_members(inspectable: Arc<Inspectable>) -> impl SceneList {
                 field_path,
                 value_path,
                 can_remove: false,
+                can_move: false,
                 attributes: Some(attrs),
             });
             parent.spawn_related_scenes::<Children>(bsn_list!(
@@ -150,7 +151,11 @@ fn tuple_members(_inspectable: Arc<Inspectable>) -> impl SceneList {
 pub fn field_inspector(field: Arc<Inspectable>) -> impl Scene {
     let field_copy = field.clone();
     dyn_scene(
-        move |cx: &Cx| field.reflect_tracked(cx).unwrap().reflect_kind().to_owned(),
+        move |cx: &Cx| {
+            field
+                .reflect_tracked(cx)
+                .map(|r| r.reflect_kind().to_owned())
+        },
         move |mut builder, _value| {
             let parent = builder.id();
             let world = unsafe { builder.world_mut() };
@@ -176,6 +181,7 @@ pub fn field_inspector(field: Arc<Inspectable>) -> impl Scene {
                     value_path: path,
                     field_path: field_copy.value_path.clone(),
                     can_remove: true,
+                    can_move: false,
                     attributes: field_copy.attributes,
                 });
 
@@ -207,8 +213,13 @@ pub fn field_group() -> impl Scene {
 pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
     let name = field.name.clone();
     let can_remove = field.can_remove;
+    let can_move = field.can_move;
     bsn! {
-        Node
+        Node {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            column_gap: px(2),
+        }
         InheritableFont {
             font: fonts::REGULAR,
             font_size: 14.0,
@@ -216,12 +227,25 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
         // ThemeFontColor(tokens::TEXT_DIM)
         ThemeFontColor(tokens::CHECKBOX_TEXT_DISABLED)
         [
+            Text({name.clone()})
+            ThemedText,
+
+            :flex_spacer,
+
+            if_then(move |_: &Cx| can_move, {
+                let field = field.clone();
+                move || bsn_list![:move_up_button(field.clone())]
+            }),
+
+            if_then(move |_: &Cx| can_move, {
+                let field = field.clone();
+                move || bsn_list![:move_down_button(field.clone())]
+            }),
+
             if_then(move |_: &Cx| can_remove, {
                 let field = field.clone();
                 move || bsn_list![:remove_button(field.clone())]
             }),
-            Text({name.clone()})
-            ThemedText
         ]
     }
 }
@@ -232,7 +256,7 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
         Node {
             flex_grow: 0.0,
             height: px(16),
-            padding: UiRect::axes(px(4), px(0)),
+            padding: UiRect::axes(px(2), px(0)),
         }
         on(move |_: On<Activate>, mut world: DeferredWorld| {
             field.remove(&mut world);
@@ -240,6 +264,64 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
         [
             :icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")
         ]
+    }
+}
+
+pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
+    bsn! {
+        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        Node {
+            flex_grow: 0.0,
+            height: px(16),
+            padding: UiRect::axes(px(2), px(0)),
+        }
+        on(move |_: On<Activate>, mut _world: DeferredWorld| {
+            info!("TODO: Move up")
+            // field.remove(&mut world);
+        })
+        [
+            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png")
+        ]
+    }
+}
+
+pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
+    bsn! {
+        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        Node {
+            flex_grow: 0.0,
+            height: px(16),
+            padding: UiRect::axes(px(2), px(0)),
+        }
+        on(move |_: On<Activate>, mut _world: DeferredWorld| {
+            info!("TODO: Move down")
+            // field.remove(&mut world);
+        })
+        [
+            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png")
+        ]
+    }
+}
+
+pub fn add_button() -> impl Scene {
+    bsn! {
+        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        Node {
+            flex_grow: 0.0,
+            height: px(16),
+            padding: UiRect::axes(px(4), px(0)),
+        }
+        [
+            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png")
+        ]
+    }
+}
+
+pub fn flex_spacer() -> impl Scene {
+    bsn! {
+        Node {
+            flex_grow: 1.0,
+        }
     }
 }
 
