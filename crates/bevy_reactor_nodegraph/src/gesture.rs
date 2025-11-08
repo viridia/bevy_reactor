@@ -82,14 +82,25 @@ pub enum Gesture {
     Cancel,
 }
 
-/// An event generated when the user interacts with the graph.
+// / An event generated when the user interacts with the graph.
+// #[derive(Clone, EntityEvent, Debug)]
+// pub struct GraphEvent {
+//     /// Event target
+//     #[event_target]
+//     pub target: Entity,
+//     /// The type of gesture.
+//     pub gesture: Gesture,
+// }
+
+/// Event triggered when moving nodes by dragging. All selected nodes will have their
+/// [`GraphNodeOffset`] components updated before the first event is dispatched.
 #[derive(Clone, EntityEvent, Debug)]
-pub struct GraphEvent {
-    /// Event target
+pub struct MoveNodesEvent {
+    /// Graph being edited
     #[event_target]
-    pub target: Entity,
-    /// The type of gesture.
-    pub gesture: Gesture,
+    pub graph: Entity,
+    /// Relative drag position
+    pub distance: Vec2,
 }
 
 #[derive(Resource, Default)]
@@ -100,6 +111,9 @@ pub(crate) struct GestureState {
 
     /// The graph we are interacting with.
     pub(crate) graph: Option<Entity>,
+
+    /// The graph node we are interacting with.
+    pub(crate) node: Option<Entity>,
 
     /// The anchor of the current drag operation, or `None` if there's no connection drag operation
     /// in progress.

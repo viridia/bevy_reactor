@@ -30,6 +30,12 @@ impl Plugin for ReactorNodeGraphPlugin {
         app.init_resource::<GestureState>();
         app.add_plugins(UiMaterialPlugin::<DrawPathMaterial>::default());
         app.add_observer(on_insert_edge);
-        app.add_systems(PostUpdate, update_edge_shader.after(UiSystems::Stack));
+        app.add_systems(
+            PostUpdate,
+            (
+                update_edge_shader.after(UiSystems::Stack),
+                update_node_outlines,
+            ),
+        );
     }
 }

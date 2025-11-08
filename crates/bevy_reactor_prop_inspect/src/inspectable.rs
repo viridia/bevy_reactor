@@ -267,8 +267,6 @@ impl Inspectable {
                         }
                     });
                 }
-                // if let Some(dyn_list) = list.dyn
-                // info!("Remove from list");
             }
             bevy::reflect::TypeInfo::Array(_) => todo!(),
             bevy::reflect::TypeInfo::Map(_) => todo!(),
