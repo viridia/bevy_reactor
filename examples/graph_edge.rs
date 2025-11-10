@@ -5,7 +5,7 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
 };
 use bevy_reactor::ReactorPlugin;
-use bevy_reactor_nodegraph::{Connection, ReactorNodeGraphPlugin};
+use bevy_reactor_nodegraph::ReactorNodeGraphPlugin;
 
 fn main() {
     App::new()

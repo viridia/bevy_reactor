@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bevy::reflect::{Access, DynamicList, List as _, OffsetAccess, ReflectMut};
+use bevy::reflect::{Access, ReflectMut};
 use bevy::{
     ecs::{
         component::{Component, Mutable},
@@ -8,7 +8,6 @@ use bevy::{
         resource::Resource,
         world::{DeferredWorld, World},
     },
-    log::info,
     reflect::{
         DynamicEnum, DynamicVariant, GetPath, ParsedPath, PartialReflect, Reflect,
         ReflectPathError, attributes::CustomAttributes,

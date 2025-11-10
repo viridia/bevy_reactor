@@ -1,6 +1,6 @@
 use bevy::{
     ecs::{entity::Entity, event::EntityEvent, resource::Resource},
-    math::{Rect, Vec2, VectorSpace},
+    math::{Rect, Vec2},
 };
 
 use crate::ConnectionTerminus;

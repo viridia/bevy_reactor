@@ -10,7 +10,7 @@ use bevy::{
         hierarchy::{ChildOf, Children},
         lifecycle::Insert,
         observer::On,
-        query::{Changed, Has, Or, With, Without},
+        query::{Changed, Or, With, Without},
         system::{Commands, Query, Res, ResMut},
         template::GetTemplate,
     },
@@ -19,7 +19,7 @@ use bevy::{
         theme::ThemedText,
     },
     input::{ButtonInput, keyboard::KeyCode},
-    log::{info, warn_once},
+    log::warn_once,
     math::{Rect, Vec2},
     picking::{
         Pickable,
@@ -650,6 +650,7 @@ fn on_graph_node_drag_end(mut drag_end: On<Pointer<DragEnd>>, mut r_gesture: Res
     }
 }
 
+// Not used because BSN limits
 fn on_graph_node_drag_cancel(mut cancel: On<Pointer<Cancel>>, mut r_gesture: ResMut<GestureState>) {
     cancel.propagate(false);
     if matches!(r_gesture.gesture, Gesture::Move) {
