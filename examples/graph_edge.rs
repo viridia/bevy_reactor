@@ -5,7 +5,7 @@ use bevy::{
     scene2::{CommandsSpawnScene, bsn},
 };
 use bevy_reactor::ReactorPlugin;
-use bevy_reactor_nodegraph::{GraphEdge, ReactorNodeGraphPlugin};
+use bevy_reactor_nodegraph::{Connection, ReactorNodeGraphPlugin};
 
 fn main() {
     App::new()
@@ -43,11 +43,12 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
             },
         }
         BackgroundColor(Srgba::new(0.1, 0.1, 0.2, 1.0))
-        [GraphEdge {
-            src_pos: Vec2::new(10.0, 10.0),
-            dst_pos: Vec2::new(180.0, 135.0),
-            color: Color::srgb(1.0, 0.0, 0.0),
-        }])
+        // [Connection {
+        //     src_pos: Vec2::new(10.0, 10.0),
+        //     dst_pos: Vec2::new(180.0, 135.0),
+        //     color: Color::srgb(1.0, 0.0, 0.0),
+        // }]
+        )
     ));
 }
 

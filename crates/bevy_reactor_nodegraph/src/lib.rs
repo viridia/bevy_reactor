@@ -16,10 +16,6 @@ pub use graph::*;
 
 use crate::graph::update_edge_shader;
 
-// use crate::display::update_edge_shader;
-
-// use crate::display::on_add_edge;
-
 pub struct ReactorNodeGraphPlugin;
 
 impl Plugin for ReactorNodeGraphPlugin {
@@ -35,6 +31,7 @@ impl Plugin for ReactorNodeGraphPlugin {
             (
                 update_edge_shader.after(UiSystems::Stack),
                 update_node_outlines,
+                update_terminal_positions,
             ),
         );
     }
