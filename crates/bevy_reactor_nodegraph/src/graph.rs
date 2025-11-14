@@ -19,7 +19,7 @@ use bevy::{
         theme::ThemedText,
     },
     input::{ButtonInput, keyboard::KeyCode},
-    log::warn_once,
+    log::{info, warn_once},
     math::{Rect, Vec2},
     picking::{
         Pickable,
@@ -45,7 +45,16 @@ use crate::{
 
 /// A node graph.
 #[derive(Component, Clone, Default)]
+#[require(GraphBounds)]
 pub struct Graph;
+
+/// Calculated bounds of the graph's contents.
+#[derive(Component, Clone, Default)]
+pub struct GraphBounds(pub Rect);
+
+/// scrolling content region of the graph.
+#[derive(Component, Clone, Default)]
+pub struct GraphContents;
 
 /// A node within a node graph.
 #[derive(Component, Clone, Default)]
@@ -75,7 +84,7 @@ impl GraphNodeSelection {
 #[derive(Component, Clone, Default)]
 pub struct SelectionRect;
 
-pub fn display_graph() -> impl Scene {
+pub fn node_graph() -> impl Scene {
     bsn! {
         Graph
         EntityCursor::System(bevy::window::SystemCursorIcon::Crosshair)
@@ -84,6 +93,17 @@ pub fn display_graph() -> impl Scene {
         on(on_graph_drag)
         on(on_graph_drag_end)
         on(on_graph_drag_cancel)
+    }
+}
+
+pub fn node_graph_contents() -> impl Scene {
+    bsn! {
+        GraphContents
+        Node {
+            position_type: PositionType::Absolute,
+            left: px(10.0),
+            top: px(20.0),
+        }
         [
             :display_selection_rect()
             Node {
@@ -94,7 +114,7 @@ pub fn display_graph() -> impl Scene {
     }
 }
 
-pub fn display_graph_node(position: Vec2) -> impl Scene {
+pub fn node_graph_node(position: Vec2) -> impl Scene {
     bsn! {
         Node {
             position_type: PositionType::Absolute,
@@ -137,7 +157,7 @@ pub fn display_graph_node(position: Vec2) -> impl Scene {
 #[derive(Component, Default, Clone)]
 pub struct GraphNodeTitle;
 
-pub fn display_graph_node_title() -> impl Scene {
+pub fn node_graph_node_title() -> impl Scene {
     bsn! {
         Node {
             display: Display::Flex,
@@ -165,7 +185,7 @@ pub fn display_graph_node_title() -> impl Scene {
 #[derive(Component, Default, Clone)]
 pub struct GraphNodeBody;
 
-pub fn display_graph_node_body() -> impl Scene {
+pub fn node_graph_node_body() -> impl Scene {
     bsn! {
         Node {
             display: Display::Flex,
@@ -287,10 +307,10 @@ pub fn label(text: impl Into<String>) -> impl Scene {
 /// A terminal where connections can attach to.
 #[derive(Component, Clone, Default, Debug, PartialEq)]
 pub enum Terminal {
-    /// An input terminal that connects to an edge dst
+    /// An input terminal that connects to an connection dst
     #[default]
     Input,
-    /// An output terminal that connects to an edge src
+    /// An output terminal that connects to an connection src
     Output,
 }
 
@@ -320,39 +340,52 @@ pub struct Connection {
     /// Pixel position of the destination terminal.
     pub dst: ConnectionTerminus,
 
-    /// Color of this edge
+    /// Color of this connection
     pub color: Color,
 }
 
-pub(crate) fn on_insert_edge(
+/// Update shader uniforms for connection
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn on_insert_connection(
     insert: On<Insert, Connection>,
     mut q_node: Query<(
         &Connection,
         &mut Node,
         Option<&MaterialNode<DrawPathMaterial>>,
     )>,
+    q_parent: Query<&ChildOf>,
+    q_graph_content: Query<(&UiGlobalTransform, &ComputedNode), With<GraphContents>>,
     q_terminals: Query<(&UiGlobalTransform, &ComputedNode)>,
     mut r_materials: ResMut<Assets<DrawPathMaterial>>,
     mut r_bindings: ResMut<Assets<ShaderStorageBuffer>>,
     mut commands: Commands,
 ) {
     // Adjust node
-    if let Ok((edge, mut node, material_node)) = q_node.get_mut(insert.entity) {
-        let mut path = DrawablePath::new(edge.color.into(), 1.5);
-        let src = match edge.src {
+    if let Ok((connection, mut node, material_node)) = q_node.get_mut(insert.entity) {
+        let Some((contents_transform, contents_computed_node)) = q_parent
+            .iter_ancestors(insert.entity)
+            .find_map(|ent| q_graph_content.get(ent).ok())
+        else {
+            return;
+        };
+
+        let contents_origin = contents_transform.translation - contents_computed_node.size() * 0.5;
+
+        let mut path = DrawablePath::new(connection.color.into(), 1.5);
+        let src = match connection.src {
             ConnectionTerminus::Terminal(entity) => {
                 if let Ok((transform, computed_node)) = q_terminals.get(entity) {
-                    transform.translation * computed_node.inverse_scale_factor()
+                    (transform.translation - contents_origin) * computed_node.inverse_scale_factor()
                 } else {
                     Vec2::ZERO
                 }
             }
             ConnectionTerminus::Location(pos) => pos,
         };
-        let dst = match edge.dst {
+        let dst = match connection.dst {
             ConnectionTerminus::Terminal(entity) => {
                 if let Ok((transform, computed_node)) = q_terminals.get(entity) {
-                    transform.translation * computed_node.inverse_scale_factor()
+                    (transform.translation - contents_origin) * computed_node.inverse_scale_factor()
                 } else {
                     Vec2::ZERO
                 }
@@ -403,7 +436,7 @@ pub(crate) fn on_insert_edge(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn update_edge_shader(
+pub(crate) fn update_connection_shader(
     mut q_node: Query<
         (&ComputedUiRenderTargetInfo, &MaterialNode<DrawPathMaterial>),
         Or<(Changed<Connection>, Changed<ComputedNode>)>,
@@ -436,11 +469,22 @@ fn on_graph_drag_start(
     mut drag_start: On<Pointer<DragStart>>,
     q_children: Query<&Children>,
     mut q_selection: Query<(&mut Node, &mut Visibility), With<SelectionRect>>,
+    q_graph_content: Query<(), With<GraphContents>>,
     mut r_gesture: ResMut<GestureState>,
 ) {
     drag_start.propagate(false);
     r_gesture.selection_anchor = drag_start.pointer_location.position;
-    if let Ok(children) = q_children.get(drag_start.entity) {
+
+    // Find the content entity
+    let Some(&content_ent) = q_children
+        .get(drag_start.entity)
+        .ok()
+        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+    else {
+        return;
+    };
+
+    if let Ok(children) = q_children.get(content_ent) {
         for child in children.iter() {
             if let Ok((mut rect_node, mut rect_vis)) = q_selection.get_mut(*child) {
                 *rect_vis = Visibility::Visible;
@@ -458,6 +502,7 @@ fn on_graph_drag(
     mut drag: On<Pointer<Drag>>,
     q_children: Query<&Children>,
     mut q_selection: Query<&mut Node, With<SelectionRect>>,
+    q_graph_content: Query<(), With<GraphContents>>,
     mut q_nodes: Query<
         (&Node, &ComputedNode, &ChildOf, &mut GraphNodeSelection),
         (With<GraphNode>, Without<SelectionRect>),
@@ -467,7 +512,18 @@ fn on_graph_drag(
     drag.propagate(false);
     let graph_ent = drag.entity;
     let rect = Rect::from_corners(r_gesture.selection_anchor, drag.pointer_location.position);
-    if let Ok(children) = q_children.get(drag.entity) {
+
+    // Find the content entity
+    let Some(&content_ent) = q_children
+        .get(graph_ent)
+        .ok()
+        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+    else {
+        return;
+    };
+
+    // Update the selection rect position
+    if let Ok(children) = q_children.get(content_ent) {
         for child in children.iter() {
             if let Ok(mut rect_node) = q_selection.get_mut(*child) {
                 rect_node.left = px(rect.min.x);
@@ -479,7 +535,7 @@ fn on_graph_drag(
     }
 
     for (node, computed_node, parent, mut selection) in q_nodes.iter_mut() {
-        let pending = parent.0 == graph_ent
+        let pending = parent.0 == content_ent
             && match (node.left, node.top) {
                 (Val::Px(x), Val::Px(y)) => {
                     let node_rect = Rect::from_center_size(
@@ -506,11 +562,23 @@ fn rect_overlaps(a: &Rect, b: &Rect) -> bool {
 fn on_graph_drag_end(
     mut drag_end: On<Pointer<DragEnd>>,
     q_children: Query<&Children>,
+    q_graph_content: Query<(), With<GraphContents>>,
     mut q_selection: Query<&mut Visibility, With<SelectionRect>>,
     mut q_nodes: Query<&mut GraphNodeSelection, With<GraphNode>>,
 ) {
     drag_end.propagate(false);
-    if let Ok(children) = q_children.get(drag_end.entity) {
+
+    // Find the content entity
+    let Some(&content_ent) = q_children
+        .get(drag_end.entity)
+        .ok()
+        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+    else {
+        return;
+    };
+
+    // Hide the selection rect
+    if let Ok(children) = q_children.get(content_ent) {
         for child in children.iter() {
             if let Ok(mut rect_vis) = q_selection.get_mut(*child) {
                 *rect_vis = Visibility::Hidden;
@@ -518,6 +586,7 @@ fn on_graph_drag_end(
         }
     }
 
+    // Finalize the selection bits.
     for mut selection in q_nodes.iter_mut() {
         if selection.pending {
             selection.selected = true;
@@ -529,11 +598,23 @@ fn on_graph_drag_end(
 fn on_graph_drag_cancel(
     mut cancel: On<Pointer<Cancel>>,
     q_children: Query<&Children>,
+    q_graph_content: Query<(), With<GraphContents>>,
     mut q_selection: Query<&mut Visibility, With<SelectionRect>>,
     mut q_nodes: Query<&mut GraphNodeSelection, With<GraphNode>>,
 ) {
     cancel.propagate(false);
-    if let Ok(children) = q_children.get(cancel.entity) {
+
+    // Find the content entity
+    let Some(&content_ent) = q_children
+        .get(cancel.entity)
+        .ok()
+        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+    else {
+        return;
+    };
+
+    // Hide the selection rect
+    if let Ok(children) = q_children.get(content_ent) {
         for child in children.iter() {
             if let Ok(mut rect_vis) = q_selection.get_mut(*child) {
                 *rect_vis = Visibility::Hidden;
@@ -541,9 +622,9 @@ fn on_graph_drag_cancel(
         }
     }
 
+    // Clear the selection bits
     for mut selection in q_nodes.iter_mut() {
         if selection.pending {
-            selection.selected = true;
             selection.pending = false;
         }
     }
@@ -591,35 +672,43 @@ fn on_graph_node_drag_start(
         (&ChildOf, &Node, &GraphNodeSelection, &mut GraphNodeOffset),
         With<GraphNode>,
     >,
+    q_graph_content: Query<&ChildOf, (With<GraphContents>, Without<Graph>)>,
     q_graph: Query<(), With<Graph>>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
     drag_start.propagate(false);
     if let Ok((&ChildOf(parent), _, _, _)) = q_node.get(drag_start.entity) {
-        if q_graph.contains(parent) {
-            r_gesture.graph = Some(parent);
-            r_gesture.gesture = Gesture::Move;
+        if let Ok(&ChildOf(grandparent)) = q_graph_content.get(parent) {
+            if q_graph.contains(grandparent) {
+                r_gesture.graph = Some(grandparent);
+                r_gesture.gesture = Gesture::Move;
 
-            for (_, node, selection, mut node_offset) in q_node.iter_mut() {
-                if selection.selected {
-                    match (node.left, node.top) {
-                        (Val::Px(x), Val::Px(y)) => {
-                            node_offset.0.x = x;
-                            node_offset.0.y = y;
+                for (_, node, selection, mut node_offset) in q_node.iter_mut() {
+                    if selection.selected {
+                        match (node.left, node.top) {
+                            (Val::Px(x), Val::Px(y)) => {
+                                node_offset.0.x = x;
+                                node_offset.0.y = y;
+                            }
+                            _ => warn_once!("Graph node position should be in pixels"),
                         }
-                        _ => warn_once!("Graph node position should be in pixels"),
                     }
                 }
-            }
 
-            commands.trigger(MoveNodesEvent {
-                graph: parent,
-                distance: Vec2::ZERO,
-            });
+                commands.trigger(MoveNodesEvent {
+                    graph: parent,
+                    distance: Vec2::ZERO,
+                });
+            } else {
+                warn_once!(
+                    "Graph content {} has a parent, but it is not a graph",
+                    drag_start.entity
+                );
+            }
         } else {
             warn_once!(
-                "Graph node {} has a parent, but it is not a graph",
+                "Graph node {} has a parent, but it is not a GraphContent",
                 drag_start.entity
             );
         }
@@ -664,7 +753,8 @@ fn on_terminal_drag_start(
     mut drag_start: On<Pointer<DragStart>>,
     q_parent: Query<&ChildOf>,
     mut q_terminal: Query<&Terminal>,
-    q_graph: Query<(), With<Graph>>,
+    q_graph: Query<&Children, With<Graph>>,
+    q_graph_content: Query<(Entity, &UiGlobalTransform, &ComputedNode), With<GraphContents>>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
@@ -677,19 +767,41 @@ fn on_terminal_drag_start(
         else {
             return;
         };
+
+        // Find the content entity
+        let Some((connections, container_transform, container_computed_node)) =
+            q_graph.get(graph).ok().and_then(|children| {
+                children
+                    .iter()
+                    .find_map(|&ent| q_graph_content.get(ent).ok())
+            })
+        else {
+            return;
+        };
+
         let anchor = if *terminal == Terminal::Input {
             ConnectionAnchor::InputTerminal(drag_start.entity)
         } else {
             ConnectionAnchor::OutputTerminal(drag_start.entity)
         };
-        let target = ConnectionTarget::Location(drag_start.pointer_location.position);
+        let target = ConnectionTarget::Location(
+            drag_start.pointer_location.position
+                - (container_transform.translation - container_computed_node.size() * 0.5)
+                    * container_computed_node.inverse_scale_factor(),
+        );
+
         r_gesture.graph = Some(graph);
-        r_gesture.gesture = Gesture::Connect { anchor, target };
+        r_gesture.gesture = Gesture::Connect {
+            connections,
+            anchor,
+            target,
+        };
         commands
             .entity(graph)
             .insert(EntityCursor::System(bevy::window::SystemCursorIcon::Copy));
         commands.trigger(ConnectEvent::from_gesture(
             graph,
+            connections,
             anchor,
             target,
             DragAction::Start,
@@ -700,6 +812,7 @@ fn on_terminal_drag_start(
 fn on_terminal_drag(
     mut drag: On<Pointer<Drag>>,
     mut r_gesture: ResMut<GestureState>,
+    q_graph_content: Query<(&UiGlobalTransform, &ComputedNode), With<GraphContents>>,
     mut commands: Commands,
 ) {
     drag.propagate(false);
@@ -707,13 +820,23 @@ fn on_terminal_drag(
         let connection_target = r_gesture.connection_target;
         if let Gesture::Connect {
             anchor,
+            connections: container,
             ref mut target,
         } = r_gesture.gesture
         {
-            *target = connection_target
-                .unwrap_or(ConnectionTarget::Location(drag.pointer_location.position));
+            let Ok((container_transform, container_computed_node)) = q_graph_content.get(container)
+            else {
+                return;
+            };
+
+            *target = connection_target.unwrap_or(ConnectionTarget::Location(
+                drag.pointer_location.position
+                    - (container_transform.translation - container_computed_node.size() * 0.5)
+                        * container_computed_node.inverse_scale_factor(),
+            ));
             commands.trigger(ConnectEvent::from_gesture(
                 graph,
+                container,
                 anchor,
                 *target,
                 DragAction::InProgress,
@@ -729,9 +852,15 @@ fn on_terminal_drag_end(
 ) {
     drag_end.propagate(false);
     if let Some(graph) = r_gesture.graph {
-        if let Gesture::Connect { anchor, target } = r_gesture.gesture {
+        if let Gesture::Connect {
+            anchor,
+            connections: container,
+            target,
+        } = r_gesture.gesture
+        {
             commands.trigger(ConnectEvent::from_gesture(
                 graph,
+                container,
                 anchor,
                 target,
                 DragAction::Finish,
@@ -752,9 +881,15 @@ fn on_terminal_drag_cancel(
 ) {
     cancel.propagate(false);
     if let Some(graph) = r_gesture.graph {
-        if let Gesture::Connect { anchor, target } = r_gesture.gesture {
+        if let Gesture::Connect {
+            anchor,
+            connections: container,
+            target,
+        } = r_gesture.gesture
+        {
             commands.trigger(ConnectEvent::from_gesture(
                 graph,
+                container,
                 anchor,
                 target,
                 DragAction::Cancel,
@@ -782,6 +917,7 @@ fn on_terminal_drag_enter(
         };
         if let Gesture::Connect {
             anchor,
+            connections: container,
             ref mut target,
         } = r_gesture.gesture
         {
@@ -814,6 +950,7 @@ fn on_terminal_drag_enter(
                 r_gesture.connection_target = Some(new_target);
                 commands.trigger(ConnectEvent::from_gesture(
                     graph,
+                    container,
                     anchor,
                     new_target,
                     DragAction::InProgress,
@@ -830,6 +967,7 @@ fn on_terminal_drag_leave(
     drag_end.propagate(false);
     if let Gesture::Connect {
         anchor: _,
+        connections: _,
         target: _,
     } = r_gesture.gesture
     {
@@ -844,9 +982,15 @@ fn on_terminal_drop(
 ) {
     drag_end.propagate(false);
     if let Some(graph) = r_gesture.graph {
-        if let Gesture::Connect { anchor, target } = r_gesture.gesture {
+        if let Gesture::Connect {
+            anchor,
+            connections: container,
+            target,
+        } = r_gesture.gesture
+        {
             commands.trigger(ConnectEvent::from_gesture(
                 graph,
+                container,
                 anchor,
                 target,
                 DragAction::Finish,
@@ -860,6 +1004,7 @@ fn on_terminal_drop(
     }
 }
 
+/// Change node outline appearance based on selection and hover
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_node_outlines(
     q_node: Query<
@@ -890,6 +1035,8 @@ pub(crate) fn update_node_outlines(
     }
 }
 
+/// For each connection that is attached to a node whose transform has changed, force
+/// a mutation on the connection to trigger a re-layout.
 pub(crate) fn update_terminal_positions(
     q_connections: Query<(Entity, &Connection)>,
     q_terminals: Query<&UiGlobalTransform, (With<Terminal>, Changed<UiGlobalTransform>)>,
@@ -909,6 +1056,43 @@ pub(crate) fn update_terminal_positions(
         if src_changed || dst_changed {
             // Re-insert connection to force Insert observer update.
             commands.entity(connection_ent).insert(connection.clone());
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+pub(crate) fn update_graph_bounds(
+    mut q_graph: Query<(&Children, &mut GraphBounds), With<Graph>>,
+    q_graph_contents: Query<
+        (&Children, &UiGlobalTransform, &ComputedNode),
+        (With<GraphContents>, Without<Graph>),
+    >,
+    q_nodes: Query<(&UiGlobalTransform, &ComputedNode), (With<GraphNode>, Without<Graph>)>,
+) {
+    for (children, mut graph_bounds) in q_graph.iter_mut() {
+        let mut new_bounds = Rect::EMPTY;
+        let Some((content_children, graph_transform, graph_computed_node)) = children
+            .iter()
+            .find_map(|&ent| q_graph_contents.get(ent).ok())
+        else {
+            continue;
+        };
+
+        let graph_origin = (graph_transform.translation - graph_computed_node.size() * 0.5)
+            * graph_computed_node.inverse_scale_factor();
+        for child_id in content_children {
+            if let Ok((node_transform, computed_node)) = q_nodes.get(*child_id) {
+                let child_pos = node_transform.translation * computed_node.inverse_scale_factor()
+                    - graph_origin;
+                new_bounds = new_bounds.union(Rect::from_center_size(
+                    child_pos,
+                    computed_node.size() * computed_node.inverse_scale_factor(),
+                ));
+            }
+        }
+
+        if graph_bounds.0 != new_bounds {
+            graph_bounds.0 = new_bounds;
         }
     }
 }

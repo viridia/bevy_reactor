@@ -6,22 +6,27 @@ use bevy::{
         FeathersPlugins,
         controls::{SliderProps, slider},
         dark_theme::create_dark_theme,
+        palette,
         theme::UiTheme,
     },
     prelude::*,
     scene2::{CommandsSpawnScene, bsn, on},
 };
-use bevy_reactor::ReactorPlugin;
+use bevy_reactor::{Cx, ReactorPlugin, effect};
 use bevy_reactor_nodegraph::{
-    ConnectEvent, Connection, ConnectionTerminus, GraphNode, GraphNodeOffset, GraphNodeSelection,
-    MoveNodesEvent, ReactorNodeGraphPlugin, Terminal, display_graph, display_graph_node,
-    display_graph_node_body, display_graph_node_title, input_terminal, label, output_terminal,
+    ConnectEvent, Connection, ConnectionTerminus, DragAction, GraphBounds, GraphNode,
+    GraphNodeOffset, GraphNodeSelection, MoveNodesEvent, ReactorNodeGraphPlugin, Terminal,
+    input_terminal, label, node_graph, node_graph_contents, node_graph_node, node_graph_node_body,
+    node_graph_node_title, output_terminal,
 };
 
 #[derive(Resource, Default)]
 struct GraphEditState {
     connection: Option<Entity>,
 }
+
+#[derive(Component, Clone, Default)]
+struct GraphBoundsDebug;
 
 fn main() {
     App::new()
@@ -43,7 +48,7 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
 
     commands.spawn((Camera::default(), Camera2d));
     commands.spawn_scene(bsn!(
-        :display_graph()
+        :node_graph()
         Node {
             position_type: PositionType::Absolute,
             left: px(0),
@@ -61,46 +66,52 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
             },
         }
         BackgroundColor(Srgba::new(0.1, 0.1, 0.13, 1.0))
-        // UiTransform {
-        //     scale: Vec2::splat(0.7)
-        // }
         on(on_move_nodes)
         on(on_connect)
         [
-            // Connection {
-            //     src: ConnectionTerminus::Location(Vec2::new(10.0, 10.0)),
-            //     dst: ConnectionTerminus::Location(Vec2::new(180.0, 135.0)),
-            //     color: Color::srgb(1.0, 0.0, 0.0),
-            // },
-
-            :display_graph_node(Vec2::new(100.0, 100.0))
+            // UiTransform {
+            //     scale: Vec2::splat(0.7)
+            // }
+            :node_graph_contents()
             [
-                :display_graph_node_title() [
-                    :label("Node")
-                ]
-                ,
-                :display_graph_node_body() [
-                    #out1
-                    :output_terminal(palettes::css::ALICE_BLUE.into()) [
-                        :label("Color")
-                    ]
-                ]
-            ],
-
-            :display_graph_node(Vec2::new(300.0, 100.0))
-            [
-                :display_graph_node_title() [
-                    :label("Node 2")
-                ]
-                ,
-                :display_graph_node_body() [
-                    #out2
-                    :output_terminal(palettes::css::RED.into()) [
-                        :label("Color")
+                :node_graph_node(Vec2::new(100.0, 100.0))
+                [
+                    :node_graph_node_title() [
+                        :label("Node")
                     ]
                     ,
-                    #in1
-                    :input_terminal(palettes::css::ALICE_BLUE.into()) [
+                    :node_graph_node_body() [
+                        #out1
+                        :output_terminal(palettes::css::ALICE_BLUE.into()) [
+                            :label("Color")
+                        ]
+                    ]
+                ],
+
+                :node_graph_node(Vec2::new(300.0, 100.0))
+                [
+                    :node_graph_node_title() [
+                        :label("Node 2")
+                    ]
+                    ,
+                    :node_graph_node_body() [
+                        #out2
+                        :output_terminal(palettes::css::RED.into()) [
+                            :label("Color")
+                        ]
+                        ,
+                        #in1
+                        :input_terminal(palettes::css::ALICE_BLUE.into()) [
+                            :slider(SliderProps {
+                                value: 0.0,
+                                min: 0.0,
+                                max: 100.0,
+                            })
+                            Node {
+                                align_self: AlignSelf::Stretch
+                            }
+                        ]
+                        ,
                         :slider(SliderProps {
                             value: 0.0,
                             min: 0.0,
@@ -110,17 +121,45 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                             align_self: AlignSelf::Stretch
                         }
                     ]
+                ],
+
+                :node_graph_node(Vec2::new(500.0, 500.0))
+                [
+                    :node_graph_node_title() [
+                        :label("Node")
+                    ]
                     ,
-                    :slider(SliderProps {
-                        value: 0.0,
-                        min: 0.0,
-                        max: 100.0,
-                    })
-                    Node {
-                        align_self: AlignSelf::Stretch
+                    :node_graph_node_body() [
+                        #out3
+                        :output_terminal(palettes::css::ALICE_BLUE.into()) [
+                            :label("Color")
+                        ]
+                    ]
+                ],
+
+                GraphBoundsDebug
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: px(0),
+                    top: px(0),
+                    border: UiRect::all(px(1)),
+                }
+                BorderColor::all(palette::X_AXIS)
+                Pickable::IGNORE
+                effect::effect(|cx: &Cx| {
+                    let parent_id = cx.owner().get::<ChildOf>().unwrap().parent();
+                    let granparent_id = cx.entity(parent_id).get::<ChildOf>().unwrap().parent();
+                    cx.entity(granparent_id).get::<GraphBounds>().unwrap().0
+                }, |ent, rect| {
+                    if !rect.is_empty() {
+                        let mut node = ent.get_mut::<Node>().unwrap();
+                        node.left = px(rect.min.x);
+                        node.top = px(rect.min.y);
+                        node.width = px(rect.width());
+                        node.height = px(rect.height());
                     }
-                ]
-            ],
+                })
+            ]
         ]
     ));
 }
@@ -143,7 +182,7 @@ fn on_connect(
     mut r_graph_state: ResMut<GraphEditState>,
     mut commands: Commands,
 ) {
-    let graph = connect.graph;
+    let container = connect.connections;
 
     // Check if connection is valid
     let input_terminal = match connect.dst {
@@ -172,18 +211,18 @@ fn on_connect(
     };
 
     match connect.action {
-        bevy_reactor_nodegraph::DragAction::Start => {
+        DragAction::Start => {
             // Create a new connection entity
             let connection = commands.spawn(connection).id();
             r_graph_state.connection = Some(connection);
-            commands.entity(graph).insert_child(0, connection);
+            commands.entity(container).insert_child(0, connection);
         }
-        bevy_reactor_nodegraph::DragAction::InProgress => {
+        DragAction::InProgress => {
             // Update the position of the connection
             let conn_id = r_graph_state.connection.unwrap();
             commands.entity(conn_id).insert(connection);
         }
-        bevy_reactor_nodegraph::DragAction::Finish => {
+        DragAction::Finish => {
             // If the connection is valid, detach (so it stays around)
             // otherwise, despawn.
             let conn_id = r_graph_state.connection.unwrap();
@@ -193,7 +232,7 @@ fn on_connect(
             }
             r_graph_state.connection = None;
         }
-        bevy_reactor_nodegraph::DragAction::Cancel => {
+        DragAction::Cancel => {
             // Despawn the connection
             let conn_id = r_graph_state.connection.unwrap();
             commands.entity(conn_id).despawn();

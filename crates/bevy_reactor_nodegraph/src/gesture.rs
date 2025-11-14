@@ -59,6 +59,8 @@ pub enum Gesture {
 
     /// Event sent when dragging a connection.
     Connect {
+        /// Parent entity for connections.
+        connections: Entity,
         /// Where we are dragging from
         anchor: ConnectionAnchor,
         /// Where we are dragging to
@@ -95,6 +97,8 @@ pub struct ConnectEvent {
     /// Graph being edited
     #[event_target]
     pub graph: Entity,
+    /// Where new connections should be spawned
+    pub connections: Entity,
     /// Source (output) terminal or location
     pub src: ConnectionTerminus,
     /// Destination (input) terminal or location
@@ -108,6 +112,7 @@ impl ConnectEvent {
     /// swapping the order if the user is dragging in the reverse direction (from end to start).
     pub fn from_gesture(
         graph: Entity,
+        container: Entity,
         anchor: ConnectionAnchor,
         target: ConnectionTarget,
         action: DragAction,
@@ -163,6 +168,7 @@ impl ConnectEvent {
 
         Self {
             graph,
+            connections: container,
             src,
             dst,
             action,

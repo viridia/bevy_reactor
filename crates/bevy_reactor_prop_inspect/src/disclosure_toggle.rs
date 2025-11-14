@@ -137,9 +137,9 @@ fn set_toggle_colors(
     checked: bool,
     // transform: &mut AnimatedTransition<UiRotationTransition>,
     transform: &mut UiTransform,
-    theme: &Res<'_, UiTheme>,
+    _theme: &Res<'_, UiTheme>,
 ) {
-    let slide_token = match disabled {
+    let _slide_token = match disabled {
         true => tokens::SWITCH_SLIDE_DISABLED,
         false => tokens::SWITCH_SLIDE,
     };

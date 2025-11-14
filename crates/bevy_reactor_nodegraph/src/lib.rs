@@ -14,7 +14,7 @@ pub use draw_path::*;
 pub use gesture::*;
 pub use graph::*;
 
-use crate::graph::update_edge_shader;
+use crate::graph::update_connection_shader;
 
 pub struct ReactorNodeGraphPlugin;
 
@@ -25,13 +25,14 @@ impl Plugin for ReactorNodeGraphPlugin {
 
         app.init_resource::<GestureState>();
         app.add_plugins(UiMaterialPlugin::<DrawPathMaterial>::default());
-        app.add_observer(on_insert_edge);
+        app.add_observer(on_insert_connection);
         app.add_systems(
             PostUpdate,
             (
-                update_edge_shader.after(UiSystems::Stack),
+                update_connection_shader.after(UiSystems::Stack),
                 update_node_outlines,
                 update_terminal_positions,
+                update_graph_bounds,
             ),
         );
     }

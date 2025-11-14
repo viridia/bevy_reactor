@@ -19,7 +19,7 @@ use crate::{Inspectable, property_inspector::remove_button};
 pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
     let can_remove = field.can_remove;
     let field_copy = field.clone();
-    let field_copy2 = field.clone();
+    // let field_copy2 = field.clone();
     let field_copy3 = field.clone();
     bsn_list![
         Node {
@@ -48,7 +48,7 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
                         return *value;
                     }
                     Srgba::default()
-                }, |entity, color| {
+                }, |_entity, _color| {
                     // if *checked {
                     //     entity.insert(Checked);
                     // } else {

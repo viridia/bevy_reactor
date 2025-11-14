@@ -113,7 +113,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                 })
             ],
 
-            if_then(|cx: &Cx| {
+            if_then(|_cx: &Cx| {
                 // TODO: Return true if list is expanded.
                 // cx.entity(#toggle).contains::<Checked>();
                 true
