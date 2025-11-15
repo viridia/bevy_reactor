@@ -19,7 +19,7 @@ use bevy::{
         theme::ThemedText,
     },
     input::{ButtonInput, keyboard::KeyCode},
-    log::{info, warn_once},
+    log::warn_once,
     math::{Rect, Vec2},
     picking::{
         Pickable,
@@ -52,13 +52,13 @@ pub struct Graph;
 #[derive(Component, Clone, Default)]
 pub struct GraphBounds(pub Rect);
 
-/// scrolling content region of the graph.
+/// Scrolling content region of the graph.
 #[derive(Component, Clone, Default)]
 pub struct GraphContents;
 
 /// A node within a node graph.
 #[derive(Component, Clone, Default)]
-#[require(GraphNodeSelection)]
+#[require(GraphNodeOffset, GraphNodeSelection)]
 pub struct GraphNode;
 
 /// Base offset for dragging a node.
@@ -105,7 +105,7 @@ pub fn node_graph_contents() -> impl Scene {
             top: px(20.0),
         }
         [
-            :display_selection_rect()
+            :selection_rect()
             Node {
                 width: px(100),
                 height: px(100),
@@ -128,7 +128,6 @@ pub fn node_graph_node(position: Vec2) -> impl Scene {
             min_height: px(20),
         }
         GraphNode
-        GraphNodeOffset
         Hovered::default()
         BorderRadius::all(px(3))
         BorderColor::all(palette::GRAY_3)
@@ -143,7 +142,7 @@ pub fn node_graph_node(position: Vec2) -> impl Scene {
         on(on_graph_node_drag_start)
         on(on_graph_node_drag)
         on(on_graph_node_drag_end)
-        // on(on_graph_node_drag_cancel)
+        on(on_graph_node_drag_cancel)
         UiTransform {
             translation: Val2::new(
                 Val::Percent(-50.0),
@@ -280,7 +279,7 @@ pub fn output_terminal(color: Color) -> impl Scene {
     }
 }
 
-pub fn display_selection_rect() -> impl Scene {
+pub fn selection_rect() -> impl Scene {
     bsn! {
         Node {
             position_type: PositionType::Absolute,
@@ -332,7 +331,7 @@ impl Default for ConnectionTerminus {
 /// Displays a stroked path between two nodes.
 #[derive(Component, GetTemplate, Clone)]
 #[component(immutable)]
-#[require(Node)]
+#[require(Node { ..Default::default() }, Pickable::IGNORE)]
 pub struct Connection {
     /// Pixel position of the source terminal.
     pub src: ConnectionTerminus,
@@ -393,11 +392,15 @@ pub(crate) fn on_insert_connection(
             ConnectionTerminus::Location(pos) => pos,
         };
         let dx = (dst.x - src.x).abs().mul(0.3).min(20.);
+        let dy = dst.y - src.y;
         let src1 = src + Vec2::new(dx, 0.);
         let dst1 = dst - Vec2::new(dx, 0.);
         path.move_to(src);
         let mlen = src1.distance(dst1);
-        if mlen > 40. {
+        if dy.abs() < 0.01 {
+            // Workaround for a bug in shader when quadratics are colinear.
+            path.line_to(dst);
+        } else if mlen > 40. {
             let src2 = src1.lerp(dst1, 20. / mlen);
             let dst2 = src1.lerp(dst1, (mlen - 20.) / mlen);
             path.quadratic_to(src1, src2);

@@ -215,7 +215,7 @@ fn on_connect(
             // Create a new connection entity
             let connection = commands.spawn(connection).id();
             r_graph_state.connection = Some(connection);
-            commands.entity(container).insert_child(0, connection);
+            commands.entity(container).add_child(connection);
         }
         DragAction::InProgress => {
             // Update the position of the connection
