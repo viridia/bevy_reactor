@@ -6,18 +6,17 @@ use bevy::{
         FeathersPlugins,
         controls::{SliderProps, slider},
         dark_theme::create_dark_theme,
-        palette,
         theme::UiTheme,
     },
     prelude::*,
     scene2::{CommandsSpawnScene, bsn, on},
 };
-use bevy_reactor::{Cx, ReactorPlugin, effect};
+use bevy_reactor::ReactorPlugin;
 use bevy_reactor_nodegraph::{
-    ConnectEvent, Connection, ConnectionTerminus, DragAction, GraphBounds, GraphNode,
-    GraphNodeOffset, GraphNodeSelection, MoveNodesEvent, ReactorNodeGraphPlugin, Terminal,
-    input_terminal, label, node_graph, node_graph_contents, node_graph_node, node_graph_node_body,
-    node_graph_node_title, output_terminal,
+    ConnectEvent, Connection, ConnectionTerminus, DragAction, GraphNode, GraphNodeOffset,
+    GraphNodeSelection, MoveNodesEvent, ReactorNodeGraphPlugin, Terminal, input_terminal, label,
+    node_graph, node_graph_document, node_graph_node, node_graph_node_body, node_graph_node_title,
+    output_terminal,
 };
 
 #[derive(Resource, Default)]
@@ -25,8 +24,8 @@ struct GraphEditState {
     connection: Option<Entity>,
 }
 
-#[derive(Component, Clone, Default)]
-struct GraphBoundsDebug;
+// #[derive(Component, Clone, Default)]
+// struct GraphBoundsDebug;
 
 fn main() {
     App::new()
@@ -72,9 +71,9 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
             // UiTransform {
             //     scale: Vec2::splat(0.7)
             // }
-            :node_graph_contents()
+            :node_graph_document()
             [
-                :node_graph_node(Vec2::new(100.0, 100.0))
+                :node_graph_node(Vec2::new(100.0, 200.0))
                 [
                     :node_graph_node_title() [
                         :label("Node")
@@ -88,7 +87,21 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                     ]
                 ],
 
-                :node_graph_node(Vec2::new(300.0, 100.0))
+                :node_graph_node(Vec2::new(700.0, 500.0))
+                [
+                    :node_graph_node_title() [
+                        :label("Bevy!")
+                    ]
+                    ,
+                    :node_graph_node_body() [
+                        #out4
+                        :output_terminal(palettes::css::ALICE_BLUE.into()) [
+                            :label("Position")
+                        ]
+                    ]
+                ],
+
+                :node_graph_node(Vec2::new(300.0, 200.0))
                 [
                     :node_graph_node_title() [
                         :label("Node 2")
@@ -123,7 +136,7 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                     ]
                 ],
 
-                :node_graph_node(Vec2::new(500.0, 500.0))
+                :node_graph_node(Vec2::new(500.0, 1000.0))
                 [
                     :node_graph_node_title() [
                         :label("Node")
@@ -137,28 +150,28 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                     ]
                 ],
 
-                GraphBoundsDebug
-                Node {
-                    position_type: PositionType::Absolute,
-                    left: px(0),
-                    top: px(0),
-                    border: UiRect::all(px(1)),
-                }
-                BorderColor::all(palette::X_AXIS)
-                Pickable::IGNORE
-                effect::effect(|cx: &Cx| {
-                    let parent_id = cx.owner().get::<ChildOf>().unwrap().parent();
-                    let granparent_id = cx.entity(parent_id).get::<ChildOf>().unwrap().parent();
-                    cx.entity(granparent_id).get::<GraphBounds>().unwrap().0
-                }, |ent, rect| {
-                    if !rect.is_empty() {
-                        let mut node = ent.get_mut::<Node>().unwrap();
-                        node.left = px(rect.min.x);
-                        node.top = px(rect.min.y);
-                        node.width = px(rect.width());
-                        node.height = px(rect.height());
-                    }
-                })
+                // GraphBoundsDebug
+                // Node {
+                //     position_type: PositionType::Absolute,
+                //     left: px(0),
+                //     top: px(0),
+                //     border: UiRect::all(px(1)),
+                // }
+                // BorderColor::all(palette::X_AXIS)
+                // Pickable::IGNORE
+                // effect::effect(|cx: &Cx| {
+                //     let parent_id = cx.owner().get::<ChildOf>().unwrap().parent();
+                //     let granparent_id = cx.entity(parent_id).get::<ChildOf>().unwrap().parent();
+                //     cx.entity(granparent_id).get::<GraphBounds>().unwrap().0
+                // }, |ent, rect| {
+                //     if !rect.is_empty() {
+                //         let mut node = ent.get_mut::<Node>().unwrap();
+                //         node.left = px(rect.min.x);
+                //         node.top = px(rect.min.y);
+                //         node.width = px(rect.width());
+                //         node.height = px(rect.height());
+                //     }
+                // })
             ]
         ]
     ));

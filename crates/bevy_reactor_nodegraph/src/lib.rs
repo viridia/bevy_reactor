@@ -9,12 +9,13 @@ use bevy::{
 mod draw_path;
 mod gesture;
 mod graph;
+mod scrolling;
 
 pub use draw_path::*;
 pub use gesture::*;
 pub use graph::*;
 
-use crate::graph::update_connection_shader;
+use crate::{graph::update_connection_shader, scrolling::update_scrollbar_thumb};
 
 pub struct ReactorNodeGraphPlugin;
 
@@ -33,6 +34,7 @@ impl Plugin for ReactorNodeGraphPlugin {
                 update_node_outlines,
                 update_terminal_positions,
                 update_graph_bounds,
+                update_scrollbar_thumb.after(update_graph_bounds),
             ),
         );
     }

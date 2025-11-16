@@ -18,13 +18,14 @@ use bevy::{
         constants::fonts, cursor::EntityCursor, font_styles::InheritableFont, palette,
         theme::ThemedText,
     },
-    input::{ButtonInput, keyboard::KeyCode},
+    input::{ButtonInput, keyboard::KeyCode, mouse::MouseScrollUnit},
     log::warn_once,
     math::{Rect, Vec2},
     picking::{
         Pickable,
         events::{
             Cancel, Drag, DragDrop, DragEnd, DragEnter, DragLeave, DragStart, Pointer, Press,
+            Scroll,
         },
         hover::Hovered,
     },
@@ -32,15 +33,17 @@ use bevy::{
     scene2::{Scene, bsn, on, template_value},
     ui::{
         AlignItems, AlignSelf, BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode,
-        ComputedUiRenderTargetInfo, Display, FlexDirection, JustifyContent, Node, Outline,
-        PositionType, UiGlobalTransform, UiRect, UiTransform, Val, Val2, px, widget::Text,
+        ComputedUiRenderTargetInfo, Display, FlexDirection, GridPlacement, JustifyContent, Node,
+        Outline, PositionType, RepeatedGridTrack, UiGlobalTransform, UiRect, UiTransform, Val,
+        Val2, px, widget::Text,
     },
     ui_render::prelude::MaterialNode,
+    ui_widgets::ControlOrientation,
 };
 
 use crate::{
     ConnectEvent, ConnectionAnchor, ConnectionTarget, DragAction, DrawPathMaterial, DrawablePath,
-    Gesture, GestureState, MoveNodesEvent,
+    Gesture, GestureState, MoveNodesEvent, scrolling::node_graph_scrollbar,
 };
 
 /// A node graph.
@@ -54,7 +57,7 @@ pub struct GraphBounds(pub Rect);
 
 /// Scrolling content region of the graph.
 #[derive(Component, Clone, Default)]
-pub struct GraphContents;
+pub struct GraphDocument;
 
 /// A node within a node graph.
 #[derive(Component, Clone, Default)]
@@ -87,22 +90,50 @@ pub struct SelectionRect;
 pub fn node_graph() -> impl Scene {
     bsn! {
         Graph
+        Node {
+            display: Display::Grid,
+            grid_template_rows: {vec![
+                RepeatedGridTrack::flex(1, 1.),
+                RepeatedGridTrack::px(1, 12.0),
+            ]},
+            grid_template_columns: {vec![
+                RepeatedGridTrack::flex(1, 1.),
+                RepeatedGridTrack::px(1, 12.0),
+            ]},
+            // border: UiRect::new(px(0), px(2), px(0), px(2)),
+        }
         EntityCursor::System(bevy::window::SystemCursorIcon::Crosshair)
         on(on_graph_press)
         on(on_graph_drag_start)
         on(on_graph_drag)
         on(on_graph_drag_end)
         on(on_graph_drag_cancel)
+        on(on_graph_scroll)
+        [
+            // Vertical scrollbar
+            :node_graph_scrollbar(ControlOrientation::Vertical)
+            Node {
+                grid_column: GridPlacement::start_span(2, 1),
+                grid_row: GridPlacement::start_span(1, 1),
+            }
+            ,
+            // Horizontal scrollbar
+            :node_graph_scrollbar(ControlOrientation::Horizontal)
+            Node {
+                grid_column: GridPlacement::start_span(1, 1),
+                grid_row: GridPlacement::start_span(2, 1),
+            }
+        ]
     }
 }
 
-pub fn node_graph_contents() -> impl Scene {
+pub fn node_graph_document() -> impl Scene {
     bsn! {
-        GraphContents
+        GraphDocument
         Node {
             position_type: PositionType::Absolute,
-            left: px(10.0),
-            top: px(20.0),
+            left: px(0.0),
+            top: px(0.0),
         }
         [
             :selection_rect()
@@ -353,7 +384,7 @@ pub(crate) fn on_insert_connection(
         Option<&MaterialNode<DrawPathMaterial>>,
     )>,
     q_parent: Query<&ChildOf>,
-    q_graph_content: Query<(&UiGlobalTransform, &ComputedNode), With<GraphContents>>,
+    q_graph_doc: Query<(&UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     q_terminals: Query<(&UiGlobalTransform, &ComputedNode)>,
     mut r_materials: ResMut<Assets<DrawPathMaterial>>,
     mut r_bindings: ResMut<Assets<ShaderStorageBuffer>>,
@@ -361,20 +392,20 @@ pub(crate) fn on_insert_connection(
 ) {
     // Adjust node
     if let Ok((connection, mut node, material_node)) = q_node.get_mut(insert.entity) {
-        let Some((contents_transform, contents_computed_node)) = q_parent
+        let Some((doc_transform, doc_computed_node)) = q_parent
             .iter_ancestors(insert.entity)
-            .find_map(|ent| q_graph_content.get(ent).ok())
+            .find_map(|ent| q_graph_doc.get(ent).ok())
         else {
             return;
         };
 
-        let contents_origin = contents_transform.translation - contents_computed_node.size() * 0.5;
+        let doc_origin = doc_transform.translation - doc_computed_node.size() * 0.5;
 
         let mut path = DrawablePath::new(connection.color.into(), 1.5);
         let src = match connection.src {
             ConnectionTerminus::Terminal(entity) => {
                 if let Ok((transform, computed_node)) = q_terminals.get(entity) {
-                    (transform.translation - contents_origin) * computed_node.inverse_scale_factor()
+                    (transform.translation - doc_origin) * computed_node.inverse_scale_factor()
                 } else {
                     Vec2::ZERO
                 }
@@ -384,7 +415,7 @@ pub(crate) fn on_insert_connection(
         let dst = match connection.dst {
             ConnectionTerminus::Terminal(entity) => {
                 if let Ok((transform, computed_node)) = q_terminals.get(entity) {
-                    (transform.translation - contents_origin) * computed_node.inverse_scale_factor()
+                    (transform.translation - doc_origin) * computed_node.inverse_scale_factor()
                 } else {
                     Vec2::ZERO
                 }
@@ -472,22 +503,22 @@ fn on_graph_drag_start(
     mut drag_start: On<Pointer<DragStart>>,
     q_children: Query<&Children>,
     mut q_selection: Query<(&mut Node, &mut Visibility), With<SelectionRect>>,
-    q_graph_content: Query<(), With<GraphContents>>,
+    q_graph_doc: Query<(), With<GraphDocument>>,
     mut r_gesture: ResMut<GestureState>,
 ) {
     drag_start.propagate(false);
     r_gesture.selection_anchor = drag_start.pointer_location.position;
 
-    // Find the content entity
-    let Some(&content_ent) = q_children
+    // Find the document
+    let Some(&doc_ent) = q_children
         .get(drag_start.entity)
         .ok()
-        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+        .and_then(|children| children.iter().find(|&&ent| q_graph_doc.contains(ent)))
     else {
         return;
     };
 
-    if let Ok(children) = q_children.get(content_ent) {
+    if let Ok(children) = q_children.get(doc_ent) {
         for child in children.iter() {
             if let Ok((mut rect_node, mut rect_vis)) = q_selection.get_mut(*child) {
                 *rect_vis = Visibility::Visible;
@@ -505,7 +536,7 @@ fn on_graph_drag(
     mut drag: On<Pointer<Drag>>,
     q_children: Query<&Children>,
     mut q_selection: Query<&mut Node, With<SelectionRect>>,
-    q_graph_content: Query<(), With<GraphContents>>,
+    q_graph_doc: Query<(), With<GraphDocument>>,
     mut q_nodes: Query<
         (&Node, &ComputedNode, &ChildOf, &mut GraphNodeSelection),
         (With<GraphNode>, Without<SelectionRect>),
@@ -516,17 +547,17 @@ fn on_graph_drag(
     let graph_ent = drag.entity;
     let rect = Rect::from_corners(r_gesture.selection_anchor, drag.pointer_location.position);
 
-    // Find the content entity
-    let Some(&content_ent) = q_children
+    // Find the document
+    let Some(&doc_ent) = q_children
         .get(graph_ent)
         .ok()
-        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+        .and_then(|children| children.iter().find(|&&ent| q_graph_doc.contains(ent)))
     else {
         return;
     };
 
     // Update the selection rect position
-    if let Ok(children) = q_children.get(content_ent) {
+    if let Ok(children) = q_children.get(doc_ent) {
         for child in children.iter() {
             if let Ok(mut rect_node) = q_selection.get_mut(*child) {
                 rect_node.left = px(rect.min.x);
@@ -538,7 +569,7 @@ fn on_graph_drag(
     }
 
     for (node, computed_node, parent, mut selection) in q_nodes.iter_mut() {
-        let pending = parent.0 == content_ent
+        let pending = parent.0 == doc_ent
             && match (node.left, node.top) {
                 (Val::Px(x), Val::Px(y)) => {
                     let node_rect = Rect::from_center_size(
@@ -565,23 +596,23 @@ fn rect_overlaps(a: &Rect, b: &Rect) -> bool {
 fn on_graph_drag_end(
     mut drag_end: On<Pointer<DragEnd>>,
     q_children: Query<&Children>,
-    q_graph_content: Query<(), With<GraphContents>>,
+    q_graph_doc: Query<(), With<GraphDocument>>,
     mut q_selection: Query<&mut Visibility, With<SelectionRect>>,
     mut q_nodes: Query<&mut GraphNodeSelection, With<GraphNode>>,
 ) {
     drag_end.propagate(false);
 
-    // Find the content entity
-    let Some(&content_ent) = q_children
+    // Find the document
+    let Some(&doc_ent) = q_children
         .get(drag_end.entity)
         .ok()
-        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+        .and_then(|children| children.iter().find(|&&ent| q_graph_doc.contains(ent)))
     else {
         return;
     };
 
     // Hide the selection rect
-    if let Ok(children) = q_children.get(content_ent) {
+    if let Ok(children) = q_children.get(doc_ent) {
         for child in children.iter() {
             if let Ok(mut rect_vis) = q_selection.get_mut(*child) {
                 *rect_vis = Visibility::Hidden;
@@ -601,23 +632,23 @@ fn on_graph_drag_end(
 fn on_graph_drag_cancel(
     mut cancel: On<Pointer<Cancel>>,
     q_children: Query<&Children>,
-    q_graph_content: Query<(), With<GraphContents>>,
+    q_graph_doc: Query<(), With<GraphDocument>>,
     mut q_selection: Query<&mut Visibility, With<SelectionRect>>,
     mut q_nodes: Query<&mut GraphNodeSelection, With<GraphNode>>,
 ) {
     cancel.propagate(false);
 
-    // Find the content entity
-    let Some(&content_ent) = q_children
+    // Find the document
+    let Some(&doc_ent) = q_children
         .get(cancel.entity)
         .ok()
-        .and_then(|children| children.iter().find(|&&ent| q_graph_content.contains(ent)))
+        .and_then(|children| children.iter().find(|&&ent| q_graph_doc.contains(ent)))
     else {
         return;
     };
 
     // Hide the selection rect
-    if let Ok(children) = q_children.get(content_ent) {
+    if let Ok(children) = q_children.get(doc_ent) {
         for child in children.iter() {
             if let Ok(mut rect_vis) = q_selection.get_mut(*child) {
                 *rect_vis = Visibility::Hidden;
@@ -629,6 +660,56 @@ fn on_graph_drag_cancel(
     for mut selection in q_nodes.iter_mut() {
         if selection.pending {
             selection.pending = false;
+        }
+    }
+}
+
+fn on_graph_scroll(
+    mut scroll: On<Pointer<Scroll>>,
+    q_graph: Query<(&ComputedNode, &GraphBounds, &Children), With<Graph>>,
+    mut q_doc: Query<&mut Node, (With<GraphDocument>, Without<Graph>)>,
+) {
+    if let Ok((computed_node, &GraphBounds(bounds), children)) = q_graph.get(scroll.entity) {
+        scroll.propagate(false);
+
+        // Find the document
+        let Some(doc_ent) = children.iter().find(|&&ent| q_doc.contains(ent)) else {
+            return;
+        };
+        let Ok(mut doc_node) = q_doc.get_mut(*doc_ent) else {
+            return;
+        };
+
+        let visible_size = computed_node.size() * computed_node.inverse_scale_factor;
+
+        let scroll_limits = Rect {
+            min: bounds.min,
+            max: (bounds.max - visible_size).max(bounds.min),
+        };
+
+        let scroll_pos = Vec2::new(
+            match doc_node.left {
+                Val::Px(px) => -px,
+                _ => 0.0,
+            },
+            match doc_node.top {
+                Val::Px(px) => -px,
+                _ => 0.0,
+            },
+        );
+
+        let scroll_delta = Vec2::new(scroll.x, scroll.y)
+            * match scroll.unit {
+                MouseScrollUnit::Line => 14.0, // Guess for now. No idea how we'd get the real value.
+                MouseScrollUnit::Pixel => 1.0,
+            };
+
+        let next_scroll_pos =
+            (scroll_pos - scroll_delta).clamp(scroll_limits.min, scroll_limits.max);
+
+        if next_scroll_pos != scroll_pos {
+            doc_node.left = px(-next_scroll_pos.x);
+            doc_node.top = px(-next_scroll_pos.y);
         }
     }
 }
@@ -675,14 +756,14 @@ fn on_graph_node_drag_start(
         (&ChildOf, &Node, &GraphNodeSelection, &mut GraphNodeOffset),
         With<GraphNode>,
     >,
-    q_graph_content: Query<&ChildOf, (With<GraphContents>, Without<Graph>)>,
+    q_graph_doc: Query<&ChildOf, (With<GraphDocument>, Without<Graph>)>,
     q_graph: Query<(), With<Graph>>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
     drag_start.propagate(false);
     if let Ok((&ChildOf(parent), _, _, _)) = q_node.get(drag_start.entity) {
-        if let Ok(&ChildOf(grandparent)) = q_graph_content.get(parent) {
+        if let Ok(&ChildOf(grandparent)) = q_graph_doc.get(parent) {
             if q_graph.contains(grandparent) {
                 r_gesture.graph = Some(grandparent);
                 r_gesture.gesture = Gesture::Move;
@@ -757,7 +838,7 @@ fn on_terminal_drag_start(
     q_parent: Query<&ChildOf>,
     mut q_terminal: Query<&Terminal>,
     q_graph: Query<&Children, With<Graph>>,
-    q_graph_content: Query<(Entity, &UiGlobalTransform, &ComputedNode), With<GraphContents>>,
+    q_graph_doc: Query<(Entity, &UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
@@ -771,13 +852,11 @@ fn on_terminal_drag_start(
             return;
         };
 
-        // Find the content entity
-        let Some((connections, container_transform, container_computed_node)) =
-            q_graph.get(graph).ok().and_then(|children| {
-                children
-                    .iter()
-                    .find_map(|&ent| q_graph_content.get(ent).ok())
-            })
+        // Find the document
+        let Some((connections, container_transform, container_computed_node)) = q_graph
+            .get(graph)
+            .ok()
+            .and_then(|children| children.iter().find_map(|&ent| q_graph_doc.get(ent).ok()))
         else {
             return;
         };
@@ -815,7 +894,7 @@ fn on_terminal_drag_start(
 fn on_terminal_drag(
     mut drag: On<Pointer<Drag>>,
     mut r_gesture: ResMut<GestureState>,
-    q_graph_content: Query<(&UiGlobalTransform, &ComputedNode), With<GraphContents>>,
+    q_graph_doc: Query<(&UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     mut commands: Commands,
 ) {
     drag.propagate(false);
@@ -827,7 +906,7 @@ fn on_terminal_drag(
             ref mut target,
         } = r_gesture.gesture
         {
-            let Ok((container_transform, container_computed_node)) = q_graph_content.get(container)
+            let Ok((container_transform, container_computed_node)) = q_graph_doc.get(container)
             else {
                 return;
             };
@@ -1065,34 +1144,54 @@ pub(crate) fn update_terminal_positions(
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn update_graph_bounds(
-    mut q_graph: Query<(&Children, &mut GraphBounds), With<Graph>>,
-    q_graph_contents: Query<
-        (&Children, &UiGlobalTransform, &ComputedNode),
-        (With<GraphContents>, Without<Graph>),
+    mut q_graph: Query<(&Children, &ComputedNode, &mut GraphBounds), With<Graph>>,
+    q_doc: Query<
+        (&Node, &Children, &UiGlobalTransform, &ComputedNode),
+        (With<GraphDocument>, Without<Graph>),
     >,
     q_nodes: Query<(&UiGlobalTransform, &ComputedNode), (With<GraphNode>, Without<Graph>)>,
 ) {
-    for (children, mut graph_bounds) in q_graph.iter_mut() {
+    for (children, graph_computed_node, mut graph_bounds) in q_graph.iter_mut() {
         let mut new_bounds = Rect::EMPTY;
-        let Some((content_children, graph_transform, graph_computed_node)) = children
-            .iter()
-            .find_map(|&ent| q_graph_contents.get(ent).ok())
+
+        // Find doc element
+        let Some((doc_node, doc_children, doc_transform, doc_computed_node)) =
+            children.iter().find_map(|&ent| q_doc.get(ent).ok())
         else {
             continue;
         };
 
-        let graph_origin = (graph_transform.translation - graph_computed_node.size() * 0.5)
-            * graph_computed_node.inverse_scale_factor();
-        for child_id in content_children {
+        // Compute bounds of each node relative to document entity and add to bounds.
+        let doc_origin = (doc_transform.translation - doc_computed_node.size() * 0.5)
+            * doc_computed_node.inverse_scale_factor();
+        for child_id in doc_children {
             if let Ok((node_transform, computed_node)) = q_nodes.get(*child_id) {
-                let child_pos = node_transform.translation * computed_node.inverse_scale_factor()
-                    - graph_origin;
-                new_bounds = new_bounds.union(Rect::from_center_size(
-                    child_pos,
-                    computed_node.size() * computed_node.inverse_scale_factor(),
-                ));
+                let child_pos =
+                    node_transform.translation * computed_node.inverse_scale_factor() - doc_origin;
+                new_bounds = new_bounds.union(
+                    Rect::from_center_size(
+                        child_pos,
+                        computed_node.size() * computed_node.inverse_scale_factor(),
+                    )
+                    .inflate(50.0),
+                );
             }
         }
+
+        let viewport_size = graph_computed_node.size() * graph_computed_node.inverse_scale_factor();
+        let scroll_pos = Vec2::new(
+            match doc_node.left {
+                Val::Px(px) => px,
+                _ => 0.0,
+            },
+            match doc_node.top {
+                Val::Px(px) => px,
+                _ => 0.0,
+            },
+        );
+
+        let visible_area = Rect::from_corners(-scroll_pos, viewport_size - scroll_pos);
+        new_bounds = new_bounds.union(visible_area);
 
         if graph_bounds.0 != new_bounds {
             graph_bounds.0 = new_bounds;
