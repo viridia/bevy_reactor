@@ -48,12 +48,22 @@ use crate::{
 
 /// A node graph.
 #[derive(Component, Clone, Default)]
-#[require(GraphBounds)]
+#[require(GraphBounds, GraphZoom)]
 pub struct Graph;
 
 /// Calculated bounds of the graph's contents.
 #[derive(Component, Clone, Default)]
 pub struct GraphBounds(pub Rect);
+
+/// Scaling factor for the graph document.
+#[derive(Component, Clone)]
+pub struct GraphZoom(pub f32);
+
+impl Default for GraphZoom {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
 
 /// Scrolling content region of the graph.
 #[derive(Component, Clone, Default)]
@@ -394,7 +404,7 @@ pub(crate) fn on_insert_connection(
     )>,
     mut q_connection_hit: Query<(&ConnectionHitBox, &mut Node), Without<Connection>>,
     q_parent: Query<&ChildOf>,
-    q_graph_doc: Query<(&UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
+    q_graph_doc: Query<(&UiTransform, &UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     q_terminals: Query<(&UiGlobalTransform, &ComputedNode)>,
     mut r_materials: ResMut<Assets<DrawPathMaterial>>,
     mut r_bindings: ResMut<Assets<ShaderStorageBuffer>>,
@@ -402,36 +412,38 @@ pub(crate) fn on_insert_connection(
 ) {
     if let Ok((connection, mut node, material_node, children)) = q_connection.get_mut(insert.entity)
     {
-        let Some((doc_transform, doc_computed_node)) = q_parent
+        let Some((doc_transform, doc_global_transform, doc_computed_node)) = q_parent
             .iter_ancestors(insert.entity)
             .find_map(|ent| q_graph_doc.get(ent).ok())
         else {
             return;
         };
 
-        let doc_origin = doc_transform.translation - doc_computed_node.size() * 0.5;
+        let doc_origin = doc_global_transform.translation - doc_computed_node.size() * 0.5;
 
         let mut path = DrawablePath::new(connection.color.into(), 1.5);
         let src = match connection.src {
             ConnectionTerminus::Terminal(entity) => {
-                if let Ok((transform, computed_node)) = q_terminals.get(entity) {
-                    (transform.translation - doc_origin) * computed_node.inverse_scale_factor()
+                if let Ok((term_transform, term_computed_node)) = q_terminals.get(entity) {
+                    (term_transform.translation - doc_origin)
+                        * term_computed_node.inverse_scale_factor()
                 } else {
                     Vec2::ZERO
                 }
             }
             ConnectionTerminus::Location(pos) => pos,
-        };
+        } / doc_transform.scale;
         let dst = match connection.dst {
             ConnectionTerminus::Terminal(entity) => {
-                if let Ok((transform, computed_node)) = q_terminals.get(entity) {
-                    (transform.translation - doc_origin) * computed_node.inverse_scale_factor()
+                if let Ok((term_transform, term_computed_node)) = q_terminals.get(entity) {
+                    (term_transform.translation - doc_origin)
+                        * term_computed_node.inverse_scale_factor()
                 } else {
                     Vec2::ZERO
                 }
             }
             ConnectionTerminus::Location(pos) => pos,
-        };
+        } / doc_transform.scale;
         let dx = (dst.x - src.x).abs().mul(0.3).min(20.);
         let dy = dst.y - src.y;
         let src1 = src + Vec2::new(dx, 0.);
@@ -577,11 +589,10 @@ fn on_graph_drag_start(
     mut drag_start: On<Pointer<DragStart>>,
     q_children: Query<&Children>,
     mut q_selection: Query<(&mut Node, &mut Visibility), With<SelectionRect>>,
-    q_graph_doc: Query<(), With<GraphDocument>>,
+    q_graph_doc: Query<&UiTransform, With<GraphDocument>>,
     mut r_gesture: ResMut<GestureState>,
 ) {
     drag_start.propagate(false);
-    r_gesture.selection_anchor = drag_start.pointer_location.position;
 
     // Find the document
     let Some(&doc_ent) = q_children
@@ -591,6 +602,8 @@ fn on_graph_drag_start(
     else {
         return;
     };
+    let doc_transform = q_graph_doc.get(doc_ent).unwrap();
+    r_gesture.selection_anchor = drag_start.pointer_location.position / doc_transform.scale;
 
     if let Ok(children) = q_children.get(doc_ent) {
         for child in children.iter() {
@@ -610,7 +623,7 @@ fn on_graph_drag(
     mut drag: On<Pointer<Drag>>,
     q_children: Query<&Children>,
     mut q_selection: Query<&mut Node, With<SelectionRect>>,
-    q_graph_doc: Query<(), With<GraphDocument>>,
+    q_graph_doc: Query<&UiTransform, With<GraphDocument>>,
     mut q_nodes: Query<
         (&Node, &ComputedNode, &ChildOf, &mut GraphNodeSelection),
         (With<GraphNode>, Without<SelectionRect>),
@@ -619,7 +632,6 @@ fn on_graph_drag(
 ) {
     drag.propagate(false);
     let graph_ent = drag.entity;
-    let rect = Rect::from_corners(r_gesture.selection_anchor, drag.pointer_location.position);
 
     // Find the document
     let Some(&doc_ent) = q_children
@@ -629,6 +641,12 @@ fn on_graph_drag(
     else {
         return;
     };
+    let doc_transform = q_graph_doc.get(doc_ent).unwrap();
+
+    let rect = Rect::from_corners(
+        r_gesture.selection_anchor,
+        drag.pointer_location.position / doc_transform.scale,
+    );
 
     // Update the selection rect position
     if let Ok(children) = q_children.get(doc_ent) {
@@ -877,14 +895,28 @@ fn on_graph_node_drag_start(
 
 fn on_graph_node_drag(
     mut drag: On<Pointer<Drag>>,
+    q_children: Query<&Children>,
+    q_graph_doc: Query<&UiTransform, With<GraphDocument>>,
     r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
     drag.propagate(false);
     if matches!(r_gesture.gesture, Gesture::Move) {
+        let Some(doc_transform) = r_gesture
+            .graph
+            .and_then(|graph| q_children.get(graph).ok())
+            .and_then(|children| {
+                children
+                    .iter()
+                    .find_map(|&child_id| q_graph_doc.get(child_id).ok())
+            })
+        else {
+            return;
+        };
+
         commands.trigger(MoveNodesEvent {
             graph: r_gesture.graph.unwrap(),
-            distance: drag.distance,
+            distance: drag.distance / doc_transform.scale,
         });
     }
 }
@@ -1357,5 +1389,24 @@ pub(crate) fn update_graph_bounds(
         if graph_bounds.0 != new_bounds {
             graph_bounds.0 = new_bounds;
         }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+pub(crate) fn update_zoom(
+    q_graph: Query<(&Children, &GraphZoom), (With<Graph>, Changed<GraphZoom>)>,
+    mut q_doc: Query<&mut UiTransform, With<GraphDocument>>,
+) {
+    for (children, &GraphZoom(zoom)) in q_graph.iter() {
+        // Find doc element
+        // Find the document
+        let Some(doc_ent) = children.iter().find(|&&ent| q_doc.contains(ent)) else {
+            return;
+        };
+        let Ok(mut doc_transform) = q_doc.get_mut(*doc_ent) else {
+            return;
+        };
+
+        doc_transform.scale = Vec2::splat(zoom);
     }
 }

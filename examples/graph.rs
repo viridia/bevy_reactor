@@ -13,15 +13,16 @@ use bevy::{
 };
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_nodegraph::{
-    ConnectEvent, Connection, ConnectionTerminus, DragAction, GraphNode, GraphNodeOffset,
-    GraphNodeSelection, MoveNodesEvent, ReactorNodeGraphPlugin, Terminal, input_terminal, label,
-    node_graph, node_graph_document, node_graph_node, node_graph_node_body, node_graph_node_title,
-    output_terminal,
+    ConnectEvent, Connection, ConnectionTerminus, DragAction, Graph, GraphNode, GraphNodeOffset,
+    GraphNodeSelection, GraphZoom, MoveNodesEvent, ReactorNodeGraphPlugin, Terminal,
+    input_terminal, label, node_graph, node_graph_document, node_graph_node, node_graph_node_body,
+    node_graph_node_title, output_terminal,
 };
 
 #[derive(Resource, Default)]
 struct GraphEditState {
     connection: Option<Entity>,
+    zoom_level: u32,
 }
 
 // #[derive(Component, Clone, Default)]
@@ -38,7 +39,7 @@ fn main() {
         .insert_resource(UiTheme(create_dark_theme()))
         .init_resource::<GraphEditState>()
         .add_systems(Startup, setup_view_root)
-        .add_systems(Update, close_on_esc)
+        .add_systems(Update, handle_key_input)
         .run();
 }
 
@@ -69,9 +70,6 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
         on(on_connect)
         [
             :node_graph_document()
-            // UiTransform {
-            //     scale: Vec2::splat(0.7)
-            // }
             [
                 :node_graph_node(Vec2::new(100.0, 200.0))
                 [
@@ -257,8 +255,23 @@ fn on_connect(
     }
 }
 
-pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
+fn handle_key_input(
+    input: Res<ButtonInput<KeyCode>>,
+    mut exit: MessageWriter<AppExit>,
+    mut q_graph: Query<&mut GraphZoom, With<Graph>>,
+    mut r_graph_state: ResMut<GraphEditState>,
+) {
     if input.just_pressed(KeyCode::Escape) {
         exit.write(AppExit::Success);
+    } else if input.just_pressed(KeyCode::Equal) {
+        r_graph_state.zoom_level = r_graph_state.zoom_level.saturating_sub(1);
+        for mut graph_zoom in q_graph.iter_mut() {
+            graph_zoom.0 = 0.8f32.powf(r_graph_state.zoom_level as f32);
+        }
+    } else if input.just_pressed(KeyCode::Minus) {
+        r_graph_state.zoom_level = r_graph_state.zoom_level.saturating_add(1);
+        for mut graph_zoom in q_graph.iter_mut() {
+            graph_zoom.0 = 0.8f32.powf(r_graph_state.zoom_level as f32);
+        }
     }
 }

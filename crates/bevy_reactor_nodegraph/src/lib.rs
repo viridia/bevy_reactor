@@ -1,5 +1,5 @@
 use bevy::{
-    app::{Plugin, PostUpdate},
+    app::{Plugin, PostUpdate, PreUpdate},
     asset::embedded_asset,
     ecs::schedule::IntoScheduleConfigs,
     ui::UiSystems,
@@ -27,6 +27,7 @@ impl Plugin for ReactorNodeGraphPlugin {
         app.init_resource::<GestureState>();
         app.add_plugins(UiMaterialPlugin::<DrawPathMaterial>::default());
         app.add_observer(on_insert_connection);
+        app.add_systems(PreUpdate, update_zoom);
         app.add_systems(
             PostUpdate,
             (
