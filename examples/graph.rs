@@ -68,10 +68,10 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
         on(on_move_nodes)
         on(on_connect)
         [
+            :node_graph_document()
             // UiTransform {
             //     scale: Vec2::splat(0.7)
             // }
-            :node_graph_document()
             [
                 :node_graph_node(Vec2::new(100.0, 200.0))
                 [
@@ -195,7 +195,7 @@ fn on_connect(
     mut r_graph_state: ResMut<GraphEditState>,
     mut commands: Commands,
 ) {
-    let container = connect.connections;
+    let container = connect.connection_list;
 
     // Check if connection is valid
     let input_terminal = match connect.dst {
@@ -224,11 +224,14 @@ fn on_connect(
     };
 
     match connect.action {
-        DragAction::Start => {
+        DragAction::StartNew => {
             // Create a new connection entity
             let connection = commands.spawn(connection).id();
             r_graph_state.connection = Some(connection);
             commands.entity(container).add_child(connection);
+        }
+        DragAction::StartEdit(connection) => {
+            r_graph_state.connection = Some(connection);
         }
         DragAction::InProgress => {
             // Update the position of the connection
@@ -240,7 +243,7 @@ fn on_connect(
             // otherwise, despawn.
             let conn_id = r_graph_state.connection.unwrap();
             if !is_valid {
-                info!("Connection not valid");
+                // debug!("Connection not valid, despawning");
                 commands.entity(conn_id).despawn();
             }
             r_graph_state.connection = None;

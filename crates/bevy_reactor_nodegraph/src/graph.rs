@@ -19,7 +19,7 @@ use bevy::{
         theme::ThemedText,
     },
     input::{ButtonInput, keyboard::KeyCode, mouse::MouseScrollUnit},
-    log::warn_once,
+    log::{debug, warn_once},
     math::{Rect, Vec2},
     picking::{
         Pickable,
@@ -33,9 +33,9 @@ use bevy::{
     scene2::{Scene, bsn, on, template_value},
     ui::{
         AlignItems, AlignSelf, BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode,
-        ComputedUiRenderTargetInfo, Display, FlexDirection, GridPlacement, JustifyContent, Node,
-        Outline, PositionType, RepeatedGridTrack, UiGlobalTransform, UiRect, UiTransform, Val,
-        Val2, px, widget::Text,
+        ComputedUiRenderTargetInfo, Display, FlexDirection, GlobalZIndex, GridPlacement,
+        JustifyContent, Node, Outline, PositionType, RepeatedGridTrack, UiGlobalTransform, UiRect,
+        UiTransform, Val, Val2, px, widget::Text,
     },
     ui_render::prelude::MaterialNode,
     ui_widgets::ControlOrientation,
@@ -61,7 +61,7 @@ pub struct GraphDocument;
 
 /// A node within a node graph.
 #[derive(Component, Clone, Default)]
-#[require(GraphNodeOffset, GraphNodeSelection)]
+#[require(GraphNodeOffset, GraphNodeSelection, GlobalZIndex(3))]
 pub struct GraphNode;
 
 /// Base offset for dragging a node.
@@ -374,15 +374,25 @@ pub struct Connection {
     pub color: Color,
 }
 
+/// Used for picking connections
+#[derive(Component, Clone, Debug)]
+pub enum ConnectionHitBox {
+    Src,
+    Dst,
+}
+
 /// Update shader uniforms for connection
+#[allow(clippy::type_complexity)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn on_insert_connection(
     insert: On<Insert, Connection>,
-    mut q_node: Query<(
+    mut q_connection: Query<(
         &Connection,
         &mut Node,
         Option<&MaterialNode<DrawPathMaterial>>,
+        Option<&Children>,
     )>,
+    mut q_connection_hit: Query<(&ConnectionHitBox, &mut Node), Without<Connection>>,
     q_parent: Query<&ChildOf>,
     q_graph_doc: Query<(&UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     q_terminals: Query<(&UiGlobalTransform, &ComputedNode)>,
@@ -390,8 +400,8 @@ pub(crate) fn on_insert_connection(
     mut r_bindings: ResMut<Assets<ShaderStorageBuffer>>,
     mut commands: Commands,
 ) {
-    // Adjust node
-    if let Ok((connection, mut node, material_node)) = q_node.get_mut(insert.entity) {
+    if let Ok((connection, mut node, material_node, children)) = q_connection.get_mut(insert.entity)
+    {
         let Some((doc_transform, doc_computed_node)) = q_parent
             .iter_ancestors(insert.entity)
             .find_map(|ent| q_graph_doc.get(ent).ok())
@@ -444,10 +454,10 @@ pub(crate) fn on_insert_connection(
         }
         let bounds = path.bounds();
 
-        node.left = Val::Px(bounds.min.x);
-        node.top = Val::Px(bounds.min.y);
-        node.width = Val::Px(bounds.width());
-        node.height = Val::Px(bounds.height());
+        node.left = px(bounds.min.x);
+        node.top = px(bounds.min.y);
+        node.width = px(bounds.width());
+        node.height = px(bounds.height());
         node.right = Val::Auto;
         node.bottom = Val::Auto;
         node.position_type = PositionType::Absolute;
@@ -466,6 +476,70 @@ pub(crate) fn on_insert_connection(
                     .insert(MaterialNode(r_materials.add(material)));
             }
         };
+
+        // Update children for picking
+        if children.is_none() {
+            commands.entity(insert.entity).with_children(|parent| {
+                parent
+                    .spawn((
+                        ConnectionHitBox::Src,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            width: px(24),
+                            height: px(16),
+                            left: px(src.x - bounds.min.x),
+                            top: px(src.y - bounds.min.y - 8.0),
+                            ..Default::default()
+                        },
+                        EntityCursor::System(bevy::window::SystemCursorIcon::Move),
+                        Pickable {
+                            is_hoverable: true,
+                            should_block_lower: true,
+                        },
+                    ))
+                    .observe(on_connection_drag_start)
+                    .observe(on_terminal_drag)
+                    .observe(on_terminal_drag_end)
+                    .observe(on_terminal_drag_cancel);
+
+                parent
+                    .spawn((
+                        ConnectionHitBox::Dst,
+                        Node {
+                            position_type: PositionType::Absolute,
+                            width: px(24),
+                            height: px(16),
+                            left: px(dst.x - bounds.min.x - 24.0),
+                            top: px(dst.y - bounds.min.y - 8.0),
+                            ..Default::default()
+                        },
+                        EntityCursor::System(bevy::window::SystemCursorIcon::Move),
+                        Pickable {
+                            is_hoverable: true,
+                            should_block_lower: true,
+                        },
+                    ))
+                    .observe(on_connection_drag_start)
+                    .observe(on_terminal_drag)
+                    .observe(on_terminal_drag_end)
+                    .observe(on_terminal_drag_cancel);
+            });
+        } else if let Some(children) = children {
+            for &child in children {
+                if let Ok((hit, mut node)) = q_connection_hit.get_mut(child) {
+                    match hit {
+                        ConnectionHitBox::Src => {
+                            node.left = px(src.x - bounds.min.x);
+                            node.top = px(src.y - bounds.min.y - 8.0);
+                        }
+                        ConnectionHitBox::Dst => {
+                            node.left = px(dst.x - bounds.min.x - 24.0);
+                            node.top = px(dst.y - bounds.min.y - 8.0);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -842,9 +916,9 @@ fn on_terminal_drag_start(
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
-    // Get graph!
     drag_start.propagate(false);
     if let Ok(terminal) = q_terminal.get_mut(drag_start.entity) {
+        // Get graph
         let Some(graph) = q_parent
             .iter_ancestors(drag_start.entity)
             .find(|e| q_graph.contains(*e))
@@ -886,7 +960,7 @@ fn on_terminal_drag_start(
             connections,
             anchor,
             target,
-            DragAction::Start,
+            DragAction::StartNew,
         ));
     }
 }
@@ -899,6 +973,7 @@ fn on_terminal_drag(
 ) {
     drag.propagate(false);
     if let Some(graph) = r_gesture.graph {
+        debug!("on_terminal_drag");
         let connection_target = r_gesture.connection_target;
         if let Gesture::Connect {
             anchor,
@@ -1082,7 +1157,93 @@ fn on_terminal_drop(
             bevy::window::SystemCursorIcon::Crosshair,
         ));
         r_gesture.graph = None;
+        r_gesture.connection_target = None;
         r_gesture.gesture = Gesture::Idle;
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn on_connection_drag_start(
+    mut drag_start: On<Pointer<DragStart>>,
+    q_parent: Query<&ChildOf>,
+    mut q_connection_hitbox: Query<&ConnectionHitBox>,
+    q_connection: Query<&Connection>,
+    q_graph_doc: Query<(Entity, &UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
+    mut r_gesture: ResMut<GestureState>,
+    mut commands: Commands,
+) {
+    drag_start.propagate(false);
+    if let Ok(hitbox) = q_connection_hitbox.get_mut(drag_start.entity) {
+        // Get connection
+        let Ok(&ChildOf(conn_id)) = q_parent.get(drag_start.entity) else {
+            warn_once!("Connection hitbox should be a child of Connection");
+            return;
+        };
+        let Ok(connection) = q_connection.get(conn_id) else {
+            warn_once!("Connection hitbox should be a child of Connection");
+            return;
+        };
+
+        // Get document
+        let Some(doc) = q_parent
+            .iter_ancestors(drag_start.entity)
+            .find(|e| q_graph_doc.contains(*e))
+        else {
+            warn_once!("Connection hitbox should be contained within a graph document");
+            return;
+        };
+
+        // Get graph
+        let Ok(&ChildOf(graph)) = q_parent.get(doc) else {
+            warn_once!("Graph documet should be contained within a graph");
+            return;
+        };
+
+        // If we hit the Src, then Dst is the anchor, and vice-versa.
+        let (target, anchor) = match hitbox {
+            ConnectionHitBox::Src => (
+                match connection.src {
+                    ConnectionTerminus::Terminal(output) => {
+                        ConnectionTarget::OutputTerminal(output)
+                    }
+                    ConnectionTerminus::Location(pos) => ConnectionTarget::Location(pos),
+                },
+                match connection.dst {
+                    ConnectionTerminus::Terminal(input) => ConnectionAnchor::InputTerminal(input),
+                    ConnectionTerminus::Location(_) => unreachable!("Should be already connected"),
+                },
+            ),
+            ConnectionHitBox::Dst => (
+                match connection.dst {
+                    ConnectionTerminus::Terminal(input) => ConnectionTarget::InputTerminal(input),
+                    ConnectionTerminus::Location(pos) => ConnectionTarget::Location(pos),
+                },
+                match connection.src {
+                    ConnectionTerminus::Terminal(output) => {
+                        ConnectionAnchor::OutputTerminal(output)
+                    }
+                    ConnectionTerminus::Location(_) => unreachable!("Should be already connected"),
+                },
+            ),
+        };
+
+        r_gesture.graph = Some(graph);
+        r_gesture.connection_target = None;
+        r_gesture.gesture = Gesture::Connect {
+            connections: doc,
+            anchor,
+            target,
+        };
+        //     commands
+        //         .entity(graph)
+        //         .insert(EntityCursor::System(bevy::window::SystemCursorIcon::Copy));
+        commands.trigger(ConnectEvent::from_gesture(
+            graph,
+            doc,
+            anchor,
+            target,
+            DragAction::StartEdit(conn_id),
+        ));
     }
 }
 

@@ -9,9 +9,11 @@ use crate::ConnectionTerminus;
 /// in the middle.
 #[derive(Clone, Copy, Default, Debug, PartialEq)]
 pub enum DragAction {
-    /// Indicates that we just started dragging.
+    /// Indicates that we just started dragging a new connection.
     #[default]
-    Start,
+    StartNew,
+    /// Indicates that we just started dragging a pre-existing connection
+    StartEdit(Entity),
     /// Indicates a drag already in progress.
     InProgress,
     /// The drag operation has completed.
@@ -98,7 +100,7 @@ pub struct ConnectEvent {
     #[event_target]
     pub graph: Entity,
     /// Where new connections should be spawned
-    pub connections: Entity,
+    pub connection_list: Entity,
     /// Source (output) terminal or location
     pub src: ConnectionTerminus,
     /// Destination (input) terminal or location
@@ -112,7 +114,7 @@ impl ConnectEvent {
     /// swapping the order if the user is dragging in the reverse direction (from end to start).
     pub fn from_gesture(
         graph: Entity,
-        container: Entity,
+        connection_list: Entity,
         anchor: ConnectionAnchor,
         target: ConnectionTarget,
         action: DragAction,
@@ -168,7 +170,7 @@ impl ConnectEvent {
 
         Self {
             graph,
-            connections: container,
+            connection_list,
             src,
             dst,
             action,
