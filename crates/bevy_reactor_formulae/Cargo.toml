@@ -1,0 +1,9 @@
+[package]
+name = "bevy_reactor_formulae"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { workspace = true }
+bevy_reactor = { workspace = true }
+thiserror = "2.0.16"

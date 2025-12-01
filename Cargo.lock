@@ -1100,6 +1100,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_reactor_formulae"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_reactor",
+ "thiserror 2.0.16",
+]
+
+[[package]]
 name = "bevy_reactor_gizmoids"
 version = "0.1.0"
 dependencies = [
