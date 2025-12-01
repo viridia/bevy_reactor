@@ -1,5 +1,6 @@
 use std::{
     any::TypeId,
+    cell::RefCell,
     ops::{Add, Div, Mul, Rem, Sub},
 };
 
@@ -129,7 +130,7 @@ pub struct VM<'w, 'g, 'p> {
     iptr: *const u8,
 
     /// Reactive tracking scope
-    pub tracking: &'p mut TrackingScope,
+    pub tracking: RefCell<&'p mut TrackingScope>,
 }
 
 type InstrHandler = unsafe fn(&mut VM) -> Result<(), VMError>;
@@ -535,7 +536,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let error = vm.run().unwrap_err();
         assert_eq!(error, VMError::InvalidInstruction);
@@ -560,7 +561,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::Bool(true));
@@ -586,7 +587,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::I32(3));
@@ -615,7 +616,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::I32(6));
@@ -644,7 +645,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::F32(6.0));
@@ -673,7 +674,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::F64(6.0));
@@ -702,7 +703,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let error = vm.run().unwrap_err();
         assert_eq!(
@@ -734,7 +735,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::I32(4));
@@ -763,7 +764,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::I32(1));
@@ -792,7 +793,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::I32(5));
@@ -815,7 +816,7 @@ mod tests {
         let mut entity_props = SymbolTable::<EntityProperty>::empty();
         let entity_methods = SymbolTable::<EntityMethod>::empty();
         let self_id = globals.insert("self", Global::Property(get_self));
-        let health_id = entity_props.insert("health", get_actor_health);
+        let health_id = entity_props.insert("health", entity_health);
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_LOAD_GLOBAL);
@@ -832,7 +833,7 @@ mod tests {
             entity_methods: &entity_methods,
             stack: Vec::with_capacity(100),
             iptr: code.as_ptr(),
-            tracking: &mut tracking,
+            tracking: RefCell::new(&mut tracking),
         };
         let result = vm.run().unwrap();
         assert_eq!(result, Value::F32(22.0));
@@ -842,11 +843,17 @@ mod tests {
         Ok(Value::Entity(vm.owner))
     }
 
-    fn get_actor_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
+    fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
         let entity = vm.world.entity(actor);
         if let Some(&Health(h)) = entity.get::<Health>() {
+            vm.tracking
+                .borrow_mut()
+                .track_component::<Health>(actor, vm.world, true);
             Ok(Value::F32(h))
         } else {
+            vm.tracking
+                .borrow_mut()
+                .track_component::<Health>(actor, vm.world, false);
             Err(VMError::MissingComponent(Health.type_id()))
         }
     }

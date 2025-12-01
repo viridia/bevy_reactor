@@ -78,12 +78,7 @@ impl TrackingScope {
     }
 
     /// Convenience method for adding a component dependency.
-    pub(crate) fn track_component<C: Component>(
-        &mut self,
-        entity: Entity,
-        world: &World,
-        present: bool,
-    ) {
+    pub fn track_component<C: Component>(&mut self, entity: Entity, world: &World, present: bool) {
         self.track_component_id(
             entity,
             world
@@ -95,12 +90,7 @@ impl TrackingScope {
     }
 
     /// Convenience method for adding a component dependency by component id.
-    pub(crate) fn track_component_id(
-        &mut self,
-        entity: Entity,
-        component: ComponentId,
-        present: bool,
-    ) {
+    pub fn track_component_id(&mut self, entity: Entity, component: ComponentId, present: bool) {
         self.component_deps.insert((entity, component, present));
     }
 
