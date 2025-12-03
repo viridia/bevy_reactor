@@ -11,4 +11,6 @@ pub(crate) mod parser;
 mod pass;
 pub mod vm;
 
+pub use compiler::{CompilationError, compile_formula};
+pub use host::HostState;
 pub use vm::{VM, Value};

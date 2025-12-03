@@ -4,10 +4,7 @@ use bevy::scene::ron::de;
 
 use crate::{
     ast::{ASTNode, NodeKind},
-    compiler::{
-        CompilationError, CompilationUnit, CompiledFunction, CompiledModule, FunctionBody,
-        ModuleExprs,
-    },
+    compiler::{CompilationError, CompiledFunction, CompiledModule, FunctionBody, ModuleExprs},
     decl::{self, ParamDecl, Scope},
     expr::{Expr, ExprKind},
     expr_type::ExprType,
@@ -851,11 +848,8 @@ mod tests {
     #[test]
     fn test_gen_expr() {
         let mut builder = instr::InstructionBuilder::default();
-        // let host = HostState::default();
         let module = CompiledModule::default();
         let function = FunctionBody::default();
-        // let unit = CompilationUnit::new("--str--", "2 + 2", &host);
-        // let mut generator = CodeGenerator::default();
 
         // Create the expression: 2 + 2
         let mut lhs = Expr {

@@ -39,7 +39,7 @@ pub(crate) fn assign_types<'e>(
             assign_types(rhs, inference)?;
             match op {
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
-                    let ty = inference.substitute(&mut expr.typ);
+                    let ty = inference.substitute(&expr.typ);
                     match ty {
                         ExprType::I32 | ExprType::I64 | ExprType::F32 | ExprType::F64 => {
                             expr.typ = ty;
@@ -122,7 +122,7 @@ pub(crate) fn assign_types<'e>(
                 BinaryOp::LogAnd | BinaryOp::LogOr => todo!(),
 
                 BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
-                    let ty = inference.substitute(&mut expr.typ);
+                    let ty = inference.substitute(&expr.typ);
                     match ty {
                         ExprType::I32 | ExprType::I64 => {
                             expr.typ = ty;

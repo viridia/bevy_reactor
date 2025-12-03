@@ -129,7 +129,7 @@ pub enum DeclKind {
 //     pub function_index: usize,
 // }
 
-/// Declaration for a local variable or constant
+// / Declaration for a local variable or constant
 // #[derive(Debug, Clone)]
 // #[allow(unused)]
 // pub struct LocalDecl {
@@ -190,33 +190,6 @@ pub struct ParamDecl {
 //     pub index: usize,
 // }
 
-// #[derive(Debug)]
-// pub struct Decls<'e> {
-//     pub symbols: InternedSymbols,
-//     // pub imports: Vec<ImportDecl>,
-//     // pub structs: Vec<StructDecl>,
-//     // pub globals: Vec<GlobalDecl>,
-//     pub functions: Vec<FunctionDecl<'e>>,
-// }
-
-// impl<'e> Decls<'e> {
-//     pub fn new() -> Self {
-//         Self {
-//             symbols: InternedSymbols::new(),
-//             // imports: Vec::new(),
-//             // structs: Vec::new(),
-//             // globals: Vec::new(),
-//             functions: Vec::new(),
-//         }
-//     }
-
-//     pub fn add_function(&mut self, decl: FunctionDecl<'e>) -> usize {
-//         let index = self.functions.len();
-//         self.functions.push(decl);
-//         index
-//     }
-// }
-
 pub type DeclTable = HashMap<SmolStr, Decl>;
 
 #[derive(Debug)]
@@ -226,13 +199,6 @@ pub(crate) struct Scope<'parent, 'decls> {
 }
 
 impl<'parent, 'decls> Scope<'parent, 'decls> {
-    // pub fn new(parent: Option<&'parent Scope>) -> Self {
-    //     Self {
-    //         parent,
-    //         decls: HashMap::new(),
-    //     }
-    // }
-
     pub fn lookup(&self, name: &str) -> Option<&Decl> {
         if let Some(decl) = self.decls.get(name) {
             return Some(decl);
@@ -243,17 +209,5 @@ impl<'parent, 'decls> Scope<'parent, 'decls> {
         } else {
             None
         }
-    }
-
-    pub fn get(&self, name: &str) -> Option<&Decl> {
-        self.decls.get(name)
-    }
-
-    // pub fn insert(&mut self, name: SmolStr, decl: Decl2) {
-    //     self.decls.insert(name, decl);
-    // }
-
-    pub fn contains(&self, symbol: &str) -> bool {
-        self.decls.contains_key(symbol)
     }
 }

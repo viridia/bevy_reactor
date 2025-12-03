@@ -4,10 +4,9 @@ use std::sync::Arc;
 use bevy::{render::render_graph::Node, scene::ron::de};
 
 use crate::{
-    ast::{ASTNode, NodeKind},
+    ast::{ASTDecl, ASTNode, NodeKind},
     compiler::{
-        self, CompilationError, CompilationUnit, CompiledFunction, CompiledModule, FunctionBody,
-        ModuleExprs,
+        self, CompilationError, CompiledFunction, CompiledModule, FunctionBody, ModuleExprs,
     },
     decl::{self, DeclKind, DeclTable, DeclVisibility, ParamDecl, Scope},
     expr::{Expr, ExprKind},
@@ -165,7 +164,7 @@ pub(crate) fn build_module_exprs<'ast>(
                         ret: ret_ast,
                         ..
                     } => {
-                        let decl = module_scope.get(name).unwrap();
+                        let decl = module.module_decls.get(name).unwrap();
                         let ret_type = match ret_ast {
                             None => ExprType::Void,
                             Some(ret_ast) => resolve_types(&module_scope, ret_ast)?,
@@ -310,10 +309,6 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
             parent: None,
             decls: &host.global_decls,
         };
-        // let module_scope = Scope {
-        //     parent: Some(&host_scope),
-        //     decls: &module.module_decls,
-        // };
 
         // Multiple declarations of the same function are not allowed.
         if module.module_decls.contains_key(CompiledModule::DEFAULT) {
@@ -323,6 +318,29 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
                 CompiledModule::DEFAULT.to_string(),
             ));
         }
+
+        // Hoisting: function and type declarations are processed first
+        let mut hoisted: Vec<&ASTNode> = Vec::new();
+        let mut non_hoisted: Vec<&ASTNode> = Vec::new();
+
+        for s in stmts.iter() {
+            if let NodeKind::Decl(decl) = s.kind
+                && let ASTDecl::Function {
+                    name: _,
+                    visibility: _,
+                    params: _,
+                    ret: _,
+                    body: _,
+                    is_native: _,
+                } = decl
+            {
+                hoisted.push(s);
+            } else {
+                non_hoisted.push(s);
+            }
+        }
+
+        // TODO: Eagerly construct all the hoisted declarations
 
         let function_index = module_exprs.functions.len();
         let fd = decl::Decl {
@@ -338,30 +356,34 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         };
         module_exprs.functions.push(FunctionBody { body: None });
 
-        // module.functions.push(CompiledFunction {
-        //     code: todo!(),
-        //     locals: todo!(),
-        // });
-
         let mut inference: TypeInference = Default::default();
-        // let param_decls = DeclTable::new();
-        // let param_scope = Scope {
-        //     parent: Some(&scope),
-        //     decls: &param_decls,
-        // };
 
-        // let param_scope = Scope::new(Some(scope));
         // let mut local_scope = Scope::new(Some(&param_scope));
         let mut local_index: usize = 0;
         // let mut locals_table: Vec<LocalDecl> = Vec::new();
-        let body_expr = build_exprs(
+
+        // Scope for the whole module.
+        let module_scope = Scope {
+            parent: Some(&host_scope),
+            decls: &module.module_decls,
+        };
+
+        // Scope for the function parameters from within the function body.
+        let param_decls = DeclTable::default();
+        // TODO: Fill in params
+        let param_scope = Scope {
+            parent: Some(&module_scope),
+            decls: &param_decls,
+        };
+
+        let body_expr = build_block(
             ast,
-            &host_scope,
-            &mut module.module_decls,
-            // decls,
+            &param_scope,
             &mut local_index,
             &mut inference,
             expr_arena,
+            &non_hoisted,
+            result,
         )?;
 
         inference.add_constraint(ret_type.clone(), body_expr.typ.clone(), body_expr.location);
@@ -373,15 +395,11 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         //     local.typ = inference.substitute(&local.typ);
         // }
 
-        // fd.body = Some(body_expr);
         // fd.locals = locals_table;
 
         module
             .module_decls
             .insert(CompiledModule::DEFAULT.into(), fd);
-
-        // let findex = decls.add_function(fd);
-        // module_scope.insert(name, decl::Decl::Function(findex));
 
         for (ref name, ref mut decl) in module.module_decls.iter_mut() {}
 
@@ -642,8 +660,9 @@ pub(crate) fn build_exprs<'a, 'e>(
                 .with_type(ty))
         }
 
-        NodeKind::FieldName(base, fname) => {
+        NodeKind::FieldName(base, _fname) => {
             let base_expr = build_exprs(base, parent_scope, current_scope, locals, inference, out)?;
+            #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 // ExprType::Struct(stype) => {
                 //     let field = stype.fields.iter().find(|field| field.name == *fname);
@@ -668,8 +687,9 @@ pub(crate) fn build_exprs<'a, 'e>(
             }
         }
 
-        NodeKind::FieldIndex(base, index) => {
+        NodeKind::FieldIndex(base, _index) => {
             let base_expr = build_exprs(base, parent_scope, current_scope, locals, inference, out)?;
+            #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 // ExprType::TupleStruct(tstype) => {
                 //     if *index >= tstype.fields.len() {
@@ -698,8 +718,8 @@ pub(crate) fn build_exprs<'a, 'e>(
                 name,
                 typ,
                 value,
-                is_const,
-                visibility,
+                is_const: _,
+                visibility: _,
                 ..
             } => {
                 let typ = match typ {
@@ -754,39 +774,22 @@ pub(crate) fn build_exprs<'a, 'e>(
             }
             _ => todo!("Decl: {:?}", decl),
         },
-        NodeKind::Block(stmts, result) => {
-            let mut stmt_exprs = Vec::<&mut Expr>::new();
-            for stmt in *stmts {
-                let stmt_expr =
-                    build_exprs(stmt, parent_scope, current_scope, locals, inference, out)?;
-                stmt_exprs.push(stmt_expr);
-            }
 
-            let result_expr = match result {
-                Some(result) => Some(build_exprs(
-                    result,
-                    parent_scope,
-                    current_scope,
-                    locals,
-                    inference,
-                    out,
-                )?),
-                None => None,
+        NodeKind::Block(stmts, result) => {
+            let block_parent_scope = Scope {
+                parent: Some(parent_scope),
+                decls: current_scope,
             };
-            let result_type = result_expr
-                .as_ref()
-                .map(|expr| expr.typ.clone())
-                .unwrap_or(ExprType::Void);
-            let location = result_expr
-                .as_ref()
-                .map(|expr| expr.location)
-                .unwrap_or(ast.location);
-            Ok(out
-                .alloc(Expr::new(
-                    location,
-                    ExprKind::Block(stmt_exprs, result_expr),
-                ))
-                .with_type(result_type))
+
+            build_block(
+                ast,
+                &block_parent_scope,
+                locals,
+                inference,
+                out,
+                stmts,
+                result,
+            )
         }
 
         NodeKind::Cast { arg, typ } => {
@@ -856,4 +859,49 @@ pub(crate) fn build_exprs<'a, 'e>(
             panic!("Invalid AST node for expression: {:?}", ast.kind);
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_block<'a, 'e>(
+    ast: &'a ASTNode<'a>,
+    parent_scope: &decl::Scope,
+    locals: &mut usize,
+    inference: &mut TypeInference,
+    out: &'e bumpalo::Bump,
+    stmts: &[&ASTNode<'_>],
+    result: &Option<&ASTNode<'_>>,
+) -> Result<&'e mut Expr<'e>, CompilationError> {
+    let mut stmt_exprs = Vec::<&mut Expr>::new();
+
+    let mut local_decls = DeclTable::default();
+    for stmt in stmts {
+        let stmt_expr = build_exprs(stmt, parent_scope, &mut local_decls, locals, inference, out)?;
+        stmt_exprs.push(stmt_expr);
+    }
+
+    let result_expr = match result {
+        Some(result) => Some(build_exprs(
+            result,
+            parent_scope,
+            &mut local_decls,
+            locals,
+            inference,
+            out,
+        )?),
+        None => None,
+    };
+    let result_type = result_expr
+        .as_ref()
+        .map(|expr| expr.typ.clone())
+        .unwrap_or(ExprType::Void);
+    let location = result_expr
+        .as_ref()
+        .map(|expr| expr.location)
+        .unwrap_or(ast.location);
+    Ok(out
+        .alloc(Expr::new(
+            location,
+            ExprKind::Block(stmt_exprs, result_expr),
+        ))
+        .with_type(result_type))
 }

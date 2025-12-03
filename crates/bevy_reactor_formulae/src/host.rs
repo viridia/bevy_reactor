@@ -64,20 +64,14 @@ pub type EntityMethod = fn(&VM, e: Entity, args: &[Value]) -> Result<Value, VMEr
 #[derive(Clone, PartialEq, Debug)]
 pub enum EntityMember {
     /// A property, such as `actor.health`
-    Property {
-        accessor: EntityPropertyAccessor,
-        typ: ExprType,
-    },
+    Property(EntityPropertyAccessor),
     /// A method, such as `actor.has_threat()`
     Method(EntityMethod),
 }
 
 impl Default for EntityMember {
     fn default() -> Self {
-        EntityMember::Property {
-            accessor: default_property,
-            typ: ExprType::Void,
-        }
+        EntityMember::Property(default_property)
     }
 }
 
@@ -92,23 +86,25 @@ pub struct HostState {
     pub(crate) global_decls: DeclTable,
 
     /// Lookup scope for entity members.
-    pub(crate) entity_scope: DeclTable,
+    pub(crate) entity_decls: DeclTable,
 
     /// Table of global variables and properties.
     pub(crate) vars: Vec<Global>,
 
     /// Properties of entities
-    pub entity: SymbolTable<EntityMember>,
+    // pub entity: SymbolTable<EntityMember>,
+    pub(crate) entity_members: Vec<EntityMember>,
 }
 
 impl HostState {
     pub fn new() -> Self {
         let mut this = Self {
             global_decls: DeclTable::default(),
-            entity_scope: DeclTable::default(),
+            entity_decls: DeclTable::default(),
             vars: Vec::new(),
+            entity_members: Vec::new(),
             // global: SymbolTable::default(),
-            entity: SymbolTable::default(),
+            // entity: SymbolTable::default(),
         };
 
         // Builtin type definitions.
@@ -217,11 +213,52 @@ impl HostState {
         accessor: EntityPropertyAccessor,
         typ: ExprType,
     ) -> usize {
-        self.entity
-            .insert(name, EntityMember::Property { accessor, typ })
+        let name: SmolStr = name.into();
+        if self.entity_decls.contains_key(&name) {
+            panic!("Entity member {name} is already defined.");
+        }
+
+        let index = self.entity_members.len();
+        self.entity_members.push(EntityMember::Property(accessor));
+        self.entity_decls.insert(
+            name.clone(),
+            Decl {
+                location: TokenLocation::default(),
+                name,
+                visibility: DeclVisibility::Public,
+                kind: DeclKind::Global {
+                    typ,
+                    is_const: true,
+                    index,
+                },
+            },
+        );
+
+        index
     }
 
-    pub fn add_entity_method(&mut self, name: &'static str, method: EntityMethod) -> usize {
-        self.entity.insert(name, EntityMember::Method(method))
-    }
+    // pub fn add_entity_method(&mut self, name: &'static str, method: EntityMethod) -> usize {
+    //     let name: SmolStr = name.into();
+    //     if self.entity_decls.contains_key(&name) {
+    //         panic!("Entity member {name} is already defined.");
+    //     }
+
+    //     let index = self.entity_members.len();
+    //     self.entity_members.push(EntityMember::Method(method));
+    //     self.entity_decls.insert(
+    //         name.clone(),
+    //         Decl {
+    //             location: TokenLocation::default(),
+    //             name,
+    //             visibility: DeclVisibility::Public,
+    //             kind: DeclKind::Global {
+    //                 typ,
+    //                 is_const: true,
+    //                 index,
+    //             },
+    //         },
+    //     );
+
+    //     index
+    // }
 }

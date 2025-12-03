@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Convert AST types to type expressions.
-pub(crate) fn resolve_types<'s, 'a>(
+pub(crate) fn resolve_types<'a>(
     scope: &Scope,
     ast: &'a ASTNode<'a>,
 ) -> Result<ExprType, CompilationError> {
@@ -14,7 +14,6 @@ pub(crate) fn resolve_types<'s, 'a>(
         NodeKind::ArrayType(_member) => todo!(),
         NodeKind::Ident(ident) => {
             let Some(decl) = scope.lookup(ident.as_str()) else {
-                // let name = decls.symbols.resolve(ident);
                 return Err(CompilationError::UnknownType(
                     ast.location,
                     ident.to_string(),

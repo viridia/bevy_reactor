@@ -1,8 +1,6 @@
-use std::path::Path;
-
 use crate::{
-    ast::ASTNode, decl::DeclTable, expr::Expr, expr_type::ExprType, host::HostState,
-    location::TokenLocation, oper::BinaryOp, parser::formula_parser, pass,
+    decl::DeclTable, expr::Expr, expr_type::ExprType, host::HostState, location::TokenLocation,
+    oper::BinaryOp, parser::formula_parser, pass,
 };
 use bumpalo::Bump;
 use peg::{error::ParseError, str::LineCol};
@@ -126,159 +124,110 @@ pub(crate) struct ModuleExprs<'ex> {
     pub(crate) functions: Vec<FunctionBody<'ex>>,
 }
 
-/// Contains all of the information needed to compile a single script file.
-pub struct CompilationUnit<'cu, 'host> {
-    path: &'cu str,
-    src: &'cu str,
+// impl<'cu, 'host> CompilationUnit<'cu, 'host> {
+//     pub fn new(path: &'cu str, src: &'cu str, host: &'host HostState) -> Self {
+//         Self {
+//             path,
+//             src,
+//             host,
+//             // decls: Decls::new(),
+//             // module: wasm_encoder::Module::new(),
+//             // intrinsic_scope: Scope::new(None),
+//             module: Default::default(),
+//         }
+//     }
 
-    /// Intrinsic definitions supplied by the host environment.
-    pub(crate) host: &'host HostState,
+//     pub fn filename(&self) -> &'cu str {
+//         Path::new(self.path).file_name().unwrap().to_str().unwrap()
+//     }
 
-    /// The output module
-    pub(crate) module: CompiledModule,
+//     /// Compile a script file.
+//     pub async fn compile_module(&mut self) -> Result<(), CompilationError> {
+//         // self.define_intrinsics();
+
+//         let ast_arena = bumpalo::Bump::new();
+//         let ast = self.parse_file(self.src, &ast_arena)?;
+
+//         // pass::define_imports(&mut self.decls, ast)?;
+//         // self.resolve_imports().await?;
+//         // let mut root_scope = Scope::new(Some(&self.host.global_scope));
+//         // pass::build_module_decls(&mut root_scope, &mut self.decls, ast)?;
+//         // pass::build_module_exprs(&mut root_scope, &mut self.decls, ast)?;
+//         // pass::gen_module(self)?;
+//         Ok(())
+//     }
+
+//     // pub fn add_imports(&mut self, src: &str) -> Result<(), CompilationError> {
+//     //     let arena = bumpalo::Bump::new();
+//     //     let ast = self.parse_file(src, &arena)?;
+
+//     //     pass::define_imports(&mut self.decls, ast)?;
+//     //     // let mut root_scope = Scope::new(Some(&self.intrinsic_scope));
+//     //     // self.resolve_imports().await?;
+
+//     //     Ok(())
+//     // }
+
+//     // pub(crate) fn define_intrinsics(&mut self) {
+//     //     let symbols = &self.decls.symbols;
+//     //     let intrinsic_scope = &mut self.intrinsic_scope;
+//     //     intrinsic_scope.insert(symbols.intern("i32"), Decl::TypeAlias(ExprType::I32));
+//     //     intrinsic_scope.insert(symbols.intern("i64"), Decl::TypeAlias(ExprType::I64));
+//     //     intrinsic_scope.insert(symbols.intern("f32"), Decl::TypeAlias(ExprType::F32));
+//     //     intrinsic_scope.insert(symbols.intern("f64"), Decl::TypeAlias(ExprType::F64));
+//     //     intrinsic_scope.insert(symbols.intern("bool"), Decl::TypeAlias(ExprType::Boolean));
+//     //     intrinsic_scope.insert(symbols.intern("String"), Decl::TypeAlias(ExprType::String));
+//     // }
+
+//     fn parse_file<'ast>(
+//         &mut self,
+//         src: &str,
+//         arena: &'ast Bump,
+//     ) -> Result<&'ast ASTNode<'ast>, CompilationError> {
+//         let ast = formula_parser::module(src, arena).map_err(transform_parse_error)?;
+
+//         Ok(ast)
+//     }
+
+//     // / Load and resolve imported symbols from other modules.
+//     // async fn resolve_imports(&mut self) -> Result<(), CompilationError> {
+//     //     // TODO: Implement
+//     //     Ok(())
+//     // }
+// }
+
+/// Print out the error with the source token highlighted.
+pub fn report_error(path: &str, src: &str, err: &CompilationError) {
+    let location = err.location();
+    let mut line_ct = 1;
+    let mut offset = 0;
+    for line in src.lines() {
+        let end_offset = offset + line.len();
+        let token_end = location.end().min(end_offset);
+        if offset <= location.start() && location.start() < end_offset {
+            eprintln!(
+                "{}:{}:{} {}",
+                path,
+                line_ct,
+                location.start() - offset + 1,
+                err
+            );
+            eprintln!("{line}");
+            eprintln!(
+                "{}{}",
+                " ".repeat(location.start() - offset),
+                "^".repeat(token_end - location.start())
+            );
+            return;
+        }
+        line_ct += 1;
+        offset = end_offset + 1;
+    }
+
+    eprintln!("{}:{:?}:{}", path, location.start(), err);
 }
 
-impl<'cu, 'host> CompilationUnit<'cu, 'host> {
-    pub fn new(path: &'cu str, src: &'cu str, host: &'host HostState) -> Self {
-        Self {
-            path,
-            src,
-            host,
-            // decls: Decls::new(),
-            // module: wasm_encoder::Module::new(),
-            // intrinsic_scope: Scope::new(None),
-            module: Default::default(),
-        }
-    }
-
-    pub fn filename(&self) -> &'cu str {
-        Path::new(self.path).file_name().unwrap().to_str().unwrap()
-    }
-
-    /// Compile a script file.
-    pub async fn compile_module(&mut self) -> Result<(), CompilationError> {
-        // self.define_intrinsics();
-
-        let ast_arena = bumpalo::Bump::new();
-        let ast = self.parse_file(self.src, &ast_arena)?;
-
-        // pass::define_imports(&mut self.decls, ast)?;
-        // self.resolve_imports().await?;
-        // let mut root_scope = Scope::new(Some(&self.host.global_scope));
-        // pass::build_module_decls(&mut root_scope, &mut self.decls, ast)?;
-        // pass::build_module_exprs(&mut root_scope, &mut self.decls, ast)?;
-        // pass::gen_module(self)?;
-        Ok(())
-    }
-
-    // /// Compile a standalone expression.
-    // pub async fn compile_formula(
-    //     &'cu mut self,
-    //     result_type: ExprType,
-    // ) -> Result<(), CompilationError> {
-    //     self.define_intrinsics();
-
-    //     let ast_arena = bumpalo::Bump::new();
-    //     let ast = self.parse_formula(self.src, &ast_arena)?;
-
-    //     // pass::define_imports(&mut self.decls, ast)?;
-    //     // self.resolve_imports().await?;
-    //     let mut root_scope = Scope::new(Some(&self.host.global_scope));
-    //     pass::build_formula_exprs(
-    //         &mut root_scope,
-    //         &mut self.decls,
-    //         ast,
-    //         result_type,
-    //         &self.expr_arena,
-    //     )?;
-    //     // pass::gen_module(self)?;
-    //     Ok(())
-    // }
-
-    /// Returns the compiled module, consuming the compilation unit.
-    pub fn into_module(self) -> CompiledModule {
-        self.module
-    }
-
-    // pub fn add_imports(&mut self, src: &str) -> Result<(), CompilationError> {
-    //     let arena = bumpalo::Bump::new();
-    //     let ast = self.parse_file(src, &arena)?;
-
-    //     pass::define_imports(&mut self.decls, ast)?;
-    //     // let mut root_scope = Scope::new(Some(&self.intrinsic_scope));
-    //     // self.resolve_imports().await?;
-
-    //     Ok(())
-    // }
-
-    // pub(crate) fn define_intrinsics(&mut self) {
-    //     let symbols = &self.decls.symbols;
-    //     let intrinsic_scope = &mut self.intrinsic_scope;
-    //     intrinsic_scope.insert(symbols.intern("i32"), Decl::TypeAlias(ExprType::I32));
-    //     intrinsic_scope.insert(symbols.intern("i64"), Decl::TypeAlias(ExprType::I64));
-    //     intrinsic_scope.insert(symbols.intern("f32"), Decl::TypeAlias(ExprType::F32));
-    //     intrinsic_scope.insert(symbols.intern("f64"), Decl::TypeAlias(ExprType::F64));
-    //     intrinsic_scope.insert(symbols.intern("bool"), Decl::TypeAlias(ExprType::Boolean));
-    //     intrinsic_scope.insert(symbols.intern("String"), Decl::TypeAlias(ExprType::String));
-    // }
-
-    fn parse_file<'ast>(
-        &mut self,
-        src: &str,
-        arena: &'ast Bump,
-    ) -> Result<&'ast ASTNode<'ast>, CompilationError> {
-        let ast = formula_parser::module(src, arena).map_err(transform_error)?;
-
-        Ok(ast)
-    }
-
-    fn parse_formula<'ast>(
-        &mut self,
-        src: &str,
-        arena: &'ast Bump,
-    ) -> Result<&'ast ASTNode<'ast>, CompilationError> {
-        let ast = formula_parser::formula(src, arena).map_err(transform_error)?;
-        Ok(ast)
-    }
-
-    // / Load and resolve imported symbols from other modules.
-    // async fn resolve_imports(&mut self) -> Result<(), CompilationError> {
-    //     // TODO: Implement
-    //     Ok(())
-    // }
-
-    pub(crate) fn report_error(&self, err: &CompilationError) {
-        let location = err.location();
-        let mut line_ct = 1;
-        let mut offset = 0;
-        for line in self.src.lines() {
-            let end_offset = offset + line.len();
-            let token_end = location.end().min(end_offset);
-            if offset <= location.start() && location.start() < end_offset {
-                eprintln!(
-                    "{}:{}:{} {}",
-                    self.path,
-                    line_ct,
-                    location.start() - offset + 1,
-                    err
-                );
-                eprintln!("{line}");
-                eprintln!(
-                    "{}{}",
-                    " ".repeat(location.start() - offset),
-                    "^".repeat(token_end - location.start())
-                );
-                return;
-            }
-            line_ct += 1;
-            offset = end_offset + 1;
-        }
-
-        eprintln!("{}:{:?}:{}", self.path, location.start(), err);
-    }
-}
-
-fn transform_error(err: ParseError<LineCol>) -> CompilationError {
+fn transform_parse_error(err: ParseError<LineCol>) -> CompilationError {
     let location = TokenLocation::new(err.location.offset, err.location.offset + 1);
     // TODO: Move error handling out
     for token in err.expected.tokens() {
@@ -294,6 +243,8 @@ fn transform_error(err: ParseError<LineCol>) -> CompilationError {
     CompilationError::Expected(location, tokens)
 }
 
+/// Given a string of source code, compile a formula. A formula is a module which allows executable
+/// statements at the root level.
 pub async fn compile_formula(
     path: &str,
     src: &str,
@@ -305,7 +256,7 @@ pub async fn compile_formula(
         ..Default::default()
     };
     let ast_arena = bumpalo::Bump::new();
-    let ast = formula_parser::formula(src, &ast_arena).map_err(transform_error)?;
+    let ast = formula_parser::formula(src, &ast_arena).map_err(transform_parse_error)?;
 
     // pass::define_imports(&mut self.decls, ast)?;
     // self.resolve_imports().await?;
@@ -319,14 +270,7 @@ pub async fn compile_formula(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        // ast::{self, FloatSuffix, IntegerSuffix},
-        VM,
-        expr_type::ExprType,
-        host::HostState,
-        // parser::formula_parser,
-        // pass::{self, assign_types},
-    };
+    use crate::{VM, Value, expr_type::ExprType, host::HostState};
     use bevy::ecs::{component::Tick, world::World};
     use bevy_reactor::TrackingScope;
     use futures_lite::future;
@@ -334,17 +278,15 @@ mod tests {
     #[test]
     fn compile_simple_formula() {
         let host = HostState::default();
-        // let mut unit = CompilationUnit::new("--str--", "20", &host);
         let module =
             future::block_on(compile_formula("--str--", "20", &host, ExprType::I32)).unwrap();
 
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        vm.run(&module, CompiledModule::DEFAULT).unwrap();
-        // vm.iptr = code.as_ptr();
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::I32(20));
 
-        // let result = vm.start().unwrap();
         // assert_eq!(result, Value::I32(5));
         // assert!(matches!(
         //     node.kind,
@@ -367,6 +309,52 @@ mod tests {
         // assert_eq!(span.start(), 0);
         // assert_eq!(span.end(), 2);
         // assert_eq!(span.lines().next(), Some("20"));
+    }
+
+    #[test]
+    fn compile_addition() {
+        let host = HostState::default();
+        let module =
+            future::block_on(compile_formula("--str--", "20 + 10", &host, ExprType::I32)).unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::I32(30));
+    }
+
+    #[test]
+    fn compile_addition_f32() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20.0 + 10.0",
+            &host,
+            ExprType::F32,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::F32(30.0));
+    }
+
+    #[test]
+    fn compile_mismatched_types() {
+        let host = HostState::default();
+        let error = future::block_on(compile_formula(
+            "--str--",
+            "20.0 + 10",
+            &host,
+            ExprType::F32,
+        ))
+        .unwrap_err();
+        assert!(matches!(error, CompilationError::MismatchedTypes(_, _, _)));
+        assert_eq!(error.location().start(), 7);
+        assert_eq!(error.location().end(), 9);
     }
 
     //     #[test]
@@ -529,13 +517,5 @@ mod tests {
     //             }
     //             _ => panic!(),
     //         }
-    //     }
-
-    //     #[test]
-    //     fn test_compiler() {
-    //         let mut unit = CompilationUnit::new("--str--", "fn test() -> i32 { 1 + 2 }");
-    //         future::block_on(unit.compile()).unwrap();
-
-    //         // (type $tup (struct i64 i64 i32))
     //     }
 }

@@ -315,8 +315,8 @@ fn load_entity_prop(vm: &mut VM) -> Result<(), VMError> {
         return Err(VMError::NotAnEntity(arg.value_type()));
     };
     let prop_index = vm.read_immediate::<u32>() as usize;
-    let val = match vm.host.entity.get(prop_index) {
-        Some(EntityMember::Property { accessor, typ: _ }) => accessor(vm, entity)?,
+    let val = match vm.host.entity_members.get(prop_index) {
+        Some(EntityMember::Property(accessor)) => accessor(vm, entity)?,
         Some(EntityMember::Method(_)) => return Err(VMError::InvalidEntityProp(prop_index)),
         None => return Err(VMError::InvalidEntityProp(prop_index)),
     };
@@ -438,12 +438,9 @@ fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
         // return Err(VMError::NotAnEntity(arg.value_type()));
     }
     let args = &vm.stack[stack_len - num_args..stack_len];
-    let val = match vm.host.entity.get(method_index) {
+    let val = match vm.host.entity_members.get(method_index) {
         Some(EntityMember::Method(method)) => method(vm, entity, args)?,
-        Some(EntityMember::Property {
-            accessor: _,
-            typ: _,
-        }) => {
+        Some(EntityMember::Property(_accessor)) => {
             return Err(VMError::InvalidEntityMethod(method_index))?;
         }
         None => return Err(VMError::InvalidEntityMethod(method_index)),
