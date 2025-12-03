@@ -408,7 +408,7 @@ fn gen_expr<'cu>(
         } => {
             gen_expr(module, function, lhs, out)?;
             gen_expr(module, function, rhs, out)?;
-            gen_binop(&expr.typ, op, out);
+            gen_binop(&expr.typ, op, &lhs.typ, &rhs.typ, out);
         }
 
         // ExprKind::Assign { ref lhs, ref rhs } => {
@@ -696,7 +696,13 @@ fn gen_expr<'cu>(
 //     }
 // }
 
-fn gen_binop(typ: &ExprType, op: BinaryOp, out: &mut InstructionBuilder) {
+fn gen_binop(
+    typ: &ExprType,
+    op: BinaryOp,
+    lhs_type: &ExprType,
+    rhs_type: &ExprType,
+    out: &mut InstructionBuilder,
+) {
     match op {
         BinaryOp::Add => {
             match typ {
@@ -791,56 +797,62 @@ fn gen_binop(typ: &ExprType, op: BinaryOp, out: &mut InstructionBuilder) {
             };
         }
         BinaryOp::Eq => {
-            match typ {
-                ExprType::I32 => out.push_op(instr::OP_EQUAL),
-                ExprType::I64 => out.push_op(instr::OP_EQUAL),
-                ExprType::F32 => out.push_op(instr::OP_EQUAL),
-                ExprType::F64 => out.push_op(instr::OP_EQUAL),
+            assert_eq!(*lhs_type, *rhs_type);
+            match lhs_type {
+                ExprType::I32 => out.push_op(instr::OP_EQ_I32),
+                ExprType::I64 => out.push_op(instr::OP_EQ_I64),
+                ExprType::F32 => out.push_op(instr::OP_EQ_F32),
+                ExprType::F64 => out.push_op(instr::OP_EQ_F64),
                 _ => panic!("Invalid type for equality comparison: {typ:?}"),
             };
         }
         BinaryOp::Ne => {
-            match typ {
-                ExprType::I32 => out.push_op(instr::OP_NOT_EQUAL),
-                ExprType::I64 => out.push_op(instr::OP_NOT_EQUAL),
-                ExprType::F32 => out.push_op(instr::OP_NOT_EQUAL),
-                ExprType::F64 => out.push_op(instr::OP_NOT_EQUAL),
+            assert_eq!(*lhs_type, *rhs_type);
+            match lhs_type {
+                ExprType::I32 => out.push_op(instr::OP_NE_I32),
+                ExprType::I64 => out.push_op(instr::OP_NE_I64),
+                ExprType::F32 => out.push_op(instr::OP_NE_F32),
+                ExprType::F64 => out.push_op(instr::OP_NE_F64),
                 _ => panic!("Invalid type for inequality comparison: {typ:?}"),
             };
         }
         BinaryOp::Lt => {
-            match typ {
-                ExprType::I32 => out.push_op(instr::OP_LESS),
-                ExprType::I64 => out.push_op(instr::OP_LESS),
-                ExprType::F32 => out.push_op(instr::OP_LESS),
-                ExprType::F64 => out.push_op(instr::OP_LESS),
+            assert_eq!(*lhs_type, *rhs_type);
+            match lhs_type {
+                ExprType::I32 => out.push_op(instr::OP_LT_I32),
+                ExprType::I64 => out.push_op(instr::OP_LT_I64),
+                ExprType::F32 => out.push_op(instr::OP_LT_F32),
+                ExprType::F64 => out.push_op(instr::OP_LT_F64),
                 _ => panic!("Invalid type for less-than comparison: {typ:?}"),
             };
         }
         BinaryOp::Le => {
-            match typ {
-                ExprType::I32 => out.push_op(instr::OP_LESS_EQUAL),
-                ExprType::I64 => out.push_op(instr::OP_LESS_EQUAL),
-                ExprType::F32 => out.push_op(instr::OP_LESS_EQUAL),
-                ExprType::F64 => out.push_op(instr::OP_LESS_EQUAL),
+            assert_eq!(*lhs_type, *rhs_type);
+            match lhs_type {
+                ExprType::I32 => out.push_op(instr::OP_LE_I32),
+                ExprType::I64 => out.push_op(instr::OP_LE_I64),
+                ExprType::F32 => out.push_op(instr::OP_LE_F32),
+                ExprType::F64 => out.push_op(instr::OP_LE_F64),
                 _ => panic!("Invalid type for less-than-or-equal comparison: {typ:?}"),
             };
         }
         BinaryOp::Gt => {
-            match typ {
-                ExprType::I32 => out.push_op(instr::OP_GREATER),
-                ExprType::I64 => out.push_op(instr::OP_GREATER),
-                ExprType::F32 => out.push_op(instr::OP_GREATER),
-                ExprType::F64 => out.push_op(instr::OP_GREATER),
+            assert_eq!(*lhs_type, *rhs_type);
+            match lhs_type {
+                ExprType::I32 => out.push_op(instr::OP_GT_I32),
+                ExprType::I64 => out.push_op(instr::OP_GT_I64),
+                ExprType::F32 => out.push_op(instr::OP_GT_F32),
+                ExprType::F64 => out.push_op(instr::OP_GT_F64),
                 _ => panic!("Invalid type for greater-than comparison: {typ:?}"),
             };
         }
         BinaryOp::Ge => {
-            match typ {
-                ExprType::I32 => out.push_op(instr::OP_GREATER_EQUAL),
-                ExprType::I64 => out.push_op(instr::OP_GREATER_EQUAL),
-                ExprType::F32 => out.push_op(instr::OP_GREATER_EQUAL),
-                ExprType::F64 => out.push_op(instr::OP_GREATER_EQUAL),
+            assert_eq!(*lhs_type, *rhs_type);
+            match lhs_type {
+                ExprType::I32 => out.push_op(instr::OP_GE_I32),
+                ExprType::I64 => out.push_op(instr::OP_GE_I64),
+                ExprType::F32 => out.push_op(instr::OP_GE_F32),
+                ExprType::F64 => out.push_op(instr::OP_GE_F64),
                 _ => panic!("Invalid type for greater-than-or-equal comparison: {typ:?}"),
             };
         }

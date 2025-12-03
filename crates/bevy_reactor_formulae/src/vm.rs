@@ -235,6 +235,36 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_BIT_XOR_I32 as usize] = bit_xor_i32;
     table[instr::OP_BIT_XOR_I64 as usize] = bit_xor_i64;
 
+    table[instr::OP_EQ_I32 as usize] = eq_i32;
+    table[instr::OP_EQ_I64 as usize] = eq_i64;
+    table[instr::OP_EQ_F32 as usize] = eq_f32;
+    table[instr::OP_EQ_F64 as usize] = eq_f64;
+
+    table[instr::OP_NE_I32 as usize] = ne_i32;
+    table[instr::OP_NE_I64 as usize] = ne_i64;
+    table[instr::OP_NE_F32 as usize] = ne_f32;
+    table[instr::OP_NE_F64 as usize] = ne_f64;
+
+    table[instr::OP_LT_I32 as usize] = lt_i32;
+    table[instr::OP_LT_I64 as usize] = lt_i64;
+    table[instr::OP_LT_F32 as usize] = lt_f32;
+    table[instr::OP_LT_F64 as usize] = lt_f64;
+
+    table[instr::OP_LE_I32 as usize] = le_i32;
+    table[instr::OP_LE_I64 as usize] = le_i64;
+    table[instr::OP_LE_F32 as usize] = le_f32;
+    table[instr::OP_LE_F64 as usize] = le_f64;
+
+    table[instr::OP_GT_I32 as usize] = gt_i32;
+    table[instr::OP_GT_I64 as usize] = gt_i64;
+    table[instr::OP_GT_F32 as usize] = gt_f32;
+    table[instr::OP_GT_F64 as usize] = gt_f64;
+
+    table[instr::OP_GE_I32 as usize] = ge_i32;
+    table[instr::OP_GE_I64 as usize] = ge_i64;
+    table[instr::OP_GE_F32 as usize] = ge_f32;
+    table[instr::OP_GE_F64 as usize] = ge_f64;
+
     table
 }
 
@@ -340,6 +370,22 @@ macro_rules! impl_typed_binop {
     };
 }
 
+macro_rules! impl_relational_binop {
+    ($name:ident, $variant:ident, $type:ty, $op:ident) => {
+        fn $name(vm: &mut VM) -> Result<(), VMError> {
+            let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+            let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs, rhs) {
+                Value::Bool(l.$op(&r))
+            } else {
+                return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
+            };
+            vm.stack.push(val);
+            Ok(())
+        }
+    };
+}
+
 impl_typed_binop!(add_i32, I32, i32, add);
 impl_typed_binop!(add_i64, I64, i64, add);
 impl_typed_binop!(add_f32, F32, f32, add);
@@ -374,6 +420,36 @@ impl_typed_binop!(bit_or_i64, I64, i64, bitor);
 impl_typed_binop!(bit_xor_i32, I32, i32, bitxor);
 impl_typed_binop!(bit_xor_i64, I64, i64, bitxor);
 
+impl_relational_binop!(eq_i32, I32, i32, eq);
+impl_relational_binop!(eq_i64, I64, i64, eq);
+impl_relational_binop!(eq_f32, F32, f32, eq);
+impl_relational_binop!(eq_f64, F64, f64, eq);
+
+impl_relational_binop!(ne_i32, I32, i32, ne);
+impl_relational_binop!(ne_i64, I64, i64, ne);
+impl_relational_binop!(ne_f32, F32, f32, ne);
+impl_relational_binop!(ne_f64, F64, f64, ne);
+
+impl_relational_binop!(lt_i32, I32, i32, lt);
+impl_relational_binop!(lt_i64, I64, i64, lt);
+impl_relational_binop!(lt_f32, F32, f32, lt);
+impl_relational_binop!(lt_f64, F64, f64, lt);
+
+impl_relational_binop!(le_i32, I32, i32, le);
+impl_relational_binop!(le_i64, I64, i64, le);
+impl_relational_binop!(le_f32, F32, f32, le);
+impl_relational_binop!(le_f64, F64, f64, le);
+
+impl_relational_binop!(gt_i32, I32, i32, gt);
+impl_relational_binop!(gt_i64, I64, i64, gt);
+impl_relational_binop!(gt_f32, F32, f32, gt);
+impl_relational_binop!(gt_f64, F64, f64, gt);
+
+impl_relational_binop!(ge_i32, I32, i32, ge);
+impl_relational_binop!(ge_i64, I64, i64, ge);
+impl_relational_binop!(ge_f32, F32, f32, ge);
+impl_relational_binop!(ge_f64, F64, f64, ge);
+
 fn log_and(vm: &mut VM) -> Result<(), VMError> {
     let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
@@ -404,10 +480,10 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
 // pub const OP_SHR: u8 = 41;
 // pub const OP_EQUAL: u8 = 42;
 // pub const OP_NOT_EQUAL: u8 = 43;
-// pub const OP_LESS: u8 = 44;
-// pub const OP_LESS_EQUAL: u8 = 45;
-// pub const OP_GREATER: u8 = 46;
-// pub const OP_GREATER_EQUAL: u8 = 47;
+// pub const OP_LT: u8 = 44;
+// pub const OP_LE: u8 = 45;
+// pub const OP_GT: u8 = 46;
+// pub const OP_GE: u8 = 47;
 
 // // Unops: all consume TOS and push result
 // pub const OP_LOG_NOT: u8 = 50;

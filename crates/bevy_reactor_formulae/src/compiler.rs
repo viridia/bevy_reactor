@@ -546,6 +546,114 @@ mod tests {
     //     }
 
     #[test]
+    fn compile_relational_eq() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20 == 10",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn compile_relational_ne() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20 != 10",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn compile_relational_lt() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20 < 10",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn compile_relational_le() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20 <= 10",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::Bool(false));
+    }
+
+    #[test]
+    fn compile_relational_gt() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20 > 10",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
+    fn compile_relational_ge() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "20 >= 10",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::Bool(true));
+    }
+
+    #[test]
     fn compile_entity_method() {
         let mut world = World::new();
         let actor = world.spawn(Health(22.0));

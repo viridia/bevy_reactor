@@ -59,7 +59,7 @@ pub(crate) fn assign_types<'e>(
                 BinaryOp::LogAnd | BinaryOp::LogOr => todo!(),
 
                 BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
-                    let ty = inference.substitute(&mut expr.typ);
+                    let ty = inference.substitute(&expr.typ);
                     match ty {
                         ExprType::I32 | ExprType::I64 => {
                             expr.typ = ty;
@@ -77,9 +77,9 @@ pub(crate) fn assign_types<'e>(
                 }
                 BinaryOp::Shl | BinaryOp::Shr => todo!(),
 
-                BinaryOp::Eq | BinaryOp::Ne => todo!(),
-
-                BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => todo!(),
+                // I don't think we need to do anything for these.
+                BinaryOp::Eq | BinaryOp::Ne => {}
+                BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {}
             }
         }
 

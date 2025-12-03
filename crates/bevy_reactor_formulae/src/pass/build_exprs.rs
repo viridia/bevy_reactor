@@ -563,7 +563,13 @@ pub(crate) fn build_exprs<'a, 'e>(
 
                 BinaryOp::Shl | BinaryOp::Shr => todo!(),
 
-                BinaryOp::Eq | BinaryOp::Ne => todo!(),
+                BinaryOp::Eq | BinaryOp::Ne => {
+                    let ty = inference.fresh_typevar();
+                    // Both sides must be the same, but the result type is Boolean.
+                    inference.add_constraint(ty.clone(), lhs_expr.typ.clone(), lhs_expr.location);
+                    inference.add_constraint(ty.clone(), rhs_expr.typ.clone(), rhs_expr.location);
+                    ExprType::Boolean
+                }
 
                 BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => {
                     let ty = inference.fresh_typevar();

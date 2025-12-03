@@ -20,12 +20,6 @@ pub const OP_LOGICAL_AND: u8 = 35;
 pub const OP_LOGICAL_OR: u8 = 36;
 pub const OP_SHL: u8 = 40;
 pub const OP_SHR: u8 = 41;
-pub const OP_EQUAL: u8 = 42;
-pub const OP_NOT_EQUAL: u8 = 43;
-pub const OP_LESS: u8 = 44;
-pub const OP_LESS_EQUAL: u8 = 45;
-pub const OP_GREATER: u8 = 46;
-pub const OP_GREATER_EQUAL: u8 = 47;
 
 // Unops: all consume TOS and push result
 pub const OP_LOG_NOT: u8 = 50;
@@ -89,12 +83,36 @@ pub const OP_BIT_XOR_I64: u8 = 127;
 // pub const OP_BIT_XOR: u8 = 39;
 // pub const OP_SHL: u8 = 40;
 // pub const OP_SHR: u8 = 41;
-// pub const OP_EQUAL: u8 = 42;
-// pub const OP_NOT_EQUAL: u8 = 43;
-// pub const OP_LESS: u8 = 44;
-// pub const OP_LESS_EQUAL: u8 = 45;
-// pub const OP_GREATER: u8 = 46;
-// pub const OP_GREATER_EQUAL: u8 = 47;
+
+pub const OP_EQ_I32: u8 = 150;
+pub const OP_EQ_I64: u8 = 151;
+pub const OP_EQ_F32: u8 = 152;
+pub const OP_EQ_F64: u8 = 152;
+
+pub const OP_NE_I32: u8 = 154;
+pub const OP_NE_I64: u8 = 155;
+pub const OP_NE_F32: u8 = 156;
+pub const OP_NE_F64: u8 = 157;
+
+pub const OP_LT_I32: u8 = 158;
+pub const OP_LT_I64: u8 = 159;
+pub const OP_LT_F32: u8 = 160;
+pub const OP_LT_F64: u8 = 161;
+
+pub const OP_LE_I32: u8 = 162;
+pub const OP_LE_I64: u8 = 163;
+pub const OP_LE_F32: u8 = 164;
+pub const OP_LE_F64: u8 = 165;
+
+pub const OP_GT_I32: u8 = 166;
+pub const OP_GT_I64: u8 = 167;
+pub const OP_GT_F32: u8 = 168;
+pub const OP_GT_F64: u8 = 169;
+
+pub const OP_GE_I32: u8 = 170;
+pub const OP_GE_I64: u8 = 171;
+pub const OP_GE_F32: u8 = 172;
+pub const OP_GE_F64: u8 = 173;
 
 #[derive(Default)]
 pub struct InstructionBuilder {
