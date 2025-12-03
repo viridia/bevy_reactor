@@ -6,4 +6,10 @@ edition = "2024"
 [dependencies]
 bevy = { workspace = true }
 bevy_reactor = { workspace = true }
+bumpalo = "3.19.0"
+peg = "0.8.5"
+smol_str = "0.3.2"
 thiserror = "2.0.16"
+
+[dev-dependencies]
+futures-lite = "2.6.1"

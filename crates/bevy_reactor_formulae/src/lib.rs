@@ -1,5 +1,14 @@
+pub(crate) mod ast;
+pub mod compiler;
+pub(crate) mod decl;
+pub(crate) mod expr;
+pub(crate) mod expr_type;
+pub mod host;
 pub mod instr;
-pub mod symbol_table;
+pub mod location;
+pub(crate) mod oper;
+pub(crate) mod parser;
+mod pass;
 pub mod vm;
 
-pub use vm::{VM, Value, ValueType};
+pub use vm::{VM, Value};

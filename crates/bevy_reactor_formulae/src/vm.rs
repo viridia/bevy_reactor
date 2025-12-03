@@ -1,45 +1,20 @@
 use std::{
     any::TypeId,
     cell::RefCell,
-    ops::{Add, Div, Mul, Rem, Sub},
+    ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Sub},
 };
 
-use bevy::ecs::{entity::Entity, world::World};
+use bevy::ecs::{component::Component, entity::Entity, world::World};
 use bevy_reactor::TrackingScope;
 use thiserror::Error;
 
 use crate::{
+    compiler,
+    decl::DeclKind,
+    expr_type::ExprType,
+    host::{EntityMember, Global, HostState},
     instr::{self, OP_RET},
-    symbol_table::SymbolTable,
 };
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum ValueType {
-    Void,
-    Bool,
-    I32,
-    I64,
-    F32,
-    F64,
-    Symbol,
-    Entity,
-}
-
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            ValueType::Void => "void",
-            ValueType::Bool => "bool",
-            ValueType::I32 => "i32",
-            ValueType::I64 => "i64",
-            ValueType::F32 => "f32",
-            ValueType::F64 => "f64",
-            ValueType::Symbol => "Symbol",
-            ValueType::Entity => "Entity",
-        };
-        f.write_str(s)
-    }
-}
 
 // Values on the stack
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -50,21 +25,21 @@ pub enum Value {
     I64(i64),
     F32(f32),
     F64(f64),
-    Symbol(&'static str),
+    // Symbol(&'static str),
     Entity(Entity),
 }
 
 impl Value {
-    pub fn value_type(&self) -> ValueType {
+    pub fn value_type(&self) -> ExprType {
         match self {
-            Value::Void => ValueType::Void,
-            Value::Bool(_) => ValueType::Bool,
-            Value::I32(_) => ValueType::I32,
-            Value::I64(_) => ValueType::I64,
-            Value::F32(_) => ValueType::F32,
-            Value::F64(_) => ValueType::F64,
-            Value::Symbol(_) => ValueType::Symbol,
-            Value::Entity(_) => ValueType::Entity,
+            Value::Void => ExprType::Void,
+            Value::Bool(_) => ExprType::Boolean,
+            Value::I32(_) => ExprType::I32,
+            Value::I64(_) => ExprType::I64,
+            Value::F32(_) => ExprType::F32,
+            Value::F64(_) => ExprType::F64,
+            // Value::Symbol(_) => ExprType::Symbol,
+            Value::Entity(_) => ExprType::Entity,
         }
     }
 }
@@ -77,34 +52,22 @@ pub enum VMError {
     #[error("Stack underflow")]
     StackUnderflow,
     #[error("Mismatched types: {0} {1}")]
-    MismatchedTypes(ValueType, ValueType),
+    MismatchedTypes(ExprType, ExprType),
     #[error("Invalid assignment")]
     InvalidAssignment,
     #[error("Value is not an entity: {0}")]
-    NotAnEntity(ValueType),
+    NotAnEntity(ExprType),
     #[error("Invalid global index: {0}")]
     InvalidGlobalIndex(usize),
     #[error("Invalid entity prop: {0}")]
     InvalidEntityProp(usize),
     #[error("Invalid entity method: {0}")]
     InvalidEntityMethod(usize),
+    #[error("Function not found: {0}")]
+    MissingFunction(String),
     #[error("Missing Component: {0:?}")]
     MissingComponent(TypeId),
 }
-
-type GlobalPropHandler = fn(&VM) -> Result<Value, VMError>;
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum Global {
-    /// A constant value.
-    Const(Value),
-
-    /// A dynamic property, such as `time`.
-    Property(GlobalPropHandler),
-}
-
-type EntityProperty = fn(&VM, e: Entity) -> Result<Value, VMError>;
-type EntityMethod = fn(&VM, e: Entity, args: &[Value]) -> Result<Value, VMError>;
 
 /// A virtual machine for evaluating formulae.
 pub struct VM<'w, 'g, 'p> {
@@ -114,14 +77,8 @@ pub struct VM<'w, 'g, 'p> {
     /// Entity upon which this script is attached.
     pub owner: Entity,
 
-    /// Global variables
-    globals: &'g SymbolTable<Global>,
-
-    /// Properties of entities
-    entity_props: &'g SymbolTable<EntityProperty>,
-
-    /// Methods of entities
-    entity_methods: &'g SymbolTable<EntityMethod>,
+    /// Globals and entity members
+    pub host: &'g HostState,
 
     /// Execution stack
     stack: Vec<Value>,
@@ -133,22 +90,22 @@ pub struct VM<'w, 'g, 'p> {
     pub tracking: RefCell<&'p mut TrackingScope>,
 }
 
-type InstrHandler = unsafe fn(&mut VM) -> Result<(), VMError>;
+type InstrHandler = fn(&mut VM) -> Result<(), VMError>;
 
 impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
     const JUMP_TABLE: [InstrHandler; 256] = build_jump_table();
 
-    /// Initialize a new virtual machine.
-    // pub fn new(world: &'w World, globals: &'g Globals, tracking: &'p mut TrackingScope) -> Self {
-    //     Self {
-    //         world,
-    //         owner: Entity::PLACEHOLDER,
-    //         globals,
-    //         stack: Vec::new(),
-    //         iptr: Default::default(),
-    //         tracking,
-    //     }
-    // }
+    // Initialize a new virtual machine.
+    pub fn new(world: &'w World, host: &'g HostState, tracking: &'p mut TrackingScope) -> Self {
+        Self {
+            world,
+            owner: Entity::PLACEHOLDER,
+            host,
+            stack: Vec::new(),
+            iptr: Default::default(),
+            tracking: RefCell::new(tracking),
+        }
+    }
 
     /// Set the entity which owns the script being executed.
     pub fn set_owner(&mut self, owner: Entity) -> &mut Self {
@@ -174,8 +131,9 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
         val
     }
 
-    /// Run a script.
-    pub fn run(&mut self) -> Result<Value, VMError> {
+    /// Begin running at the current instruction pointer. Run until we return and the call
+    /// stack is empty.
+    fn start(&mut self) -> Result<Value, VMError> {
         loop {
             let op = unsafe { *self.iptr };
             // println!("op: {op}");
@@ -183,9 +141,41 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
                 break;
             }
             self.iptr = unsafe { self.iptr.add(1) };
-            unsafe { VM::JUMP_TABLE[op as usize](self)? };
+            VM::JUMP_TABLE[op as usize](self)?;
         }
         Ok(*self.stack.last().unwrap_or(&Value::Void))
+    }
+
+    /// Run a compiled function by name.
+    pub fn run(
+        &mut self,
+        module: &compiler::CompiledModule,
+        function_name: &str,
+    ) -> Result<Value, VMError> {
+        if let Some(entry_fn) = module.module_decls.get(function_name) {
+            if let DeclKind::Function {
+                params: _,
+                ret: _,
+                is_native: _,
+                index,
+            } = &entry_fn.kind
+            {
+                self.iptr = module.functions[*index].code.as_ptr();
+            }
+            self.start()
+        } else {
+            Err(VMError::MissingFunction(function_name.to_string()))
+        }
+    }
+
+    /// Return a reference to the Component `C` on the given entity. Calling this function
+    /// adds the component as a dependency of the current tracking scope.
+    pub fn component<C: Component>(&self, entity: Entity) -> Option<&C> {
+        let comp = self.world.entity(entity).get::<C>();
+        self.tracking
+            .borrow_mut()
+            .track_component::<C>(entity, self.world, comp.is_some());
+        comp
     }
 }
 
@@ -205,78 +195,102 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_LOAD_GLOBAL as usize] = load_global;
     table[instr::OP_LOAD_ENTITY_PROP as usize] = load_entity_prop;
 
-    table[instr::OP_ADD as usize] = add;
-    table[instr::OP_SUB as usize] = sub;
-    table[instr::OP_MUL as usize] = mul;
-    table[instr::OP_DIV as usize] = div;
-    table[instr::OP_REM as usize] = rem;
     table[instr::OP_LOGICAL_AND as usize] = log_and;
     table[instr::OP_LOGICAL_OR as usize] = log_or;
-    table[instr::OP_BIT_AND as usize] = bit_and;
-    table[instr::OP_BIT_OR as usize] = bit_or;
-    table[instr::OP_BIT_XOR as usize] = bit_xor;
 
     table[instr::OP_RET as usize] = ret;
     table[instr::OP_BRANCH as usize] = branch;
 
     table[instr::OP_CALL_ENTITY_METHOD as usize] = call_entity_method;
 
+    table[instr::OP_ADD_I32 as usize] = add_i32;
+    table[instr::OP_ADD_I64 as usize] = add_i64;
+    table[instr::OP_ADD_F32 as usize] = add_f32;
+    table[instr::OP_ADD_F64 as usize] = add_f64;
+
+    table[instr::OP_SUB_I32 as usize] = sub_i32;
+    table[instr::OP_SUB_I64 as usize] = sub_i64;
+    table[instr::OP_SUB_F32 as usize] = sub_f32;
+    table[instr::OP_SUB_F64 as usize] = sub_f64;
+
+    table[instr::OP_MUL_I32 as usize] = mul_i32;
+    table[instr::OP_MUL_I64 as usize] = mul_i64;
+    table[instr::OP_MUL_F32 as usize] = mul_f32;
+    table[instr::OP_MUL_F64 as usize] = mul_f64;
+
+    table[instr::OP_DIV_I32 as usize] = div_i32;
+    table[instr::OP_DIV_I64 as usize] = div_i64;
+    table[instr::OP_DIV_F32 as usize] = div_f32;
+    table[instr::OP_DIV_F64 as usize] = div_f64;
+
+    table[instr::OP_REM_I32 as usize] = rem_i32;
+    table[instr::OP_REM_I64 as usize] = rem_i64;
+    table[instr::OP_REM_F32 as usize] = rem_f32;
+    table[instr::OP_REM_F64 as usize] = rem_f64;
+
+    table[instr::OP_BIT_AND_I32 as usize] = bit_and_i32;
+    table[instr::OP_BIT_AND_I64 as usize] = bit_and_i64;
+    table[instr::OP_BIT_OR_I32 as usize] = bit_or_i32;
+    table[instr::OP_BIT_OR_I64 as usize] = bit_or_i64;
+    table[instr::OP_BIT_XOR_I32 as usize] = bit_xor_i32;
+    table[instr::OP_BIT_XOR_I64 as usize] = bit_xor_i64;
+
     table
 }
 
-unsafe fn invalid(_vm: &mut VM) -> Result<(), VMError> {
+fn invalid(_vm: &mut VM) -> Result<(), VMError> {
     Err(VMError::InvalidInstruction)
 }
 
-unsafe fn const_true(vm: &mut VM) -> Result<(), VMError> {
+fn const_true(vm: &mut VM) -> Result<(), VMError> {
     vm.stack.push(Value::Bool(true));
     // vm.iptr = unsafe { vm.iptr.byte_add(1) };
     Ok(())
 }
 
-unsafe fn const_false(vm: &mut VM) -> Result<(), VMError> {
+fn const_false(vm: &mut VM) -> Result<(), VMError> {
     vm.stack.push(Value::Bool(false));
     // vm.iptr = unsafe { vm.iptr.byte_add(1) };
     Ok(())
 }
 
-unsafe fn const_i32(vm: &mut VM) -> Result<(), VMError> {
+fn const_i32(vm: &mut VM) -> Result<(), VMError> {
     let val = vm.read_immediate::<i32>();
     vm.stack.push(Value::I32(val));
     Ok(())
 }
 
-unsafe fn const_i64(vm: &mut VM) -> Result<(), VMError> {
+fn const_i64(vm: &mut VM) -> Result<(), VMError> {
     let val = vm.read_immediate::<i64>();
     vm.stack.push(Value::I64(val));
     Ok(())
 }
 
-unsafe fn const_f32(vm: &mut VM) -> Result<(), VMError> {
+fn const_f32(vm: &mut VM) -> Result<(), VMError> {
     let val = vm.read_immediate::<f32>();
     vm.stack.push(Value::F32(val));
     Ok(())
 }
 
-unsafe fn const_f64(vm: &mut VM) -> Result<(), VMError> {
+fn const_f64(vm: &mut VM) -> Result<(), VMError> {
     let val = vm.read_immediate::<f64>();
     vm.stack.push(Value::F64(val));
     Ok(())
 }
 
-unsafe fn drop1(vm: &mut VM) -> Result<(), VMError> {
+fn drop1(vm: &mut VM) -> Result<(), VMError> {
     vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     Ok(())
 }
 
-unsafe fn drop_n(vm: &mut VM) -> Result<(), VMError> {
+fn drop_n(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u32>() as usize;
     let final_length = vm.stack.len().saturating_sub(n);
     vm.stack.truncate(final_length);
     Ok(())
 }
 
-unsafe fn load_param(_vm: &mut VM) -> Result<(), VMError> {
+fn load_param(_vm: &mut VM) -> Result<(), VMError> {
     // let n = vm.read_immediate::<u32>() as usize;
     // let final_length = vm.stack.len().saturating_sub(n);
     // vm.stack.truncate(final_length);
@@ -284,112 +298,83 @@ unsafe fn load_param(_vm: &mut VM) -> Result<(), VMError> {
     todo!();
 }
 
-unsafe fn load_global(vm: &mut VM) -> Result<(), VMError> {
+fn load_global(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u32>() as usize;
-    let val = match vm.globals.get(n) {
+    let val = match vm.host.vars.get(n) {
         Some(Global::Const(val)) => *val,
-        Some(Global::Property(prop)) => prop(vm)?,
+        Some(Global::Property(accessor)) => accessor(vm)?,
         None => return Err(VMError::InvalidGlobalIndex(n)),
     };
     vm.stack.push(val);
     Ok(())
 }
 
-unsafe fn load_entity_prop(vm: &mut VM) -> Result<(), VMError> {
+fn load_entity_prop(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let Value::Entity(entity) = arg else {
         return Err(VMError::NotAnEntity(arg.value_type()));
     };
     let prop_index = vm.read_immediate::<u32>() as usize;
-    let val = match vm.entity_props.get(prop_index) {
-        Some(prop) => prop(vm, entity)?,
+    let val = match vm.host.entity.get(prop_index) {
+        Some(EntityMember::Property { accessor, typ: _ }) => accessor(vm, entity)?,
+        Some(EntityMember::Method(_)) => return Err(VMError::InvalidEntityProp(prop_index)),
         None => return Err(VMError::InvalidEntityProp(prop_index)),
     };
     vm.stack.push(val);
     Ok(())
 }
 
-unsafe fn add(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::I32(l), Value::I32(r)) => Value::I32(l.add(r)),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l.add(r)),
-        (Value::F32(l), Value::F32(r)) => Value::F32(l.add(r)),
-        (Value::F64(l), Value::F64(r)) => Value::F64(l.add(r)),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
+macro_rules! impl_typed_binop {
+    ($name:ident, $variant:ident, $type:ty, $op:ident) => {
+        fn $name(vm: &mut VM) -> Result<(), VMError> {
+            let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+            let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs, rhs) {
+                Value::$variant(l.$op(r))
+            } else {
+                return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
+            };
+            vm.stack.push(val);
+            Ok(())
         }
     };
-    vm.stack.push(val);
-    Ok(())
 }
 
-unsafe fn sub(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::I32(l), Value::I32(r)) => Value::I32(l.sub(r)),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l.sub(r)),
-        (Value::F32(l), Value::F32(r)) => Value::F32(l.sub(r)),
-        (Value::F64(l), Value::F64(r)) => Value::F64(l.sub(r)),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
+impl_typed_binop!(add_i32, I32, i32, add);
+impl_typed_binop!(add_i64, I64, i64, add);
+impl_typed_binop!(add_f32, F32, f32, add);
+impl_typed_binop!(add_f64, F64, f64, add);
 
-unsafe fn mul(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::I32(l), Value::I32(r)) => Value::I32(l.mul(r)),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l.mul(r)),
-        (Value::F32(l), Value::F32(r)) => Value::F32(l.mul(r)),
-        (Value::F64(l), Value::F64(r)) => Value::F64(l.mul(r)),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
+impl_typed_binop!(sub_i32, I32, i32, sub);
+impl_typed_binop!(sub_i64, I64, i64, sub);
+impl_typed_binop!(sub_f32, F32, f32, sub);
+impl_typed_binop!(sub_f64, F64, f64, sub);
 
-unsafe fn div(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::I32(l), Value::I32(r)) => Value::I32(l.div(r)),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l.div(r)),
-        (Value::F32(l), Value::F32(r)) => Value::F32(l.div(r)),
-        (Value::F64(l), Value::F64(r)) => Value::F64(l.div(r)),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
+impl_typed_binop!(mul_i32, I32, i32, mul);
+impl_typed_binop!(mul_i64, I64, i64, mul);
+impl_typed_binop!(mul_f32, F32, f32, mul);
+impl_typed_binop!(mul_f64, F64, f64, mul);
 
-unsafe fn rem(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::I32(l), Value::I32(r)) => Value::I32(l.rem(r)),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l.rem(r)),
-        (Value::F32(l), Value::F32(r)) => Value::F32(l.rem(r)),
-        (Value::F64(l), Value::F64(r)) => Value::F64(l.rem(r)),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
+impl_typed_binop!(div_i32, I32, i32, div);
+impl_typed_binop!(div_i64, I64, i64, div);
+impl_typed_binop!(div_f32, F32, f32, div);
+impl_typed_binop!(div_f64, F64, f64, div);
 
-unsafe fn log_and(vm: &mut VM) -> Result<(), VMError> {
+impl_typed_binop!(rem_i32, I32, i32, rem);
+impl_typed_binop!(rem_i64, I64, i64, rem);
+impl_typed_binop!(rem_f32, F32, f32, rem);
+impl_typed_binop!(rem_f64, F64, f64, rem);
+
+impl_typed_binop!(bit_and_i32, I32, i32, bitand);
+impl_typed_binop!(bit_and_i64, I64, i64, bitand);
+
+impl_typed_binop!(bit_or_i32, I32, i32, bitor);
+impl_typed_binop!(bit_or_i64, I64, i64, bitor);
+
+impl_typed_binop!(bit_xor_i32, I32, i32, bitxor);
+impl_typed_binop!(bit_xor_i64, I64, i64, bitxor);
+
+fn log_and(vm: &mut VM) -> Result<(), VMError> {
     let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let val = match (lhs, rhs) {
@@ -402,56 +387,11 @@ unsafe fn log_and(vm: &mut VM) -> Result<(), VMError> {
     Ok(())
 }
 
-unsafe fn log_or(vm: &mut VM) -> Result<(), VMError> {
+fn log_or(vm: &mut VM) -> Result<(), VMError> {
     let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let val = match (lhs, rhs) {
         (Value::Bool(l), Value::Bool(r)) => Value::Bool(l && r),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
-
-unsafe fn bit_and(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::Bool(l), Value::Bool(r)) => Value::Bool(l & r),
-        (Value::I32(l), Value::I32(r)) => Value::I32(l & r),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l & r),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
-
-unsafe fn bit_or(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::Bool(l), Value::Bool(r)) => Value::Bool(l | r),
-        (Value::I32(l), Value::I32(r)) => Value::I32(l | r),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l | r),
-        (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
-        }
-    };
-    vm.stack.push(val);
-    Ok(())
-}
-
-unsafe fn bit_xor(vm: &mut VM) -> Result<(), VMError> {
-    let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let val = match (lhs, rhs) {
-        (Value::Bool(l), Value::Bool(r)) => Value::Bool(l ^ r),
-        (Value::I32(l), Value::I32(r)) => Value::I32(l ^ r),
-        (Value::I64(l), Value::I64(r)) => Value::I64(l ^ r),
         (v0, v1) => {
             return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
         }
@@ -475,18 +415,18 @@ unsafe fn bit_xor(vm: &mut VM) -> Result<(), VMError> {
 // pub const OP_COMPLEMENT: u8 = 52;
 // pub const OP_CALL: u8 = 60; // (imm i32 num arguments, consumes TOS + num arguments)
 
-unsafe fn branch(vm: &mut VM) -> Result<(), VMError> {
+fn branch(vm: &mut VM) -> Result<(), VMError> {
     let offset = vm.read_immediate::<i32>();
     vm.iptr = unsafe { vm.iptr.offset(offset as isize) };
     Ok(())
 }
 
-unsafe fn ret(_vm: &mut VM) -> Result<(), VMError> {
+fn ret(_vm: &mut VM) -> Result<(), VMError> {
     // `ret` is handled by the interpreter loop.
     unreachable!("`ret` instruction handler should not be called");
 }
 
-unsafe fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
+fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let Value::Entity(entity) = arg else {
         return Err(VMError::NotAnEntity(arg.value_type()));
@@ -498,9 +438,15 @@ unsafe fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
         // return Err(VMError::NotAnEntity(arg.value_type()));
     }
     let args = &vm.stack[stack_len - num_args..stack_len];
-    let val = match vm.entity_methods.get(method_index) {
-        Some(method) => method(vm, entity, args)?,
-        None => return Err(VMError::InvalidGlobalIndex(method_index)),
+    let val = match vm.host.entity.get(method_index) {
+        Some(EntityMember::Method(method)) => method(vm, entity, args)?,
+        Some(EntityMember::Property {
+            accessor: _,
+            typ: _,
+        }) => {
+            return Err(VMError::InvalidEntityMethod(method_index))?;
+        }
+        None => return Err(VMError::InvalidEntityMethod(method_index)),
     };
     // Drop args
     vm.stack.truncate(stack_len - num_args);
@@ -514,288 +460,188 @@ mod tests {
 
     use bevy::ecs::component::{Component, Tick};
 
-    use crate::instr;
+    use crate::{expr_type::ExprType, instr};
 
     use super::*;
 
     #[test]
     fn test_invalid_instr() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(255);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let error = vm.run().unwrap_err();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let error = vm.start().unwrap_err();
         assert_eq!(error, VMError::InvalidInstruction);
     }
 
     #[test]
     fn test_const_bool() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_TRUE);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
     #[test]
     fn test_const_i32() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(3);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::I32(3));
     }
 
     #[test]
     fn test_add_i32() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(5);
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(1);
-        builder.push_op(instr::OP_ADD);
+        builder.push_op(instr::OP_ADD_I32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::I32(6));
     }
 
     #[test]
     fn test_add_f32() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_F32);
         builder.push_immediate::<f32>(5.0);
         builder.push_op(instr::OP_CONST_F32);
         builder.push_immediate::<f32>(1.0);
-        builder.push_op(instr::OP_ADD);
+        builder.push_op(instr::OP_ADD_F32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::F32(6.0));
     }
 
     #[test]
     fn test_add_f64() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_F64);
         builder.push_immediate::<f64>(5.0);
         builder.push_op(instr::OP_CONST_F64);
         builder.push_immediate::<f64>(1.0);
-        builder.push_op(instr::OP_ADD);
+        builder.push_op(instr::OP_ADD_F64);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::F64(6.0));
     }
 
     #[test]
     fn test_add_mismatched() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(5);
         builder.push_op(instr::OP_CONST_F32);
         builder.push_immediate::<f32>(1.0);
-        builder.push_op(instr::OP_ADD);
+        builder.push_op(instr::OP_ADD_I32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let error = vm.run().unwrap_err();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let error = vm.start().unwrap_err();
         assert_eq!(
             error,
-            VMError::MismatchedTypes(ValueType::I32, ValueType::F32)
+            VMError::MismatchedTypes(ExprType::I32, ExprType::F32)
         );
     }
 
     #[test]
     fn test_sub_i32() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(5);
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(1);
-        builder.push_op(instr::OP_SUB);
+        builder.push_op(instr::OP_SUB_I32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::I32(4));
     }
 
     #[test]
     fn test_bit_and_i32() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(5);
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(1);
-        builder.push_op(instr::OP_BIT_AND);
+        builder.push_op(instr::OP_BIT_AND_I32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::I32(1));
     }
 
     #[test]
     fn test_bit_or_i32() {
         let world = World::new();
-        let globals = SymbolTable::<Global>::empty();
-        let entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
+        let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(4);
         builder.push_op(instr::OP_CONST_I32);
         builder.push_immediate::<i32>(1);
-        builder.push_op(instr::OP_BIT_OR);
+        builder.push_op(instr::OP_BIT_OR_I32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: Entity::PLACEHOLDER,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::I32(5));
     }
 
@@ -812,11 +658,9 @@ mod tests {
         let mut world = World::new();
         let actor = world.spawn(Health(22.0));
         let actor_id = actor.id();
-        let mut globals = SymbolTable::<Global>::empty();
-        let mut entity_props = SymbolTable::<EntityProperty>::empty();
-        let entity_methods = SymbolTable::<EntityMethod>::empty();
-        let self_id = globals.insert("self", Global::Property(get_self));
-        let health_id = entity_props.insert("health", entity_health);
+        let mut host = HostState::default();
+        let self_id = host.add_global_prop("self", get_self, ExprType::Entity);
+        let health_id = host.add_entity_prop("health", entity_health, ExprType::F32);
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_LOAD_GLOBAL);
@@ -825,17 +669,10 @@ mod tests {
         builder.push_immediate::<u32>(health_id as u32);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
-        let mut vm = VM {
-            world: &world,
-            owner: actor_id,
-            globals: &globals,
-            entity_props: &entity_props,
-            entity_methods: &entity_methods,
-            stack: Vec::with_capacity(100),
-            iptr: code.as_ptr(),
-            tracking: RefCell::new(&mut tracking),
-        };
-        let result = vm.run().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.owner = actor_id;
+        vm.iptr = code.as_ptr();
+        let result = vm.start().unwrap();
         assert_eq!(result, Value::F32(22.0));
     }
 
@@ -844,16 +681,9 @@ mod tests {
     }
 
     fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
-        let entity = vm.world.entity(actor);
-        if let Some(&Health(h)) = entity.get::<Health>() {
-            vm.tracking
-                .borrow_mut()
-                .track_component::<Health>(actor, vm.world, true);
+        if let Some(&Health(h)) = vm.component::<Health>(actor) {
             Ok(Value::F32(h))
         } else {
-            vm.tracking
-                .borrow_mut()
-                .track_component::<Health>(actor, vm.world, false);
             Err(VMError::MissingComponent(Health.type_id()))
         }
     }

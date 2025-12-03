@@ -16,16 +16,8 @@ pub const OP_LOAD_GLOBAL: u8 = 21; // (imm u32)
 pub const OP_LOAD_ENTITY_PROP: u8 = 22; // (imm u32, consumes TOS)
 
 // Binops: all consume TOS + 1 and push result
-pub const OP_ADD: u8 = 30;
-pub const OP_SUB: u8 = 31;
-pub const OP_MUL: u8 = 32;
-pub const OP_DIV: u8 = 33;
-pub const OP_REM: u8 = 34;
 pub const OP_LOGICAL_AND: u8 = 35;
 pub const OP_LOGICAL_OR: u8 = 36;
-pub const OP_BIT_AND: u8 = 37;
-pub const OP_BIT_OR: u8 = 38;
-pub const OP_BIT_XOR: u8 = 39;
 pub const OP_SHL: u8 = 40;
 pub const OP_SHR: u8 = 41;
 pub const OP_EQUAL: u8 = 42;
@@ -52,6 +44,57 @@ pub const OP_BRANCH_IF_TRUE: u8 = 62; // (imm i32 relative offset, consumes TOS)
 /// stack input: args
 /// stack output: result
 pub const OP_CALL_ENTITY_METHOD: u8 = 70;
+
+// Experimental
+// Typed Binops: all consume TOS + 1 and push result
+pub const OP_ADD_I32: u8 = 100;
+pub const OP_ADD_I64: u8 = 101;
+pub const OP_ADD_F32: u8 = 102;
+pub const OP_ADD_F64: u8 = 103;
+
+pub const OP_SUB_I32: u8 = 104;
+pub const OP_SUB_I64: u8 = 105;
+pub const OP_SUB_F32: u8 = 106;
+pub const OP_SUB_F64: u8 = 107;
+
+pub const OP_MUL_I32: u8 = 108;
+pub const OP_MUL_I64: u8 = 109;
+pub const OP_MUL_F32: u8 = 110;
+pub const OP_MUL_F64: u8 = 111;
+
+pub const OP_DIV_I32: u8 = 112;
+pub const OP_DIV_I64: u8 = 113;
+pub const OP_DIV_F32: u8 = 114;
+pub const OP_DIV_F64: u8 = 115;
+
+pub const OP_REM_I32: u8 = 116;
+pub const OP_REM_I64: u8 = 117;
+pub const OP_REM_F32: u8 = 118;
+pub const OP_REM_F64: u8 = 119;
+
+// pub const OP_LOGICAL_AND: u8 = 120;
+// pub const OP_LOGICAL_OR: u8 = 121;
+
+pub const OP_BIT_AND_I32: u8 = 122;
+pub const OP_BIT_AND_I64: u8 = 123;
+
+pub const OP_BIT_OR_I32: u8 = 124;
+pub const OP_BIT_OR_I64: u8 = 125;
+
+pub const OP_BIT_XOR_I32: u8 = 126;
+pub const OP_BIT_XOR_I64: u8 = 127;
+
+// pub const OP_BIT_AND: u8 = 37;
+// pub const OP_BIT_OR: u8 = 38;
+// pub const OP_BIT_XOR: u8 = 39;
+// pub const OP_SHL: u8 = 40;
+// pub const OP_SHR: u8 = 41;
+// pub const OP_EQUAL: u8 = 42;
+// pub const OP_NOT_EQUAL: u8 = 43;
+// pub const OP_LESS: u8 = 44;
+// pub const OP_LESS_EQUAL: u8 = 45;
+// pub const OP_GREATER: u8 = 46;
+// pub const OP_GREATER_EQUAL: u8 = 47;
 
 #[derive(Default)]
 pub struct InstructionBuilder {
@@ -99,8 +142,11 @@ mod tests {
         let mut builder = InstructionBuilder::default();
         builder.push_op(OP_CONST_TRUE);
         builder.push_op(OP_CONST_FALSE);
-        builder.push_op(OP_ADD);
-        assert_eq!(builder.code, vec![OP_CONST_TRUE, OP_CONST_FALSE, OP_ADD]);
+        builder.push_op(OP_ADD_I32);
+        assert_eq!(
+            builder.code,
+            vec![OP_CONST_TRUE, OP_CONST_FALSE, OP_ADD_I32]
+        );
     }
 
     #[test]

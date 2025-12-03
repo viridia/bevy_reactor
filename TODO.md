@@ -62,7 +62,7 @@
   - following
 - derived properties of the actor
   - alive (health above zero)
-    - Health component contents > 0
+    - Health component .0 > 0
   - has threat (threat list not empty)
   - has enemies (filtered threat list by position and reduced reactivity)
   - has inventory items
@@ -99,3 +99,20 @@ let health = actor.health;
 }
 
 ```
+
+# Compilation modes:
+
+- module
+  - a standalone assets that contains only declarations
+- formula
+  - an embedded snippet
+  - can contain statements at the top level (like a JavaScript file)
+  - it's effectively a function body but with no delimeters
+  - can have decls which are local to the formula (not exported)
+  - can import modules
+
+output of a compiled formula:
+
+- list of functions
+- a default function (named `.default`) which contains the top-level stuff.
+  - otherwise, the result looks like a module.
