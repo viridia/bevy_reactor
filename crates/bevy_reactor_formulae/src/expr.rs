@@ -17,12 +17,18 @@ pub(crate) enum ExprKind<'e> {
     ConstBool(bool),
     ConstString(SmolStr),
     FunctionRef(usize),
+    /// A local `let` statement
     LocalDecl(usize, Option<&'e mut Expr<'e>>),
+    /// A reference to a function parameter.
     ParamRef(usize),
+    /// A reference to a local variable.
     LocalRef(usize),
+    /// A reference to a global variable.
+    /// TODO: Distinguish between host globals and module globals.
     GlobalRef(usize),
     Field(&'e mut Expr<'e>, usize),
     Index(&'e mut Expr<'e>, usize),
+    EntityProp(&'e mut Expr<'e>, usize),
     Call(&'e mut Expr<'e>, Vec<&'e mut Expr<'e>>),
     BinaryExpr {
         op: BinaryOp,
@@ -67,21 +73,25 @@ impl<'e> Display for Expr<'e> {
                 str_val.fmt(f)
             }
             ExprKind::ConstBool(value) => value.fmt(f),
-            ExprKind::ConstString(symbol) => write!(f, "String({})", symbol),
-            ExprKind::FunctionRef(id) => write!(f, "Function({})", id),
-            ExprKind::LocalRef(id) => write!(f, "LocalRef({})", id),
-            ExprKind::GlobalRef(id) => write!(f, "GlobalRef({})", id),
+            ExprKind::ConstString(symbol) => write!(f, "String({symbol})"),
+            ExprKind::FunctionRef(id) => write!(f, "Function({id})"),
+            ExprKind::LocalRef(id) => write!(f, "LocalRef({id})"),
+            ExprKind::GlobalRef(id) => write!(f, "GlobalRef({id})"),
             ExprKind::Field(base, index) => {
                 base.fmt(f)?;
-                write!(f, ".{}", index)
+                write!(f, ".{index}")
             }
             ExprKind::Index(base, index) => {
                 base.fmt(f)?;
-                write!(f, ".{}", index)
+                write!(f, ".{index}")
             }
-            ExprKind::ParamRef(id) => write!(f, "ParamRef({})", id),
+            ExprKind::EntityProp(base, index) => {
+                base.fmt(f)?;
+                write!(f, ".{index}")
+            }
+            ExprKind::ParamRef(id) => write!(f, "ParamRef({id})"),
             ExprKind::LocalDecl(id, init) => {
-                write!(f, "Local({}", id)?;
+                write!(f, "Local({id}")?;
                 if let Some(init) = init {
                     write!(f, " = ")?;
                     init.fmt(f)?;
@@ -91,11 +101,11 @@ impl<'e> Display for Expr<'e> {
             ExprKind::BinaryExpr { op, lhs, rhs } => {
                 // TODO: Parens if necessary.
                 lhs.fmt(f)?;
-                write!(f, " {} ", op)?;
+                write!(f, " {op} ")?;
                 rhs.fmt(f)
             }
             ExprKind::UnaryExpr { op, arg } => {
-                write!(f, "{:?}", op)?;
+                write!(f, "{op:?}")?;
                 arg.fmt(f)
             }
             ExprKind::Assign { lhs, rhs } => {
@@ -105,7 +115,7 @@ impl<'e> Display for Expr<'e> {
             }
             ExprKind::AssignOp { op, lhs, rhs } => {
                 lhs.fmt(f)?;
-                write!(f, " {:?}= ", op)?;
+                write!(f, " {op}= ")?;
                 rhs.fmt(f)
             }
             ExprKind::Cast(arg) => {

@@ -243,6 +243,27 @@ fn transform_parse_error(err: ParseError<LineCol>) -> CompilationError {
     CompilationError::Expected(location, tokens)
 }
 
+/// Given a string of source code, compile a module.
+pub async fn compile_module(
+    path: &str,
+    src: &str,
+    host: &HostState,
+) -> Result<CompiledModule, CompilationError> {
+    let mut module = CompiledModule {
+        path: path.to_string(),
+        ..Default::default()
+    };
+    let ast_arena = bumpalo::Bump::new();
+    let ast = formula_parser::module(src, &ast_arena).map_err(transform_parse_error)?;
+
+    // pass::define_imports(&mut self.decls, ast)?;
+    // self.resolve_imports().await?;
+    let expr_arena = Bump::new();
+    let module_exprs = pass::build_module_decls(host, &mut module, ast, &expr_arena)?;
+    pass::gen_module(&mut module, &module_exprs)?;
+    Ok(module)
+}
+
 /// Given a string of source code, compile a formula. A formula is a module which allows executable
 /// statements at the root level.
 pub async fn compile_formula(
@@ -262,18 +283,23 @@ pub async fn compile_formula(
     // self.resolve_imports().await?;
     let expr_arena = Bump::new();
     let module_exprs = pass::build_formula_exprs(host, &mut module, ast, result_type, &expr_arena)?;
-    assert_eq!(module_exprs.functions.len(), 1);
     pass::gen_module(&mut module, &module_exprs)?;
     Ok(module)
 }
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
-    use crate::{VM, Value, expr_type::ExprType, host::HostState};
-    use bevy::ecs::{component::Tick, world::World};
+    use crate::{VM, Value, expr_type::ExprType, host::HostState, vm::VMError};
+    use bevy::ecs::{
+        component::{Component, Tick},
+        entity::Entity,
+        world::World,
+    };
     use bevy_reactor::TrackingScope;
     use futures_lite::future;
+    use std::any::Any;
 
     #[test]
     fn compile_simple_formula() {
@@ -518,4 +544,43 @@ mod tests {
     //             _ => panic!(),
     //         }
     //     }
+
+    #[test]
+    fn compile_entity_method() {
+        let mut world = World::new();
+        let actor = world.spawn(Health(22.0));
+        let actor_id = actor.id();
+        let mut host = HostState::default();
+        host.add_global_prop("self", get_self, ExprType::Entity);
+        host.add_entity_prop("health", entity_health, ExprType::F32);
+
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "self.health",
+            &host,
+            ExprType::F32,
+        ))
+        .unwrap();
+
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.owner = actor_id;
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::F32(22.0));
+    }
+
+    fn get_self(vm: &VM) -> Result<Value, VMError> {
+        Ok(Value::Entity(vm.owner))
+    }
+
+    fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
+        if let Some(&Health(h)) = vm.component::<Health>(actor) {
+            Ok(Value::F32(h))
+        } else {
+            Err(VMError::MissingComponent(Health.type_id()))
+        }
+    }
+
+    #[derive(Component)]
+    struct Health(f32);
 }

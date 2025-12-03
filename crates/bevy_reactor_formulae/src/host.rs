@@ -237,28 +237,31 @@ impl HostState {
         index
     }
 
-    // pub fn add_entity_method(&mut self, name: &'static str, method: EntityMethod) -> usize {
-    //     let name: SmolStr = name.into();
-    //     if self.entity_decls.contains_key(&name) {
-    //         panic!("Entity member {name} is already defined.");
-    //     }
+    pub fn add_entity_method(&mut self, name: &'static str, method: EntityMethod) -> usize {
+        let name: SmolStr = name.into();
+        if self.entity_decls.contains_key(&name) {
+            panic!("Entity member {name} is already defined.");
+        }
 
-    //     let index = self.entity_members.len();
-    //     self.entity_members.push(EntityMember::Method(method));
-    //     self.entity_decls.insert(
-    //         name.clone(),
-    //         Decl {
-    //             location: TokenLocation::default(),
-    //             name,
-    //             visibility: DeclVisibility::Public,
-    //             kind: DeclKind::Global {
-    //                 typ,
-    //                 is_const: true,
-    //                 index,
-    //             },
-    //         },
-    //     );
+        let index = self.entity_members.len();
+        self.entity_members.push(EntityMember::Method(method));
+        self.entity_decls.insert(
+            name.clone(),
+            Decl {
+                location: TokenLocation::default(),
+                name,
+                visibility: DeclVisibility::Public,
+                kind: DeclKind::Function {
+                    // TODO: fill in
+                    params: Default::default(),
+                    // TODO: fill in
+                    ret: ExprType::None,
+                    is_native: true,
+                    index,
+                },
+            },
+        );
 
-    //     index
-    // }
+        index
+    }
 }

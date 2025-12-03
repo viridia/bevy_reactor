@@ -19,12 +19,15 @@ use super::{
     assign_types::assign_types, resolve_types::resolve_types, type_inference::TypeInference,
 };
 
-pub(crate) fn build_module_decls<'ast>(
-    _host: &HostState,
+pub(crate) fn build_module_decls<'ast, 'me>(
+    host: &HostState,
     module: &mut CompiledModule,
     ast: &'ast ASTNode<'ast>,
-) -> Result<(), CompilationError> {
-    if let NodeKind::Program(ast_decls) = &ast.kind {
+    expr_arena: &'me bumpalo::Bump,
+) -> Result<ModuleExprs<'me>, CompilationError> {
+    if let NodeKind::Module(ast_decls) = &ast.kind {
+        let mut module_exprs = ModuleExprs::default();
+
         for ast_decl in *ast_decls {
             match &ast_decl.kind {
                 // NodeKind::Import(_, _) => {}
@@ -132,7 +135,7 @@ pub(crate) fn build_module_decls<'ast>(
         //     }
         // }
 
-        Ok(())
+        Ok(module_exprs)
     } else {
         panic!("Invalid AST node for compilation unit: {:?}", ast.kind);
     }
@@ -144,7 +147,7 @@ pub(crate) fn build_module_exprs<'ast>(
     ast: &'ast ASTNode<'ast>,
 ) -> Result<(), CompilationError> {
     // Resolve types for all declarations.
-    if let NodeKind::Program(ast_decls) = &ast.kind {
+    if let NodeKind::Module(ast_decls) = &ast.kind {
         let host_scope = Scope {
             parent: None,
             decls: &host.global_decls,
@@ -378,6 +381,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
 
         let body_expr = build_block(
             ast,
+            host,
             &param_scope,
             &mut local_index,
             &mut inference,
@@ -411,6 +415,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
 
 pub(crate) fn build_exprs<'a, 'e>(
     ast: &'a ASTNode<'a>,
+    host: &HostState,
     parent_scope: &decl::Scope,
     current_scope: &mut decl::DeclTable,
     locals: &mut usize,
@@ -507,8 +512,24 @@ pub(crate) fn build_exprs<'a, 'e>(
         NodeKind::QName(_name) => panic!("Should already be resolved"),
 
         NodeKind::BinaryExpr { op, lhs, rhs } => {
-            let lhs_expr = build_exprs(lhs, parent_scope, current_scope, locals, inference, out)?;
-            let rhs_expr = build_exprs(rhs, parent_scope, current_scope, locals, inference, out)?;
+            let lhs_expr = build_exprs(
+                lhs,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
+            let rhs_expr = build_exprs(
+                rhs,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
             let ty = match op {
                 BinaryOp::Add
                 | BinaryOp::Sub
@@ -566,8 +587,24 @@ pub(crate) fn build_exprs<'a, 'e>(
         }
 
         NodeKind::Assign { lhs, rhs } => {
-            let lhs_expr = build_exprs(lhs, parent_scope, current_scope, locals, inference, out)?;
-            let rhs_expr = build_exprs(rhs, parent_scope, current_scope, locals, inference, out)?;
+            let lhs_expr = build_exprs(
+                lhs,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
+            let rhs_expr = build_exprs(
+                rhs,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
 
             inference.add_constraint(
                 lhs_expr.typ.clone(),
@@ -586,8 +623,24 @@ pub(crate) fn build_exprs<'a, 'e>(
         }
 
         NodeKind::AssignOp { op, lhs, rhs } => {
-            let lhs_expr = build_exprs(lhs, parent_scope, current_scope, locals, inference, out)?;
-            let rhs_expr = build_exprs(rhs, parent_scope, current_scope, locals, inference, out)?;
+            let lhs_expr = build_exprs(
+                lhs,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
+            let rhs_expr = build_exprs(
+                rhs,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
             match op {
                 BinaryOp::Add
                 | BinaryOp::Sub
@@ -634,7 +687,15 @@ pub(crate) fn build_exprs<'a, 'e>(
         }
 
         NodeKind::UnaryExpr { op, arg } => {
-            let arg_expr = build_exprs(arg, parent_scope, current_scope, locals, inference, out)?;
+            let arg_expr = build_exprs(
+                arg,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
             let arg_expr = out.alloc(arg_expr);
             let ty = match op {
                 UnaryOp::Not => {
@@ -660,10 +721,52 @@ pub(crate) fn build_exprs<'a, 'e>(
                 .with_type(ty))
         }
 
-        NodeKind::FieldName(base, _fname) => {
-            let base_expr = build_exprs(base, parent_scope, current_scope, locals, inference, out)?;
+        NodeKind::FieldName(base, fname) => {
+            let base_expr = build_exprs(
+                base,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
             #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
+                ExprType::Entity => {
+                    if let Some(field) = host.entity_decls.get(fname) {
+                        match &field.kind {
+                            DeclKind::Global {
+                                typ,
+                                is_const: _,
+                                index,
+                            } => {
+                                // assign_types(arg_expr, &infer)?;
+                                Ok(out
+                                    .alloc(Expr::new(
+                                        ast.location,
+                                        ExprKind::EntityProp(base_expr, *index),
+                                    ))
+                                    .with_type(typ.clone()))
+                                // builder.push_op(instr::OP_LOAD_ENTITY_PROP);
+                                // builder.push_immediate::<u32>(health_id as u32);
+                            }
+                            DeclKind::Function {
+                                params: _,
+                                ret: _,
+                                is_native: _,
+                                index: _,
+                            } => todo!(),
+                            _ => panic!("Invalid entity member"),
+                        }
+                    } else {
+                        Err(CompilationError::UnknownField(
+                            ast.location,
+                            "Entity".to_string(),
+                            fname.to_string(),
+                        ))
+                    }
+                }
                 // ExprType::Struct(stype) => {
                 //     let field = stype.fields.iter().find(|field| field.name == *fname);
                 //     if let Some(field) = field {
@@ -688,7 +791,15 @@ pub(crate) fn build_exprs<'a, 'e>(
         }
 
         NodeKind::FieldIndex(base, _index) => {
-            let base_expr = build_exprs(base, parent_scope, current_scope, locals, inference, out)?;
+            let base_expr = build_exprs(
+                base,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
             #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 // ExprType::TupleStruct(tstype) => {
@@ -729,6 +840,7 @@ pub(crate) fn build_exprs<'a, 'e>(
                 let value_expr = match value {
                     Some(value) => Some(build_exprs(
                         value,
+                        host,
                         parent_scope,
                         current_scope,
                         locals,
@@ -783,6 +895,7 @@ pub(crate) fn build_exprs<'a, 'e>(
 
             build_block(
                 ast,
+                host,
                 &block_parent_scope,
                 locals,
                 inference,
@@ -795,7 +908,15 @@ pub(crate) fn build_exprs<'a, 'e>(
         NodeKind::Cast { arg, typ } => {
             let mut infer = TypeInference::default();
             let to_typ = resolve_types(parent_scope, typ)?;
-            let arg_expr = build_exprs(arg, parent_scope, current_scope, locals, &mut infer, out)?;
+            let arg_expr = build_exprs(
+                arg,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                &mut infer,
+                out,
+            )?;
             infer.solve_constraints()?;
 
             if to_typ == arg_expr.typ {
@@ -815,11 +936,26 @@ pub(crate) fn build_exprs<'a, 'e>(
         }
 
         NodeKind::Call(func, args) => {
-            let func_expr = build_exprs(func, parent_scope, current_scope, locals, inference, out)?;
+            let func_expr = build_exprs(
+                func,
+                host,
+                parent_scope,
+                current_scope,
+                locals,
+                inference,
+                out,
+            )?;
             let mut arg_exprs = Vec::<&mut Expr>::new();
             for arg in args.iter() {
-                let arg_expr =
-                    build_exprs(arg, parent_scope, current_scope, locals, inference, out)?;
+                let arg_expr = build_exprs(
+                    arg,
+                    host,
+                    parent_scope,
+                    current_scope,
+                    locals,
+                    inference,
+                    out,
+                )?;
                 arg_exprs.push(arg_expr);
             }
 
@@ -864,6 +1000,7 @@ pub(crate) fn build_exprs<'a, 'e>(
 #[allow(clippy::too_many_arguments)]
 fn build_block<'a, 'e>(
     ast: &'a ASTNode<'a>,
+    host: &HostState,
     parent_scope: &decl::Scope,
     locals: &mut usize,
     inference: &mut TypeInference,
@@ -875,13 +1012,22 @@ fn build_block<'a, 'e>(
 
     let mut local_decls = DeclTable::default();
     for stmt in stmts {
-        let stmt_expr = build_exprs(stmt, parent_scope, &mut local_decls, locals, inference, out)?;
+        let stmt_expr = build_exprs(
+            stmt,
+            host,
+            parent_scope,
+            &mut local_decls,
+            locals,
+            inference,
+            out,
+        )?;
         stmt_exprs.push(stmt_expr);
     }
 
     let result_expr = match result {
         Some(result) => Some(build_exprs(
             result,
+            host,
             parent_scope,
             &mut local_decls,
             locals,

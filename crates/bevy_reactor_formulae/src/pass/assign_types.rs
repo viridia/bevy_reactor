@@ -26,7 +26,7 @@ pub(crate) fn assign_types<'e>(
         ExprKind::ConstString(_) => {}
         ExprKind::FunctionRef(_) => {}
         ExprKind::LocalRef(_) | ExprKind::GlobalRef(_) | ExprKind::ParamRef(_) => {}
-        ExprKind::Field(base, _) | ExprKind::Index(base, _) => {
+        ExprKind::Field(base, _) | ExprKind::Index(base, _) | ExprKind::EntityProp(base, _) => {
             assign_types(base, inference)?;
         }
         ExprKind::LocalDecl(_, init) => {

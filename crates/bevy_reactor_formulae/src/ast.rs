@@ -39,7 +39,7 @@ pub(crate) enum FloatSuffix {
 // Content of an AST node.
 #[derive(Debug)]
 pub(crate) enum NodeKind<'a> {
-    Program(&'a [&'a ASTNode<'a>]),
+    Module(&'a [&'a ASTNode<'a>]),
     Empty,
     // Import(&'a ASTNode<'a>, &'a [Symbol]),
     Decl(&'a ASTDecl<'a>),

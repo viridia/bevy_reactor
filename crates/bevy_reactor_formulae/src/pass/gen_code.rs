@@ -379,13 +379,21 @@ fn gen_expr<'cu>(
         //         _ => todo!(),
         //     }
         // }
+        ExprKind::EntityProp(ref base, field_index) => {
+            gen_expr(module, function, base, out)?;
+            out.push_op(instr::OP_LOAD_ENTITY_PROP);
+            out.push_immediate::<u32>(field_index as u32);
+        }
+
         // ExprKind::Index(ref base, _field_index) => {
         //     gen_expr(unit, generator, base, out)?;
         //     todo!();
         // }
-        // ExprKind::GlobalRef(index) => {
-        //     out.instruction(&Instruction::GlobalGet(index as u32));
-        // }
+        ExprKind::GlobalRef(index) => {
+            out.push_op(instr::OP_LOAD_GLOBAL);
+            out.push_immediate::<u32>(index as u32);
+        }
+
         // ExprKind::LocalDecl(index, ref init) => {
         //     if let Some(init) = init {
         //         gen_expr(unit, generator, init, out)?;

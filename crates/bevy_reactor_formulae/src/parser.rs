@@ -571,7 +571,7 @@ peg::parser! {
 
         pub rule module() -> &'a ASTNode<'a> = _ d:(d:decl() _ { d })* {
             let decls = arena.alloc_slice_copy(d.as_slice());
-            arena.alloc(ASTNode::new((0, 0), NodeKind::Program(decls)))
+            arena.alloc(ASTNode::new((0, 0), NodeKind::Module(decls)))
         }
     }
 }
