@@ -103,8 +103,6 @@ impl HostState {
             entity_decls: DeclTable::default(),
             vars: Vec::new(),
             entity_members: Vec::new(),
-            // global: SymbolTable::default(),
-            // entity: SymbolTable::default(),
         };
 
         // Builtin type definitions.
@@ -116,22 +114,6 @@ impl HostState {
         this.add_type_alias("String", ExprType::String);
         this.add_type_alias("Entity", ExprType::Entity);
 
-        // for (name, index) in host.global.iter() {
-        //     let sym = symbols.intern(name);
-        //     // Host names cannot override builtin names
-        //     if intrinsic_scope.contains(sym) {
-        //         panic!("The host name {name} is already defined.");
-        //     }
-        //     let value = host.global.get(index).unwrap();
-        //     match value {
-        //         crate::host::Global::Const(value) => {
-        //             intrinsic_scope.insert(sym, Decl::Global(value.value_type(), index));
-        //         }
-        //         crate::host::Global::Property { accessor: _, typ } => {
-        //             intrinsic_scope.insert(sym, Decl::Global(typ.clone(), index));
-        //         }
-        //     }
-        // }
         this
     }
 
@@ -141,10 +123,9 @@ impl HostState {
             panic!("Host symbol {name} is already defined.");
         }
         self.global_decls.insert(
-            name.clone(),
+            name,
             Decl {
                 location: TokenLocation::default(),
-                name,
                 visibility: DeclVisibility::Public,
                 kind: DeclKind::TypeAlias(typ),
             },
@@ -161,10 +142,9 @@ impl HostState {
         let index = self.vars.len();
         self.vars.push(Global::Const(value));
         self.global_decls.insert(
-            name.clone(),
+            name,
             Decl {
                 location: TokenLocation::default(),
-                name,
                 visibility: DeclVisibility::Public,
                 kind: DeclKind::Global {
                     typ: var_type,
@@ -191,10 +171,9 @@ impl HostState {
         let index = self.vars.len();
         self.vars.push(Global::Property(accessor));
         self.global_decls.insert(
-            name.clone(),
+            name,
             Decl {
                 location: TokenLocation::default(),
-                name,
                 visibility: DeclVisibility::Public,
                 kind: DeclKind::Global {
                     typ,
@@ -221,10 +200,9 @@ impl HostState {
         let index = self.entity_members.len();
         self.entity_members.push(EntityMember::Property(accessor));
         self.entity_decls.insert(
-            name.clone(),
+            name,
             Decl {
                 location: TokenLocation::default(),
-                name,
                 visibility: DeclVisibility::Public,
                 kind: DeclKind::Global {
                     typ,
@@ -246,10 +224,9 @@ impl HostState {
         let index = self.entity_members.len();
         self.entity_members.push(EntityMember::Method(method));
         self.entity_decls.insert(
-            name.clone(),
+            name,
             Decl {
                 location: TokenLocation::default(),
-                name,
                 visibility: DeclVisibility::Public,
                 kind: DeclKind::Function {
                     // TODO: fill in

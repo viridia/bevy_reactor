@@ -69,44 +69,6 @@ impl ExprType {
     pub fn is_number(&self) -> bool {
         self.is_integer() || self.is_float()
     }
-
-    // /// Returns the number of WASM primitives needed to represent the type. This will always
-    // /// be 1 for reference types. For tuples, this will be the sum of the number of primitives
-    // /// needed to represent each element.
-    // pub fn value_count(&self) -> usize {
-    //     match self {
-    //         ExprType::None | ExprType::Void => 0,
-    //         ExprType::Infer(_) => unreachable!("Infer type should be resolved"),
-    //         ExprType::Boolean
-    //         | ExprType::IUnsized
-    //         | ExprType::I32
-    //         | ExprType::I64
-    //         | ExprType::F32
-    //         | ExprType::F64
-    //         | ExprType::String => 1,
-    //         ExprType::Tuple(types) => types.iter().map(|ty| ty.value_count()).sum(),
-    //         ExprType::Array(_) => 1,
-    //         ExprType::Function(_) => 1,
-    //         ExprType::Struct(stype) => {
-    //             if stype.is_record {
-    //                 1
-    //             } else {
-    //                 stype
-    //                     .fields
-    //                     .iter()
-    //                     .map(|field| field.typ.value_count())
-    //                     .sum()
-    //             }
-    //         }
-    //         ExprType::TupleStruct(stype) => {
-    //             if stype.is_record {
-    //                 1
-    //             } else {
-    //                 stype.fields.iter().map(|field| field.value_count()).sum()
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 impl Display for ExprType {

@@ -25,7 +25,6 @@ pub enum Value {
     I64(i64),
     F32(f32),
     F64(f64),
-    // Symbol(&'static str),
     Entity(Entity),
 }
 
@@ -38,7 +37,6 @@ impl Value {
             Value::I64(_) => ExprType::I64,
             Value::F32(_) => ExprType::F32,
             Value::F64(_) => ExprType::F64,
-            // Value::Symbol(_) => ExprType::Symbol,
             Value::Entity(_) => ExprType::Entity,
         }
     }
@@ -476,14 +474,9 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
     Ok(())
 }
 
+// TODO:
 // pub const OP_SHL: u8 = 40;
 // pub const OP_SHR: u8 = 41;
-// pub const OP_EQUAL: u8 = 42;
-// pub const OP_NOT_EQUAL: u8 = 43;
-// pub const OP_LT: u8 = 44;
-// pub const OP_LE: u8 = 45;
-// pub const OP_GT: u8 = 46;
-// pub const OP_GE: u8 = 47;
 
 // // Unops: all consume TOS and push result
 // pub const OP_LOG_NOT: u8 = 50;

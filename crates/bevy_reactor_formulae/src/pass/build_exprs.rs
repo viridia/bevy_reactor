@@ -48,7 +48,6 @@ pub(crate) fn build_module_decls<'ast, 'me>(
 
                         let fd = decl::Decl {
                             location: ast_decl.location,
-                            name: name.clone(),
                             visibility: *visibility,
                             kind: DeclKind::Function {
                                 params: Vec::new(),
@@ -348,7 +347,6 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         let function_index = module_exprs.functions.len();
         let fd = decl::Decl {
             location: ast.location,
-            name: CompiledModule::DEFAULT.into(),
             visibility: DeclVisibility::Private,
             kind: DeclKind::Function {
                 params: Vec::new(),

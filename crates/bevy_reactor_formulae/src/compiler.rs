@@ -125,36 +125,8 @@ pub(crate) struct ModuleExprs<'ex> {
 }
 
 // impl<'cu, 'host> CompilationUnit<'cu, 'host> {
-//     pub fn new(path: &'cu str, src: &'cu str, host: &'host HostState) -> Self {
-//         Self {
-//             path,
-//             src,
-//             host,
-//             // decls: Decls::new(),
-//             // module: wasm_encoder::Module::new(),
-//             // intrinsic_scope: Scope::new(None),
-//             module: Default::default(),
-//         }
-//     }
-
 //     pub fn filename(&self) -> &'cu str {
 //         Path::new(self.path).file_name().unwrap().to_str().unwrap()
-//     }
-
-//     /// Compile a script file.
-//     pub async fn compile_module(&mut self) -> Result<(), CompilationError> {
-//         // self.define_intrinsics();
-
-//         let ast_arena = bumpalo::Bump::new();
-//         let ast = self.parse_file(self.src, &ast_arena)?;
-
-//         // pass::define_imports(&mut self.decls, ast)?;
-//         // self.resolve_imports().await?;
-//         // let mut root_scope = Scope::new(Some(&self.host.global_scope));
-//         // pass::build_module_decls(&mut root_scope, &mut self.decls, ast)?;
-//         // pass::build_module_exprs(&mut root_scope, &mut self.decls, ast)?;
-//         // pass::gen_module(self)?;
-//         Ok(())
 //     }
 
 //     // pub fn add_imports(&mut self, src: &str) -> Result<(), CompilationError> {
@@ -289,7 +261,6 @@ pub async fn compile_formula(
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{VM, Value, expr_type::ExprType, host::HostState, vm::VMError};
     use bevy::ecs::{
@@ -435,43 +406,6 @@ mod tests {
     //         .unwrap();
     //         assert_eq!(expr.to_string(), "20.0");
     //         inference.solve_constraints().unwrap();
-    //     }
-
-    //     #[test]
-    //     fn parse_binop_add() {
-    //         let arena = bumpalo::Bump::new();
-    //         let symbols = InternedSymbols::new();
-    //         let mut unit = CompilationUnit::new("--str--", "20.0 + 10.0");
-    //         let node = saga_parser::expr(unit.src, &arena, &symbols).unwrap();
-    //         match &node.kind {
-    //             ast::NodeKind::BinaryExpr { op, lhs, rhs } => {
-    //                 assert_eq!(*op, oper::BinaryOp::Add);
-    //                 assert!(matches!(
-    //                     lhs.kind,
-    //                     ast::NodeKind::LitFloat(20.0, FloatSuffix::F32)
-    //                 ));
-    //                 assert!(matches!(
-    //                     rhs.kind,
-    //                     ast::NodeKind::LitFloat(10.0, FloatSuffix::F32)
-    //                 ));
-    //             }
-    //             _ => panic!(),
-    //         }
-    //         let mut inference: pass::TypeInference = Default::default();
-    //         let mut root_scope = Scope::new(None);
-    //         let mut locals = Vec::<LocalDecl>::new();
-    //         let mut expr = pass::build_exprs(
-    //             node,
-    //             &mut root_scope,
-    //             &mut unit.decls,
-    //             &mut locals,
-    //             &mut inference,
-    //         )
-    //         .unwrap();
-    //         assert_eq!(expr.to_string(), "20.0 + 10.0");
-    //         inference.solve_constraints().unwrap();
-    //         assign_types(&mut expr, &inference).unwrap();
-    //         assert_eq!(expr.typ, Type::F32);
     //     }
 
     //     #[test]
