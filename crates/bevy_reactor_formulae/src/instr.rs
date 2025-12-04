@@ -29,7 +29,7 @@ pub const OP_COMPLEMENT: u8 = 52;
 // Control flow
 pub const OP_RET: u8 = 61;
 pub const OP_BRANCH: u8 = 62; // (imm i32 relative offset)
-pub const OP_BRANCH_IF_TRUE: u8 = 62; // (imm i32 relative offset, consumes TOS)
+pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS)
 
 // Method calls
 
@@ -120,10 +120,12 @@ pub struct InstructionBuilder {
 }
 
 impl InstructionBuilder {
+    /// Write an instruction opcode (8 bits)
     pub fn push_op(&mut self, op: u8) {
         self.code.push(op);
     }
 
+    /// Write an immediate operand.
     pub fn push_immediate<T>(&mut self, val: T) {
         self.align_ip::<T>();
         let slot = std::mem::size_of::<T>();
@@ -135,6 +137,47 @@ impl InstructionBuilder {
         }
     }
 
+    /// Reserve space for an immediate operand, but don't write anything to it yet.
+    /// Return the offset of the reserved value.
+    pub fn reserve_immediate<T>(&mut self) -> usize {
+        self.align_ip::<T>();
+        let slot = std::mem::size_of::<T>();
+        let offset = self.code.len();
+        self.code.resize(offset + slot, 0);
+        offset
+    }
+
+    /// The offset of the next available instruction slot.
+    pub fn position(&self) -> usize {
+        self.code.len()
+    }
+
+    /// Write an immediate operand into a previously reserved location. The data type
+    /// must match that of the previously reserved space.
+    pub fn patch_immediate<T>(&mut self, val: T, offset: usize) {
+        let slot = std::mem::size_of::<T>();
+        assert!(offset + slot <= self.code.len());
+        unsafe {
+            let dst = self.code.as_mut_ptr().add(offset) as *mut T;
+            std::ptr::write_unaligned(dst, val);
+        }
+    }
+
+    /// # Arguments
+    /// - `from` - the previously reserved immediate operand of the branch instruction
+    /// - `to` - the offset which we are jumping to.
+    pub fn patch_branch_target(&mut self, from: usize, to: usize) {
+        let slot = std::mem::size_of::<i32>();
+        assert!(from + slot <= self.code.len());
+        unsafe {
+            let dst = self.code.as_mut_ptr().add(from) as *mut i32;
+            // Note that the jump instruction pre-increments the address before computing
+            // the jump, so we need to calculate relative to the end of the immediate value.
+            std::ptr::write_unaligned(dst, (to as i32) - ((from + slot) as i32));
+        }
+    }
+
+    /// Return the generate opcode stream, consuming self.
     pub fn inner(self) -> Vec<u8> {
         self.code
     }

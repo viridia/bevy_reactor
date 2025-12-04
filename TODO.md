@@ -78,41 +78,62 @@
   - whether a door has an input signal connected to it
   - timers
 
-Syntactical ideas:
+## Formula TODO
 
-```
-use panoply::actors::Health;
+Next:
 
-let health = actor.get::<Health>().0;
-let health = actor::<Health>.0;
-let health = actor::Health.0;
-let health = actor.get(#Health).0;
+- if
+- load module from asset
 
-let health = actor.get::<panoply::actors::Health>().0;
+  - extension: .fmod
 
-// Best: We don't access components directly from scripts, we go through registered
-// accessors
-let health = actor.health;
+- function definitions
+  - native
+  - host
+  - entity
+- inferred function adaptors
+- local vars
+- parameters
+  - script functions
+  - native functions
+  - entity methods
+- operators
+  - shl / shr
+  - log and/not
+  - unary
+- type alias
+- control flow
+  - if
+  - for
+  - loop
+  - return
+  - break
+  - continue
+- bblocks
+- complex types
+  - string
+  - array
+  - struct
+  - tuple
+- import statements
+  - parse
+  - resolve
+  - backend
 
-(self: Actor<Self>, player: Actor<Player>) => {
-  self.health > 0
-}
-
-```
-
-# Compilation modes:
-
-- module
-  - a standalone assets that contains only declarations
-- formula
-  - an embedded snippet
-  - can contain statements at the top level (like a JavaScript file)
-  - it's effectively a function body but with no delimeters
-  - can have decls which are local to the formula (not exported)
-  - can import modules
-
-output of a compiled formula:
-
-- list of functions
-- a default function (named `.default`) which contains the top-level stuff.
-  - otherwise, the result looks like a module.
+[
+:00 21, 0, 0, 0, // OP_LOAD_GLOBAL
+:04 0, 0, 0, 0, // immediate
+:08 22, 0, 0, 0, // OP_LOAD_ENTITY_PROP
+:12 0, 0, 0, 0, // immediate
+:16 5, 0, 0, 0, // OP_CONST_F32
+:20 0, 0, 0, 0, // immediate f32
+:24 168, // OP_GT_F32
+:25 63, 0, 0, // OP_BRANCH_IF_FALSE
+:28 16, 0, 0, 0, // immediate (16)
+:32 5, 0, 0, 0, // OP_CONST_F32
+:36 0, 0, 0, 64, // immediate
+:40 62, 0, 0, 0, // OP_BRANCH
+:44 8, 0, 0, 0,
+:48 5, 0, 0, 0,
+:52 0, 0, 64, 64,
+:56 61 // OP_RET

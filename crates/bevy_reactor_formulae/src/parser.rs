@@ -364,8 +364,10 @@ peg::parser! {
             p:primary() { p }
         }
 
-        pub rule expr() -> &'a ASTNode<'a> = l:(binop()) { l } / expected!("expression")
-        rule empty_stmt() -> &'a ASTNode<'a> = ";" _ {
+        pub rule expr() -> &'a ASTNode<'a> = l:binop() { l } / expected!("expression")
+        // pub rule expr_stmt() -> &'a ASTNode<'a> = e:expr() _ (";" / expected!("semicolon")) { e }
+
+        rule empty_stmt() -> &'a ASTNode<'a> = ";" {
             arena.alloc(ASTNode::new((0, 0), NodeKind::Empty))
         }
 
@@ -400,37 +402,71 @@ peg::parser! {
             init: (_ "=" _ e:expr() { e })?
             _ ";" _
             end:position!() {
-            let location = (start, end);
-            arena.alloc(ASTNode::new(location, NodeKind::Decl(arena.alloc(ASTDecl::Let {
-                name: id,
-                visibility: decl::DeclVisibility::Private,
-                typ: ty,
-                value: init,
-                is_const
-            }))))
-        }
+                let location = (start, end);
+                arena.alloc(ASTNode::new(location, NodeKind::Decl(arena.alloc(ASTDecl::Let {
+                    name: id,
+                    visibility: decl::DeclVisibility::Private,
+                    typ: ty,
+                    value: init,
+                    is_const
+                }))))
+            }
+
+        pub(crate) rule if_stmt() -> &'a ASTNode<'a> =
+            start:position!()
+            "if"
+            _ test:expr()
+            _ then_block:block()
+            else_block: (
+                _ "else"
+                _ s:(
+                    s:block() { s }
+                    / s:if_stmt() { s }
+                ) { s }
+            )?
+            end:position!()
+            {
+                let location = (start, end);
+                arena.alloc(ASTNode::new(location, NodeKind::If {
+                    test, then_block, else_block
+                }))
+            }
 
         rule stmt() -> &'a ASTNode<'a> =
             start:position!()
+            _
             s:(
-                s0: empty_stmt() { s0 }
-                / v: var_decl() { v }
-                / s:(expr()) _ (";" / expected!("semicolon")) _ { s }
+                s0:empty_stmt() { s0 }
+                / v:var_decl() { v }
+                / i:if_stmt() !(_ "}") [_] { i }
+                / b:block() !(_ "}") [_] { b }
+                / s:expr() (";" / expected!("semicolon")) { s }
             )
             end:position!()
             { s } / expected!("statement")
 
-        rule block() -> &'a ASTNode<'a> =
-            start:position!()
-            "{" _
+        rule block_contents() -> (Vec<&'a ASTNode<'a>>, Option<&'a ASTNode<'a>>)  =
             l:(stmt()*)
-            f:expr()?
-            _ "}"
+            f:(
+                _ e: if_stmt() { e }
+                / _ e: block() { e }
+                / _ e: expr() { e }
+            )?
+            _
+        {
+            (l, f)
+        }
+
+        pub(crate) rule block() -> &'a ASTNode<'a> =
+            start:position!()
+            "{"
+            c:block_contents()
+            "}"
             end:position!()
         {
             let location = (start, end);
-            let stmts = arena.alloc_slice_copy(l.as_slice());
-            arena.alloc(ASTNode::new(location, NodeKind::Block(stmts, f)))
+            let stmts = arena.alloc_slice_copy(c.0.as_slice());
+            arena.alloc(ASTNode::new(location, NodeKind::Block(stmts, c.1)))
         }
 
         rule visiblity() -> decl::DeclVisibility =
@@ -479,15 +515,14 @@ peg::parser! {
             end:position!()
         {
             let location = (start, end);
-            todo!();
-            // arena.alloc(ASTNode::new(location, NodeKind::Decl(arena.alloc(ASTDecl::Function {
-            //     name: id,
-            //     visibility: vis,
-            //     params: p,
-            //     ret,
-            //     body,
-            //     is_native: native,
-            // }))))
+            arena.alloc(ASTNode::new(location, NodeKind::Decl(arena.alloc(ASTDecl::Function {
+                name: id,
+                visibility: vis,
+                params: p,
+                ret,
+                body,
+                is_native: native,
+            }))))
         }
 
         rule struct_field() -> &'a StructField<'a> =
@@ -560,13 +595,12 @@ peg::parser! {
 
         pub rule formula() -> &'a ASTNode<'a> =
             start:position!()
-            l:(stmt()*)
-            f:expr()?
+            c:block_contents()
             end:position!()
         {
             let location = (start, end);
-            let stmts = arena.alloc_slice_copy(l.as_slice());
-            arena.alloc(ASTNode::new(location, NodeKind::Block(stmts, f)))
+            let stmts = arena.alloc_slice_copy(c.0.as_slice());
+            arena.alloc(ASTNode::new(location, NodeKind::Block(stmts, c.1)))
         }
 
         pub rule module() -> &'a ASTNode<'a> = _ d:(d:decl() _ { d })* {
@@ -769,5 +803,139 @@ mod tests {
 
         let ast = formula_parser::param_list("(a: bool, b: bool,)", &arena).unwrap();
         assert_eq!(ast.len(), 2);
+    }
+
+    #[test]
+    pub fn block() {
+        let arena = Bump::new();
+
+        let ast = formula_parser::block("{}", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 0);
+        assert!(result.is_none());
+
+        let ast = formula_parser::block("{ 10 }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 0);
+        assert!(result.is_some());
+
+        let ast = formula_parser::block("{ 10; }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 1);
+        assert!(result.is_none());
+
+        let ast = formula_parser::block("{ 10; 10 }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 1);
+        assert!(result.is_some());
+
+        let ast = formula_parser::block("{ if true { 0 } }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 0);
+        assert!(result.is_some());
+
+        let ast = formula_parser::block("{ if true { 0 } 10 }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 1);
+        assert!(result.is_some());
+
+        let ast = formula_parser::block("{ { 0 } }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 0);
+        assert!(result.is_some());
+
+        let ast = formula_parser::block("{ { 1 } { 0 } }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 1);
+        assert!(result.is_some());
+
+        let ast = formula_parser::formula("{ 0 }", &arena).unwrap();
+        let NodeKind::Block(stmts, result) = ast.kind else {
+            panic!()
+        };
+        assert_eq!(stmts.len(), 0);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    pub fn if_stmt() {
+        let arena = Bump::new();
+        let ast = formula_parser::if_stmt("if x > 0 { 1.0 }", &arena);
+        match ast {
+            Ok(ASTNode {
+                kind:
+                    NodeKind::If {
+                        test,
+                        then_block,
+                        else_block,
+                    },
+                location,
+                ..
+            }) => {
+                assert_eq!(location.start(), 0);
+                assert_eq!(location.end(), 16);
+                assert!(matches!(
+                    test.kind,
+                    NodeKind::BinaryExpr {
+                        op: _,
+                        lhs: _,
+                        rhs: _
+                    }
+                ));
+                assert!(matches!(then_block.kind, NodeKind::Block(_, _)));
+                assert!(else_block.is_none());
+            }
+            Err(err) => panic!("Parse error: {err} at {}", err.location),
+            _ => panic!("Unexpected AST: {ast:?}"),
+        }
+    }
+
+    #[test]
+    pub fn if_else_stmt() {
+        let arena = Bump::new();
+        let ast = formula_parser::if_stmt("if x > 0 { 1.0 } else { 2.0 }", &arena);
+        match ast {
+            Ok(ASTNode {
+                kind:
+                    NodeKind::If {
+                        test,
+                        then_block,
+                        else_block,
+                    },
+                location,
+                ..
+            }) => {
+                assert_eq!(location.start(), 0);
+                assert_eq!(location.end(), 29);
+                assert!(matches!(
+                    test.kind,
+                    NodeKind::BinaryExpr {
+                        op: _,
+                        lhs: _,
+                        rhs: _
+                    }
+                ));
+                assert!(matches!(then_block.kind, NodeKind::Block(_, _)));
+                assert!(matches!(else_block.unwrap().kind, NodeKind::Block(_, _)));
+            }
+            Err(err) => panic!("Parse error: {err} at {}", err.location),
+            _ => panic!("Unexpected AST: {ast:?}"),
+        }
     }
 }

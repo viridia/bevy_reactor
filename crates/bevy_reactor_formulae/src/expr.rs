@@ -50,6 +50,11 @@ pub(crate) enum ExprKind<'e> {
     },
     Cast(&'e mut Expr<'e>),
     Block(Vec<&'e mut Expr<'e>>, Option<&'e mut Expr<'e>>),
+    If {
+        test: &'e mut Expr<'e>,
+        then_branch: &'e mut Expr<'e>,
+        else_branch: Option<&'e mut Expr<'e>>,
+    },
 }
 
 /// Expression node.
@@ -142,6 +147,21 @@ impl<'e> Display for Expr<'e> {
                     result.fmt(f)?;
                 }
                 write!(f, "}}")
+            }
+            ExprKind::If {
+                test,
+                then_branch,
+                else_branch,
+            } => {
+                write!(f, "if ")?;
+                test.fmt(f);
+                write!(f, " ")?;
+                then_branch.fmt(f);
+                if let Some(e) = else_branch {
+                    write!(f, " else ")?;
+                    e.fmt(f);
+                }
+                Ok(())
             }
         }
     }

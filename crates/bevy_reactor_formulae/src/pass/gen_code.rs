@@ -400,6 +400,31 @@ fn gen_expr<'cu>(
             }
         }
 
+        ExprKind::If {
+            ref test,
+            ref then_branch,
+            ref else_branch,
+        } => {
+            gen_expr(module, function, test, out)?;
+            out.push_op(instr::OP_BRANCH_IF_FALSE);
+            let false_branch = out.reserve_immediate::<i32>();
+            gen_expr(module, function, then_branch, out)?;
+            if let Some(else_branch) = else_branch {
+                // Branch at end of then block
+                out.push_op(instr::OP_BRANCH);
+                let end_if = out.reserve_immediate::<i32>();
+
+                // Patch first jump to go to this block.
+                out.patch_branch_target(false_branch, out.position());
+                gen_expr(module, function, else_branch, out)?;
+
+                // Patch second jump
+                out.patch_branch_target(end_if, out.position());
+            } else {
+                out.patch_branch_target(false_branch, out.position());
+            }
+        }
+
         _ => todo!("Unimplemented {:?}", expr.kind),
     }
 

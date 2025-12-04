@@ -102,7 +102,7 @@ pub(crate) fn assign_types<'e>(
             assign_types(rhs, inference)?;
             match op {
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
-                    let ty = inference.substitute(&mut lhs.typ);
+                    let ty = inference.substitute(&lhs.typ);
                     match ty {
                         ExprType::I32 | ExprType::I64 | ExprType::F32 | ExprType::F64 => {
                             // expr.typ = ty;
@@ -161,6 +161,18 @@ pub(crate) fn assign_types<'e>(
             }
             if let Some(result) = result {
                 assign_types(result, inference)?;
+            }
+        }
+
+        ExprKind::If {
+            test,
+            then_branch,
+            else_branch,
+        } => {
+            assign_types(test, inference)?;
+            assign_types(then_branch, inference)?;
+            if let Some(e) = else_branch {
+                assign_types(e, inference)?;
             }
         }
     }

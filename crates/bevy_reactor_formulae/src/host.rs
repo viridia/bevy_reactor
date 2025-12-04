@@ -75,7 +75,7 @@ impl Default for EntityMember {
     }
 }
 
-fn default_property(_: &VM, e: Entity) -> Result<Value, VMError> {
+fn default_property(_: &VM, _e: Entity) -> Result<Value, VMError> {
     panic!("Default property handler")
 }
 

@@ -273,7 +273,7 @@ mod tests {
     use std::any::Any;
 
     #[test]
-    fn compile_simple_formula() {
+    fn compile_int_lit() {
         let host = HostState::default();
         let module =
             future::block_on(compile_formula("--str--", "20", &host, ExprType::I32)).unwrap();
@@ -609,6 +609,44 @@ mod tests {
         vm.owner = actor_id;
         let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
         assert_eq!(result, Value::F32(22.0));
+    }
+
+    #[test]
+    fn compile_block_result() {
+        let host = HostState::default();
+        let module =
+            future::block_on(compile_formula("--str--", "{ 20 }", &host, ExprType::I32)).unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::I32(20));
+    }
+
+    #[test]
+    fn compile_if_else() {
+        let mut world = World::new();
+        let actor = world.spawn(Health(22.0));
+        let actor_id = actor.id();
+        let mut host = HostState::default();
+        host.add_global_prop("self", get_self, ExprType::Entity);
+        host.add_entity_prop("health", entity_health, ExprType::F32);
+
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "if self.health > 0.0 { 2.0 } else { 3.0 }",
+            &host,
+            ExprType::F32,
+        ))
+        .unwrap();
+
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.owner = actor_id;
+        // eprintln!("Code: {:?}", module.functions[0].code);
+        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        assert_eq!(result, Value::F32(2.0));
     }
 
     fn get_self(vm: &VM) -> Result<Value, VMError> {

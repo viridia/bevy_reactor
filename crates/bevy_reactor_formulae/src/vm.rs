@@ -134,7 +134,7 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
     fn start(&mut self) -> Result<Value, VMError> {
         loop {
             let op = unsafe { *self.iptr };
-            // println!("op: {op}");
+            // eprintln!("Opcode: {op}");
             if op == OP_RET {
                 break;
             }
@@ -198,6 +198,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
 
     table[instr::OP_RET as usize] = ret;
     table[instr::OP_BRANCH as usize] = branch;
+    table[instr::OP_BRANCH_IF_FALSE as usize] = branch_if_false;
 
     table[instr::OP_CALL_ENTITY_METHOD as usize] = call_entity_method;
 
@@ -266,7 +267,8 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table
 }
 
-fn invalid(_vm: &mut VM) -> Result<(), VMError> {
+fn invalid(vm: &mut VM) -> Result<(), VMError> {
+    eprintln!("Invalid instruction: {}", unsafe { *vm.iptr.offset(-1) });
     Err(VMError::InvalidInstruction)
 }
 
@@ -488,6 +490,24 @@ fn branch(vm: &mut VM) -> Result<(), VMError> {
     let offset = vm.read_immediate::<i32>();
     vm.iptr = unsafe { vm.iptr.offset(offset as isize) };
     Ok(())
+}
+
+fn branch_if_false(vm: &mut VM) -> Result<(), VMError> {
+    let test = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    let offset = vm.read_immediate::<i32>();
+    match test {
+        Value::Bool(false) => {
+            vm.iptr = unsafe { vm.iptr.offset(offset as isize) };
+            Ok(())
+        }
+
+        Value::Bool(true) => Ok(()),
+
+        _ => Err(VMError::MismatchedTypes(
+            test.value_type(),
+            ExprType::Boolean,
+        )),
+    }
 }
 
 fn ret(_vm: &mut VM) -> Result<(), VMError> {

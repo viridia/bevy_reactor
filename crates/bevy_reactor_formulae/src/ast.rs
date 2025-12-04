@@ -76,6 +76,11 @@ pub(crate) enum NodeKind<'a> {
         rhs: &'a ASTNode<'a>,
     },
     ArrayType(&'a ASTNode<'a>),
+    If {
+        test: &'a ASTNode<'a>,
+        then_block: &'a ASTNode<'a>,
+        else_block: Option<&'a ASTNode<'a>>,
+    },
     // StructType
     // TupleStructType
     // EnumType
