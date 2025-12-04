@@ -1,5 +1,7 @@
+use std::sync::Mutex;
+
 use crate::{
-    decl::DeclTable, expr::Expr, expr_type::ExprType, host::HostState, location::TokenLocation,
+    Module, expr::Expr, expr_type::ExprType, host::HostState, location::TokenLocation,
     oper::BinaryOp, parser::formula_parser, pass,
 };
 use bumpalo::Bump;
@@ -89,28 +91,6 @@ impl CompilationError {
 #[derive(Default, Debug)]
 pub struct CompiledFunction {
     pub(crate) code: Vec<u8>,
-}
-
-/// The output of a compilation, either a module or a formula.
-/// - a "module" is a standalone asset containing declarations (functions and variables)
-/// - a "formula" is a module that is intended to be embedded within another asset. It's similar
-///   to a module, however it can have executable statements at the root level which are compiled
-///   into a special ".default" function that takes no arguments.
-#[derive(Default, Debug)]
-pub struct CompiledModule {
-    /// Name of the asset or file containing the source of this module.
-    pub(crate) path: String,
-
-    /// Top-level declarations in this module.
-    pub(crate) module_decls: DeclTable,
-
-    /// Compiled functions, including both top-level and nested.
-    pub(crate) functions: Vec<CompiledFunction>,
-}
-
-impl CompiledModule {
-    /// The name of the default export.
-    pub const DEFAULT: &str = ".default";
 }
 
 #[derive(Default, Debug)]
@@ -219,9 +199,9 @@ fn transform_parse_error(err: ParseError<LineCol>) -> CompilationError {
 pub async fn compile_module(
     path: &str,
     src: &str,
-    host: &HostState,
-) -> Result<CompiledModule, CompilationError> {
-    let mut module = CompiledModule {
+    host: &Mutex<HostState>,
+) -> Result<Module, CompilationError> {
+    let mut module = Module {
         path: path.to_string(),
         ..Default::default()
     };
@@ -231,7 +211,8 @@ pub async fn compile_module(
     // pass::define_imports(&mut self.decls, ast)?;
     // self.resolve_imports().await?;
     let expr_arena = Bump::new();
-    let module_exprs = pass::build_module_decls(host, &mut module, ast, &expr_arena)?;
+    let host_lock = host.lock().unwrap();
+    let module_exprs = pass::build_module_exprs(&host_lock, &mut module, ast, &expr_arena)?;
     pass::gen_module(&mut module, &module_exprs)?;
     Ok(module)
 }
@@ -243,8 +224,8 @@ pub async fn compile_formula(
     src: &str,
     host: &HostState,
     result_type: ExprType,
-) -> Result<CompiledModule, CompilationError> {
-    let mut module = CompiledModule {
+) -> Result<Module, CompilationError> {
+    let mut module = Module {
         path: path.to_string(),
         ..Default::default()
     };
@@ -281,31 +262,8 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::I32(20));
-
-        // assert_eq!(result, Value::I32(5));
-        // assert!(matches!(
-        //     node.kind,
-        //     ast::NodeKind::LitInt(20, IntegerSuffix::Unsized)
-        // ));
-        // let mut inference: pass::TypeInference = Default::default();
-        // let mut root_scope = Scope::new(None);
-        // let mut locals = Vec::<LocalDecl>::new();
-        // let expr = pass::build_exprs(
-        //     node,
-        //     &mut root_scope,
-        //     &mut unit.decls,
-        //     &mut locals,
-        //     &mut inference,
-        // )
-        // .unwrap();
-        // assert_eq!(expr.to_string(), "20");
-        // inference.solve_constraints().unwrap();
-        // let span = expr.location.as_span("20").unwrap();
-        // assert_eq!(span.start(), 0);
-        // assert_eq!(span.end(), 2);
-        // assert_eq!(span.lines().next(), Some("20"));
     }
 
     #[test]
@@ -317,7 +275,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::I32(30));
     }
 
@@ -335,7 +293,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::F32(30.0));
     }
 
@@ -354,131 +312,6 @@ mod tests {
         assert_eq!(error.location().end(), 9);
     }
 
-    //     #[test]
-    //     fn parse_integer() {
-    //         let arena = bumpalo::Bump::new();
-    //         let symbols = InternedSymbols::new();
-    //         let mut unit = CompilationUnit::new("--str--", "20");
-    //         let node = saga_parser::expr(unit.src, &arena, &symbols).unwrap();
-    //         assert!(matches!(
-    //             node.kind,
-    //             ast::NodeKind::LitInt(20, IntegerSuffix::Unsized)
-    //         ));
-    //         let mut inference: pass::TypeInference = Default::default();
-    //         let mut root_scope = Scope::new(None);
-    //         let mut locals = Vec::<LocalDecl>::new();
-    //         let expr = pass::build_exprs(
-    //             node,
-    //             &mut root_scope,
-    //             &mut unit.decls,
-    //             &mut locals,
-    //             &mut inference,
-    //         )
-    //         .unwrap();
-    //         assert_eq!(expr.to_string(), "20");
-    //         inference.solve_constraints().unwrap();
-    //         // let span = expr.location.as_span("20").unwrap();
-    //         // assert_eq!(span.start(), 0);
-    //         // assert_eq!(span.end(), 2);
-    //         // assert_eq!(span.lines().next(), Some("20"));
-    //     }
-
-    //     #[test]
-    //     fn parse_float() {
-    //         let arena = bumpalo::Bump::new();
-    //         let symbols = InternedSymbols::new();
-    //         let mut unit = CompilationUnit::new("--str--", "20.0");
-    //         let node = saga_parser::expr(unit.src, &arena, &symbols).unwrap();
-    //         assert!(matches!(
-    //             node.kind,
-    //             ast::NodeKind::LitFloat(20.0, FloatSuffix::F32)
-    //         ));
-    //         let mut inference: pass::TypeInference = Default::default();
-    //         let mut root_scope = Scope::new(None);
-    //         let mut locals = Vec::<LocalDecl>::new();
-    //         let expr = pass::build_exprs(
-    //             node,
-    //             &mut root_scope,
-    //             &mut unit.decls,
-    //             &mut locals,
-    //             &mut inference,
-    //         )
-    //         .unwrap();
-    //         assert_eq!(expr.to_string(), "20.0");
-    //         inference.solve_constraints().unwrap();
-    //     }
-
-    //     #[test]
-    //     fn parse_binop_prec() {
-    //         let arena = bumpalo::Bump::new();
-    //         let symbols = InternedSymbols::new();
-    //         let mut unit = CompilationUnit::new("--str--", "20.0 + 10.0 * 0");
-    //         let node = saga_parser::expr(unit.src, &arena, &symbols).unwrap();
-    //         match &node.kind {
-    //             ast::NodeKind::BinaryExpr { op, lhs, rhs } => {
-    //                 assert_eq!(*op, oper::BinaryOp::Add);
-    //                 assert!(matches!(
-    //                     lhs.kind,
-    //                     ast::NodeKind::LitFloat(20.0, FloatSuffix::F32)
-    //                 ));
-    //                 match &rhs.kind {
-    //                     ast::NodeKind::BinaryExpr { op, lhs, rhs } => {
-    //                         assert_eq!(*op, oper::BinaryOp::Mul);
-    //                         assert!(matches!(
-    //                             lhs.kind,
-    //                             ast::NodeKind::LitFloat(10.0, FloatSuffix::F32)
-    //                         ));
-    //                         assert!(matches!(
-    //                             rhs.kind,
-    //                             ast::NodeKind::LitInt(0, IntegerSuffix::Unsized)
-    //                         ));
-    //                     }
-    //                     _ => panic!(),
-    //                 }
-    //                 // assert!(matches!(rhs.value, ast::NodeValue::ConstF64(10.0)));
-    //             }
-    //             _ => panic!(),
-    //         }
-    //         let mut inference: pass::TypeInference = Default::default();
-    //         let mut root_scope = Scope::new(None);
-    //         let mut locals = Vec::<LocalDecl>::new();
-    //         let expr = pass::build_exprs(
-    //             node,
-    //             &mut root_scope,
-    //             &mut unit.decls,
-    //             &mut locals,
-    //             &mut inference,
-    //         )
-    //         .unwrap();
-    //         assert_eq!(expr.to_string(), "20.0 + 10.0 * 0");
-    //         let err = inference.solve_constraints().unwrap_err();
-    //         assert_eq!(err.to_string(), "Cannot assign type i32 to f32");
-    //     }
-
-    //     #[test]
-    //     fn parse_module() {
-    //         let arena = bumpalo::Bump::new();
-    //         let symbols = InternedSymbols::new();
-    //         let node = saga_parser::compilation_unit(
-    //             r#"
-    //             fn test() -> i32 {
-    //                 1 + 2
-    //             }"#,
-    //             &arena,
-    //             &symbols,
-    //         )
-    //         .unwrap();
-    //         assert!(matches!(node.kind, ast::NodeKind::Program(_)));
-    //         match node.kind {
-    //             ast::NodeKind::Program(decls) => {
-    //                 assert_eq!(decls.len(), 1);
-    //                 let decl = decls[0];
-    //                 assert!(matches!(decl.kind, ast::NodeKind::Decl(_)));
-    //             }
-    //             _ => panic!(),
-    //         }
-    //     }
-
     #[test]
     fn compile_relational_eq() {
         let host = HostState::default();
@@ -493,7 +326,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -511,7 +344,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -529,7 +362,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -547,7 +380,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::Bool(false));
     }
 
@@ -565,7 +398,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -583,7 +416,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::Bool(true));
     }
 
@@ -607,7 +440,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.owner = actor_id;
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::F32(22.0));
     }
 
@@ -620,7 +453,7 @@ mod tests {
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::I32(20));
     }
 
@@ -645,7 +478,7 @@ mod tests {
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.owner = actor_id;
         // eprintln!("Code: {:?}", module.functions[0].code);
-        let result = vm.run(&module, CompiledModule::DEFAULT).unwrap();
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::F32(2.0));
     }
 
@@ -663,4 +496,18 @@ mod tests {
 
     #[derive(Component)]
     struct Health(f32);
+
+    #[test]
+    fn compile_module_with_func() {
+        let host = Mutex::new(HostState::new());
+        let module =
+            future::block_on(compile_module("--str--", "fn test() -> i32 { 20 }", &host)).unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let host = host.lock().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, "test").unwrap();
+        assert_eq!(result, Value::I32(20));
+    }
 }

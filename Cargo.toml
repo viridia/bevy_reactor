@@ -34,33 +34,3 @@ opt-level = 1
 # Enable a large amount of optimization in the dev profile for dependencies.
 [profile.dev.package."*"]
 opt-level = 3
-
-# [patch.crates-io]
-# bevy_app = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_asset = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_color = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_ecs = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_platform = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_log = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_camera = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_math = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_mesh = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_light = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_reflect = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_state = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_time = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_utils = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_window = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_render = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_core_pipeline = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_pbr = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_image = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_gizmos = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_text = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_picking = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_sprite = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_sprite_render = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_winit = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_ui_render = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_shader = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }
-# bevy_transform = { git = "https://github.com/cart/bevy.git", version = "0.17.2", branch = "next-gen-scenes-0.17.1" }

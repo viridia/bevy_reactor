@@ -82,11 +82,7 @@
 
 Next:
 
-- if
-- load module from asset
-
-  - extension: .fmod
-
+- load module from asset (extension: .fmod or .crow)
 - function definitions
   - native
   - host
@@ -119,21 +115,3 @@ Next:
   - parse
   - resolve
   - backend
-
-[
-:00 21, 0, 0, 0, // OP_LOAD_GLOBAL
-:04 0, 0, 0, 0, // immediate
-:08 22, 0, 0, 0, // OP_LOAD_ENTITY_PROP
-:12 0, 0, 0, 0, // immediate
-:16 5, 0, 0, 0, // OP_CONST_F32
-:20 0, 0, 0, 0, // immediate f32
-:24 168, // OP_GT_F32
-:25 63, 0, 0, // OP_BRANCH_IF_FALSE
-:28 16, 0, 0, 0, // immediate (16)
-:32 5, 0, 0, 0, // OP_CONST_F32
-:36 0, 0, 0, 64, // immediate
-:40 62, 0, 0, 0, // OP_BRANCH
-:44 8, 0, 0, 0,
-:48 5, 0, 0, 0,
-:52 0, 0, 64, 64,
-:56 61 // OP_RET

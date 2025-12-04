@@ -890,14 +890,7 @@ mod tests {
             }) => {
                 assert_eq!(location.start(), 0);
                 assert_eq!(location.end(), 16);
-                assert!(matches!(
-                    test.kind,
-                    NodeKind::BinaryExpr {
-                        op: _,
-                        lhs: _,
-                        rhs: _
-                    }
-                ));
+                assert!(matches!(test.kind, NodeKind::BinaryExpr { .. }));
                 assert!(matches!(then_block.kind, NodeKind::Block(_, _)));
                 assert!(else_block.is_none());
             }
@@ -923,14 +916,7 @@ mod tests {
             }) => {
                 assert_eq!(location.start(), 0);
                 assert_eq!(location.end(), 29);
-                assert!(matches!(
-                    test.kind,
-                    NodeKind::BinaryExpr {
-                        op: _,
-                        lhs: _,
-                        rhs: _
-                    }
-                ));
+                assert!(matches!(test.kind, NodeKind::BinaryExpr { .. }));
                 assert!(matches!(then_block.kind, NodeKind::Block(_, _)));
                 assert!(matches!(else_block.unwrap().kind, NodeKind::Block(_, _)));
             }

@@ -1154,12 +1154,7 @@ fn on_terminal_drag_leave(
     mut r_gesture: ResMut<GestureState>,
 ) {
     drag_end.propagate(false);
-    if let Gesture::Connect {
-        anchor: _,
-        connections: _,
-        target: _,
-    } = r_gesture.gesture
-    {
+    if let Gesture::Connect { .. } = r_gesture.gesture {
         r_gesture.connection_target = None;
     }
 }

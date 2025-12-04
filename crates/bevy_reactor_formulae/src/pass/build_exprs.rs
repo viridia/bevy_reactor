@@ -1,6 +1,7 @@
 use core::result;
 use std::sync::Arc;
 
+use crate::Module;
 use crate::ast::{ASTNode, FloatSuffix, IntegerSuffix, NodeKind};
 use crate::decl::{Decl, DeclKind, DeclTable, Scope};
 use crate::expr_type::ExprType;
@@ -9,10 +10,8 @@ use bevy::{log::info, render::render_graph::Node, scene::ron::de};
 
 use crate::{
     ast::ASTDecl,
-    compiler::{
-        self, CompilationError, CompiledFunction, CompiledModule, FunctionBody, ModuleExprs,
-    },
-    decl::{self, DeclVisibility, ParamDecl},
+    compiler::{self, CompilationError, CompiledFunction, FunctionBody, ModuleExprs},
+    decl::{self, DeclVisibility, FunctionParam},
     expr::{Expr, ExprKind},
     expr_type::FunctionType,
     oper::{BinaryOp, UnaryOp},
@@ -22,120 +21,19 @@ use super::{
     assign_types::assign_types, resolve_types::resolve_types, type_inference::TypeInference,
 };
 
-pub(crate) fn build_module_decls<'ast, 'me>(
+pub(crate) fn build_module_exprs<'ast, 'me>(
     host: &HostState,
-    module: &mut CompiledModule,
+    module: &mut Module,
     ast: &'ast ASTNode<'ast>,
     expr_arena: &'me bumpalo::Bump,
 ) -> Result<ModuleExprs<'me>, CompilationError> {
     if let NodeKind::Module(ast_decls) = &ast.kind {
         let mut module_exprs = ModuleExprs::default();
 
-        for ast_decl in *ast_decls {
-            match &ast_decl.kind {
-                // NodeKind::Import(_, _) => {}
-                NodeKind::Decl(d) => match d {
-                    ASTDecl::Function {
-                        name,
-                        visibility,
-                        is_native: _,
-                        ..
-                    } => {
-                        // Multiple declarations of the same function are not allowed.
-                        if module.module_decls.contains_key(name) {
-                            return Err(CompilationError::FunctionRedefinition(
-                                ast_decl.location,
-                                name.to_string(),
-                            ));
-                        }
-
-                        let fd = decl::Decl {
-                            location: ast_decl.location,
-                            visibility: *visibility,
-                            kind: DeclKind::Function {
-                                params: Vec::new(),
-                                ret: ExprType::default(),
-                                is_native: false,
-                                index: 0,
-                            },
-                        };
-
-                        module.module_decls.insert(name.clone(), fd);
-                        // let findex = module.add_function(fd);
-                        // scope.insert(*name, decl::Decl::Function(findex));
-                    }
-                    ASTDecl::Let {
-                        name,
-                        visibility: _,
-                        is_const: _,
-                        ..
-                    } => {
-                        // Multiple declarations of the same function are not allowed.
-                        if module.module_decls.contains_key(name) {
-                            return Err(CompilationError::NameRedefinition(
-                                ast_decl.location,
-                                name.to_string(),
-                            ));
-                        }
-
-                        todo!();
-                        // let index = decls.globals.len();
-                        // let gd = decl::GlobalDecl {
-                        //     location: ast_decl.location,
-                        //     visibility: *visibility,
-                        //     name: *name,
-                        //     typ: ExprType::None,
-                        //     is_const: *is_const,
-                        //     index,
-                        // };
-
-                        // decls.globals.push(gd);
-                        // scope.insert(*name, decl::Decl::Global(index));
-                    } // ASTDecl::Struct {
-                      //     name, visibility, ..
-                      // } => {
-                      //     // Multiple declarations of the same function are not allowed.
-                      //     if scope.contains(*name) {
-                      //         let name_str = decls.symbols.resolve(*name);
-                      //         return Err(CompilationError::NameRedefinition(
-                      //             ast_decl.location,
-                      //             name_str,
-                      //         ));
-                      //     }
-
-                      //     let index = decls.structs.len();
-                      //     let sd = decl::StructDecl {
-                      //         location: ast_decl.location,
-                      //         name: *name,
-                      //         visibility: *visibility,
-                      //         typ: Arc::new(StructType::default()),
-                      //         index,
-                      //     };
-
-                      //     decls.structs.push(sd);
-                      //     scope.insert(*name, decl::Decl::Struct(index));
-                      // } // ASTDecl::TypeAlias { .. } => todo!(),
-                },
-                _ => panic!("Invalid AST node for declaration: {:?}", ast_decl.kind),
-            }
-        }
-
-        // Assign indices to functions. Imported functions first.
-        // let mut index = 0;
-        // for fd in decls.functions.iter_mut() {
-        //     if fd.is_native {
-        //         fd.function_index = index;
-        //         index += 1;
-        //     }
-        // }
-
-        // // Then local functions.
-        // for fd in decls.functions.iter_mut() {
-        //     if !fd.is_native {
-        //         fd.function_index = index;
-        //         index += 1;
-        //     }
-        // }
+        // Construct all the top-level declarations first
+        create_decls(module, &mut module_exprs, ast_decls)?;
+        resolve_decl_types(host, module, ast_decls)?;
+        build_function_bodies(host, module, ast_decls, &mut module_exprs, expr_arena)?;
 
         Ok(module_exprs)
     } else {
@@ -143,165 +41,63 @@ pub(crate) fn build_module_decls<'ast, 'me>(
     }
 }
 
-pub(crate) fn build_module_exprs<'ast>(
-    host: &HostState,
-    module: &mut CompiledModule,
-    ast: &'ast ASTNode<'ast>,
-) -> Result<(), CompilationError> {
-    // Resolve types for all declarations.
-    if let NodeKind::Module(ast_decls) = &ast.kind {
-        let host_scope = Scope {
-            parent: None,
-            decls: &host.global_decls,
-        };
-        let module_scope = Scope {
-            parent: Some(&host_scope),
-            decls: &module.module_decls,
-        };
+// pub(crate) fn _build_module_exprs<'ast>(ast: &'ast ASTNode<'ast>) -> Result<(), CompilationError> {
+//     // Resolve types for all declarations.
+//     if let NodeKind::Module(ast_decls) = &ast.kind {
+//         // Build function body expressions.
+//         for decl_ast in *ast_decls {
+//             if let NodeKind::Decl(ASTDecl::Function {
+//                 name,
+//                 body: body_ast,
+//                 ..
+//             }) = &decl_ast.kind
+//             {
+//                 let mut local_scope = Scope::new(Some(&param_scope));
+//                 let mut locals_table: Vec<LocalDecl> = Vec::new();
+//                 let mut body_expr = if let Some(body_ast) = body_ast {
+//                     if function.is_native {
+//                         return Err(CompilationError::NativeFunctionHasBody(function.location));
+//                     }
+//                     build_exprs(
+//                         body_ast,
+//                         &mut local_scope,
+//                         decls,
+//                         &mut locals_table,
+//                         &mut inference,
+//                     )?
+//                 } else {
+//                     if !function.is_native {
+//                         return Err(CompilationError::MissingBody(function.location));
+//                     }
+//                     Expr::new(decl_ast.location, ExprKind::Empty)
+//                 };
+//                 let function = &mut decls.functions[*findex];
+//                 if body_ast.is_some() {
+//                     inference.add_constraint(
+//                         function.typ.ret.clone(),
+//                         body_expr.typ.clone(),
+//                         body_expr.location,
+//                     );
+//                     inference.solve_constraints()?;
+//                     assign_types(&mut body_expr, &inference)?;
+//                     for local in locals_table.iter_mut() {
+//                         local.typ = inference.substitute(&local.typ);
+//                     }
+//                 }
+//                 function.body = body_expr;
+//                 function.locals = locals_table;
+//             }
+//         }
 
-        for ast_decl in *ast_decls {
-            match &ast_decl.kind {
-                // NodeKind::Import(_, _) => {}
-                NodeKind::Decl(d) => match d {
-                    ASTDecl::Function {
-                        name,
-                        params,
-                        ret: ret_ast,
-                        ..
-                    } => {
-                        let decl = module.module_decls.get(name).unwrap();
-                        let ret_type = match ret_ast {
-                            None => ExprType::Void,
-                            Some(ret_ast) => resolve_types(&module_scope, ret_ast)?,
-                        };
-
-                        let mut params_mapped: Vec<ParamDecl> = Vec::with_capacity(params.len());
-                        for (i, p) in params.iter().enumerate() {
-                            let typ = resolve_types(&module_scope, p.typ)?;
-                            params_mapped.push(ParamDecl {
-                                location: p.location,
-                                name: p.name.clone(),
-                                typ,
-                                index: i,
-                                local_index: 0,
-                            });
-                        }
-
-                        todo!();
-
-                        // let decl::Decl::Function(findex) = decl else {
-                        //     unreachable!()
-                        // };
-                        // decls.functions[*findex].typ = Arc::new(FunctionType {
-                        //     params: params_mapped,
-                        //     ret: ret_type,
-                        // });
-                    }
-                    ASTDecl::Let { .. } => todo!(),
-                    // ASTDecl::Struct {
-                    //     name,
-                    //     is_record,
-                    //     fields,
-                    //     ..
-                    // } => {
-                    //     let decl = scope.get(*name).unwrap();
-                    //     let decl::Decl::Struct(sindex) = decl else {
-                    //         unreachable!()
-                    //     };
-
-                    //     let mut stype = StructType {
-                    //         name: *name,
-                    //         is_record: *is_record,
-                    //         fields: Vec::with_capacity(fields.len()),
-                    //     };
-
-                    //     for (i, f) in fields.iter().enumerate() {
-                    //         let typ = resolve_types(decls, scope, f.typ)?;
-                    //         stype.fields.push(decl::FieldDecl {
-                    //             location: f.location,
-                    //             name: f.name,
-                    //             typ,
-                    //             index: i,
-                    //         });
-                    //     }
-
-                    //     let sd = &mut decls.structs[*sindex];
-                    //     sd.typ = Arc::new(stype);
-                    // } // ASTDecl::TypeAlias { .. } => todo!(),
-                },
-                _ => panic!("Invalid AST node for declaration: {:?}", ast_decl.kind),
-            }
-        }
-
-        // Build function body expressions.
-        for (ref name, ref mut decl) in module.module_decls.iter_mut() {}
-        // for decl_ast in *ast_decls {
-        //     if let NodeKind::Decl(ASTDecl::Function {
-        //         name,
-        //         body: body_ast,
-        //         ..
-        //     }) = &decl_ast.kind
-        //     {
-        //         let decl = scope.get(*name).unwrap();
-        //         let decl::Decl::Function(findex) = decl else {
-        //             unreachable!()
-        //         };
-
-        //         let mut inference: TypeInference = Default::default();
-        //         let mut param_scope = Scope::new(Some(scope));
-        //         let function = &mut decls.functions[*findex];
-        //         for param in function.typ.params.iter() {
-        //             param_scope.insert(
-        //                 param.name,
-        //                 decl::Decl::Param(param.typ.clone(), param.index),
-        //             );
-        //         }
-        //         let mut local_scope = Scope::new(Some(&param_scope));
-        //         let mut locals_table: Vec<LocalDecl> = Vec::new();
-        //         let mut body_expr = if let Some(body_ast) = body_ast {
-        //             if function.is_native {
-        //                 return Err(CompilationError::NativeFunctionHasBody(function.location));
-        //             }
-        //             build_exprs(
-        //                 body_ast,
-        //                 &mut local_scope,
-        //                 decls,
-        //                 &mut locals_table,
-        //                 &mut inference,
-        //             )?
-        //         } else {
-        //             if !function.is_native {
-        //                 return Err(CompilationError::MissingBody(function.location));
-        //             }
-        //             Expr::new(decl_ast.location, ExprKind::Empty)
-        //         };
-        //         let function = &mut decls.functions[*findex];
-        //         if body_ast.is_some() {
-        //             inference.add_constraint(
-        //                 function.typ.ret.clone(),
-        //                 body_expr.typ.clone(),
-        //                 body_expr.location,
-        //             );
-        //             inference.solve_constraints()?;
-        //             assign_types(&mut body_expr, &inference)?;
-        //             for local in locals_table.iter_mut() {
-        //                 local.typ = inference.substitute(&local.typ);
-        //             }
-        //         }
-        //         function.body = body_expr;
-        //         function.locals = locals_table;
-        //     }
-        // }
-
-        Ok(())
-    } else {
-        panic!("Invalid AST node for compilation unit: {:?}", ast.kind);
-    }
-}
+//         Ok(())
+//     } else {
+//         panic!("Invalid AST node for compilation unit: {:?}", ast.kind);
+//     }
+// }
 
 pub(crate) fn build_formula_exprs<'ast, 'me>(
     host: &HostState,
-    module: &mut CompiledModule,
+    module: &mut Module,
     ast: &'ast ASTNode<'ast>,
     ret_type: ExprType,
     expr_arena: &'me bumpalo::Bump,
@@ -316,11 +112,11 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         };
 
         // Multiple declarations of the same function are not allowed.
-        if module.module_decls.contains_key(CompiledModule::DEFAULT) {
+        if module.module_decls.contains_key(Module::DEFAULT) {
             // This should never happen since this is only called once per compilation unit.
             return Err(CompilationError::FunctionRedefinition(
                 ast.location,
-                CompiledModule::DEFAULT.to_string(),
+                Module::DEFAULT.to_string(),
             ));
         }
 
@@ -330,14 +126,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
 
         for s in stmts.iter() {
             if let NodeKind::Decl(decl) = s.kind
-                && let ASTDecl::Function {
-                    name: _,
-                    visibility: _,
-                    params: _,
-                    ret: _,
-                    body: _,
-                    is_native: _,
-                } = decl
+                && let ASTDecl::Function { .. } = decl
             {
                 hoisted.push(s);
             } else {
@@ -345,8 +134,10 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
             }
         }
 
-        // TODO: Eagerly construct all the hoisted declarations
-        // for (ref name, ref mut decl) in module.module_decls.iter_mut() {}
+        // Construct all the hoisted declarations first
+        create_decls(module, &mut module_exprs, &hoisted)?;
+        resolve_decl_types(host, module, &hoisted)?;
+        build_function_bodies(host, module, &hoisted, &mut module_exprs, expr_arena)?;
 
         let function_index = module_exprs.functions.len();
         let fd = decl::Decl {
@@ -362,8 +153,6 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         module_exprs.functions.push(FunctionBody { body: None });
 
         let mut inference: TypeInference = Default::default();
-
-        // let mut local_scope = Scope::new(Some(&param_scope));
         let mut local_index: usize = 0;
         // let mut locals_table: Vec<LocalDecl> = Vec::new();
 
@@ -375,7 +164,6 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
 
         // Scope for the function parameters from within the function body.
         let param_decls = DeclTable::default();
-        // TODO: Fill in params
         let param_scope = Scope {
             parent: Some(&module_scope),
             decls: &param_decls,
@@ -397,23 +185,299 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         assign_types(body_expr, &inference)?;
         module_exprs.functions[function_index].body = Some(body_expr);
 
-        // for local in locals_table.iter_mut() {
-        //     local.typ = inference.substitute(&local.typ);
-        // }
-
-        // fd.locals = locals_table;
-
-        module
-            .module_decls
-            .insert(CompiledModule::DEFAULT.into(), fd);
-
+        module.module_decls.insert(Module::DEFAULT.into(), fd);
         Ok(module_exprs)
     } else {
         panic!("Invalid AST node for formula: {:?}", ast.kind);
     }
 }
 
-pub(crate) fn build_exprs<'a, 'e>(
+/// Populate the module scope with all of the declarations.
+fn create_decls<'ast, 'me>(
+    module: &mut Module,
+    module_exprs: &mut ModuleExprs<'me>,
+    ast_decls: &'ast [&'ast ASTNode<'ast>],
+) -> Result<(), CompilationError> {
+    for ast_decl in ast_decls {
+        match &ast_decl.kind {
+            // NodeKind::Import(_, _) => {}
+            NodeKind::Decl(d) => match d {
+                ASTDecl::Function {
+                    name, visibility, ..
+                } => {
+                    // Multiple declarations of the same function are not allowed.
+                    if module.module_decls.contains_key(name) {
+                        return Err(CompilationError::FunctionRedefinition(
+                            ast_decl.location,
+                            name.to_string(),
+                        ));
+                    }
+
+                    // Note: fill in param and return type later, once the module scope
+                    // is fully populated with type definitions.
+                    let function_index = module_exprs.functions.len();
+                    let fd = decl::Decl {
+                        location: ast_decl.location,
+                        visibility: *visibility,
+                        kind: DeclKind::Function {
+                            params: Vec::new(),
+                            ret: ExprType::default(),
+                            is_native: false,
+                            index: function_index,
+                        },
+                    };
+                    module_exprs.functions.push(FunctionBody { body: None });
+                    module.module_decls.insert(name.clone(), fd);
+                }
+
+                ASTDecl::Let {
+                    name,
+                    visibility: _,
+                    is_const: _,
+                    ..
+                } => {
+                    // Multiple declarations of the same function are not allowed.
+                    if module.module_decls.contains_key(name) {
+                        return Err(CompilationError::NameRedefinition(
+                            ast_decl.location,
+                            name.to_string(),
+                        ));
+                    }
+
+                    todo!();
+                    // let index = decls.globals.len();
+                    // let gd = decl::GlobalDecl {
+                    //     location: ast_decl.location,
+                    //     visibility: *visibility,
+                    //     name: *name,
+                    //     typ: ExprType::None,
+                    //     is_const: *is_const,
+                    //     index,
+                    // };
+
+                    // decls.globals.push(gd);
+                    // scope.insert(*name, decl::Decl::Global(index));
+                } // ASTDecl::Struct {
+                  //     name, visibility, ..
+                  // } => {
+                  //     // Multiple declarations of the same function are not allowed.
+                  //     if scope.contains(*name) {
+                  //         let name_str = decls.symbols.resolve(*name);
+                  //         return Err(CompilationError::NameRedefinition(
+                  //             ast_decl.location,
+                  //             name_str,
+                  //         ));
+                  //     }
+
+                  //     let index = decls.structs.len();
+                  //     let sd = decl::StructDecl {
+                  //         location: ast_decl.location,
+                  //         name: *name,
+                  //         visibility: *visibility,
+                  //         typ: Arc::new(StructType::default()),
+                  //         index,
+                  //     };
+
+                  //     decls.structs.push(sd);
+                  //     scope.insert(*name, decl::Decl::Struct(index));
+                  // } // ASTDecl::TypeAlias { .. } => todo!(),
+            },
+            _ => panic!("Invalid AST node for declaration: {:?}", ast_decl.kind),
+        }
+    }
+
+    Ok(())
+}
+
+/// Assign type information to the parameter and return types of each declaration.
+pub(crate) fn resolve_decl_types<'ast>(
+    host: &HostState,
+    module: &mut Module,
+    ast_decls: &'ast [&'ast ASTNode<'ast>],
+) -> Result<(), CompilationError> {
+    let host_scope = Scope {
+        parent: None,
+        decls: &host.global_decls,
+    };
+
+    for ast_decl in ast_decls {
+        match &ast_decl.kind {
+            // NodeKind::Import(_, _) => {}
+            NodeKind::Decl(d) => match d {
+                ASTDecl::Function {
+                    name,
+                    params,
+                    ret: ret_ast,
+                    ..
+                } => {
+                    let module_scope = Scope {
+                        parent: Some(&host_scope),
+                        decls: &module.module_decls,
+                    };
+
+                    let ret_type = match ret_ast {
+                        None => ExprType::Void,
+                        Some(ret_ast) => resolve_types(&module_scope, ret_ast)?,
+                    };
+
+                    let mut params_mapped: Vec<FunctionParam> = Vec::with_capacity(params.len());
+                    for (i, p) in params.iter().enumerate() {
+                        let typ = resolve_types(&module_scope, p.typ)?;
+                        params_mapped.push(FunctionParam {
+                            location: p.location,
+                            name: p.name.clone(),
+                            typ,
+                            index: i,
+                            local_index: 0,
+                        });
+                    }
+
+                    let decl = module.module_decls.get_mut(name).unwrap();
+                    let DeclKind::Function {
+                        params: fd_params,
+                        ret: fd_ret,
+                        ..
+                    } = &mut decl.kind
+                    else {
+                        panic!("Expected function declaration");
+                    };
+
+                    *fd_params = params_mapped;
+                    *fd_ret = ret_type;
+                }
+                ASTDecl::Let { .. } => todo!(),
+                // ASTDecl::Struct {
+                //     name,
+                //     is_record,
+                //     fields,
+                //     ..
+                // } => {
+                //     let decl = scope.get(*name).unwrap();
+                //     let decl::Decl::Struct(sindex) = decl else {
+                //         unreachable!()
+                //     };
+
+                //     let mut stype = StructType {
+                //         name: *name,
+                //         is_record: *is_record,
+                //         fields: Vec::with_capacity(fields.len()),
+                //     };
+
+                //     for (i, f) in fields.iter().enumerate() {
+                //         let typ = resolve_types(decls, scope, f.typ)?;
+                //         stype.fields.push(decl::FieldDecl {
+                //             location: f.location,
+                //             name: f.name,
+                //             typ,
+                //             index: i,
+                //         });
+                //     }
+
+                //     let sd = &mut decls.structs[*sindex];
+                //     sd.typ = Arc::new(stype);
+                // } // ASTDecl::TypeAlias { .. } => todo!(),
+            },
+            _ => panic!("Invalid AST node for declaration: {:?}", ast_decl.kind),
+        }
+    }
+    Ok(())
+}
+
+/// Assign type information to the parameter and return types of each declaration.
+pub(crate) fn build_function_bodies<'ast, 'me>(
+    host: &HostState,
+    module: &mut Module,
+    ast_decls: &'ast [&'ast ASTNode<'ast>],
+    module_exprs: &mut ModuleExprs<'me>,
+    expr_arena: &'me bumpalo::Bump,
+) -> Result<(), CompilationError> {
+    let host_scope = Scope {
+        parent: None,
+        decls: &host.global_decls,
+    };
+
+    for ast_decl in ast_decls {
+        if let NodeKind::Decl(d) = ast_decl.kind
+            && let ASTDecl::Function { name, body, .. } = d
+        {
+            let decl = module.module_decls.get_mut(name).unwrap();
+            let DeclKind::Function {
+                params: fd_params,
+                ret: fd_ret,
+                index: fd_index,
+                ..
+            } = &mut decl.kind
+            else {
+                panic!("Expected function declaration");
+            };
+            let fd_ret = fd_ret.clone();
+            let fd_index = *fd_index;
+
+            let Some(body_ast) = body else {
+                continue;
+            };
+
+            // Build parameter scope
+            let mut param_decls = DeclTable::default();
+            for param in fd_params {
+                param_decls.insert(
+                    param.name.clone(),
+                    Decl {
+                        location: param.location,
+                        visibility: DeclVisibility::Public,
+                        kind: DeclKind::Param {
+                            typ: param.typ.clone(),
+                            index: param.index,
+                        },
+                    },
+                );
+            }
+
+            let module_scope = Scope {
+                parent: Some(&host_scope),
+                decls: &module.module_decls,
+            };
+
+            let param_scope = Scope {
+                parent: Some(&module_scope),
+                decls: &param_decls,
+            };
+
+            let mut local_decls = DeclTable::default();
+
+            let mut inference: TypeInference = Default::default();
+            let mut local_index: usize = 0;
+            let body_expr = build_exprs(
+                body_ast,
+                host,
+                &param_scope,
+                &mut local_decls,
+                &mut local_index,
+                &mut inference,
+                expr_arena,
+            )?;
+
+            // fn build_exprs<'a, 'e>(
+            //     ast: &'a ASTNode<'a>,
+            //     host: &HostState,
+            //     parent_scope: &decl::Scope,
+            //     current_scope: &mut decl::DeclTable,
+            //     locals: &mut usize,
+            //     inference: &mut TypeInference,
+            //     out: &'e bumpalo::Bump,
+            // ) -> Result<&'e mut Expr<'e>, CompilationError> {
+
+            inference.add_constraint(fd_ret, body_expr.typ.clone(), body_expr.location);
+            inference.solve_constraints()?;
+            assign_types(body_expr, &inference)?;
+            module_exprs.functions[fd_index].body = Some(body_expr);
+        }
+    }
+
+    Ok(())
+}
+
+fn build_exprs<'a, 'e>(
     ast: &'a ASTNode<'a>,
     host: &HostState,
     parent_scope: &decl::Scope,
@@ -468,10 +532,10 @@ pub(crate) fn build_exprs<'a, 'e>(
             Some(decl) => {
                 match &decl.kind {
                     decl::DeclKind::Function {
-                        params,
-                        ret,
-                        is_native,
-                        index,
+                        params: _,
+                        ret: _,
+                        is_native: _,
+                        index: _,
                     } => {
                         todo!();
                         // let function = &decls.functions[*findex];
@@ -483,14 +547,14 @@ pub(crate) fn build_exprs<'a, 'e>(
                     }
                     decl::DeclKind::Local {
                         typ,
-                        is_const,
+                        is_const: _,
                         index,
                     } => Ok(out
                         .alloc(Expr::new(ast.location, ExprKind::LocalRef(*index)))
                         .with_type(typ.clone())),
                     decl::DeclKind::Global {
                         typ,
-                        is_const,
+                        is_const: _,
                         index,
                     } => Ok(out
                         .alloc(Expr::new(ast.location, ExprKind::GlobalRef(*index)))
@@ -1565,5 +1629,80 @@ mod tests {
         let expr = result.unwrap();
         assert!(matches!(expr.kind, ExprKind::Block(_, None)));
         assert_eq!(expr.typ, ExprType::Void);
+    }
+
+    #[test]
+    fn test_build_module_exprs_with_function() {
+        let arena = bumpalo::Bump::new();
+        let mut module = Module::default();
+        let host = HostState::new();
+        let expr_arena = bumpalo::Bump::new();
+
+        // Create a simple function: fn test() -> i32 { 42 }
+        let body_ast = arena.alloc(ASTNode {
+            location: TokenLocation::default(),
+            kind: NodeKind::LitInt(42, IntegerSuffix::I32),
+        });
+
+        let ret_type_ast = arena.alloc(ASTNode {
+            location: TokenLocation::default(),
+            kind: NodeKind::Ident("i32".into()),
+        });
+
+        let func_ast = arena.alloc(ASTNode {
+            location: TokenLocation::default(),
+            kind: NodeKind::Decl(arena.alloc(ASTDecl::Function {
+                name: "test".into(),
+                visibility: DeclVisibility::Public,
+                params: arena.alloc_slice_copy(&[]),
+                ret: Some(ret_type_ast),
+                body: Some(body_ast),
+                is_native: false,
+            })),
+        });
+
+        let module_ast = ASTNode {
+            location: TokenLocation::default(),
+            kind: NodeKind::Module(arena.alloc_slice_copy(&[&*func_ast])),
+        };
+
+        let result = build_module_exprs(&host, &mut module, &module_ast, &expr_arena);
+
+        let module_exprs = result.unwrap();
+        assert_eq!(module_exprs.functions.len(), 1);
+        assert!(module.module_decls.contains_key("test"));
+    }
+
+    #[test]
+    fn test_build_module_exprs_function_redefinition() {
+        let arena = bumpalo::Bump::new();
+        let mut module = Module::default();
+        let host = HostState::default();
+        let expr_arena = bumpalo::Bump::new();
+
+        let func_ast = arena.alloc(ASTNode {
+            location: TokenLocation::default(),
+            kind: NodeKind::Decl(arena.alloc(ASTDecl::Function {
+                name: "test".into(),
+                visibility: DeclVisibility::Public,
+                params: arena.alloc_slice_copy(&[]),
+                ret: None,
+                body: None,
+                is_native: false,
+            })),
+        });
+
+        let module_ast = ASTNode {
+            location: TokenLocation::default(),
+            kind: NodeKind::Module(arena.alloc_slice_copy(&[&*func_ast, &*func_ast])),
+        };
+
+        let result = build_module_exprs(&host, &mut module, &module_ast, &expr_arena);
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CompilationError::FunctionRedefinition(_, _)
+        ));
     }
 }

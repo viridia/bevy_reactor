@@ -3,9 +3,10 @@ use core::result;
 use bevy::scene::ron::de;
 
 use crate::{
+    Module,
     ast::{ASTNode, NodeKind},
-    compiler::{CompilationError, CompiledFunction, CompiledModule, FunctionBody, ModuleExprs},
-    decl::{self, ParamDecl, Scope},
+    compiler::{CompilationError, CompiledFunction, FunctionBody, ModuleExprs},
+    decl::{self, FunctionParam, Scope},
     expr::{Expr, ExprKind},
     expr_type::ExprType,
     instr::{self, InstructionBuilder, OP_CONST_I32},
@@ -13,7 +14,7 @@ use crate::{
 };
 
 pub(crate) fn gen_module<'content>(
-    module: &mut CompiledModule,
+    module: &mut Module,
     module_exprs: &'content ModuleExprs<'content>,
 ) -> Result<(), CompilationError> {
     // let mut generator = CodeGenerator::default();
@@ -35,12 +36,7 @@ pub(crate) fn gen_module<'content>(
                 is_const: _,
                 index: _,
             } => unreachable!(),
-            decl::DeclKind::Function {
-                params: _,
-                ret: _,
-                is_native: _,
-                index,
-            } => {
+            decl::DeclKind::Function { index, .. } => {
                 let mut builder = instr::InstructionBuilder::default();
                 let function = &module_exprs.functions[*index];
                 if let Some(body) = function.body {
@@ -186,7 +182,7 @@ pub(crate) fn gen_module<'content>(
 }
 
 fn gen_expr<'cu>(
-    module: &'cu CompiledModule,
+    module: &'cu Module,
     // module_contents: &'cu mut ModuleContents<'cu>,
     function: &'cu FunctionBody,
     expr: &'cu Expr,
@@ -777,7 +773,7 @@ mod tests {
     #[test]
     fn test_gen_expr() {
         let mut builder = instr::InstructionBuilder::default();
-        let module = CompiledModule::default();
+        let module = Module::default();
         let function = FunctionBody::default();
 
         // Create the expression: 2 + 2

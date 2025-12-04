@@ -40,7 +40,7 @@ pub enum DeclKind {
         index: usize,
     },
     Function {
-        params: Vec<ParamDecl>,
+        params: Vec<FunctionParam>,
         ret: ExprType,
         is_native: bool,
         /// Index of this function in the host or module's functions table.
@@ -59,7 +59,7 @@ pub enum DeclKind {
 
 /// Declaration for a function parameter
 #[derive(Debug, PartialEq, Clone)]
-pub struct ParamDecl {
+pub struct FunctionParam {
     pub location: TokenLocation,
     pub name: SmolStr,
     pub typ: ExprType,

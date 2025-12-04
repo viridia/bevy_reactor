@@ -1,7 +1,7 @@
 use core::fmt::Display;
 use std::sync::Arc;
 
-use crate::decl::ParamDecl;
+use crate::decl::FunctionParam;
 
 /// Represents the type of an expression.
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -29,7 +29,7 @@ pub enum ExprType {
 /// Type data for a function
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FunctionType {
-    pub params: Vec<ParamDecl>,
+    pub params: Vec<FunctionParam>,
     pub ret: ExprType,
 }
 

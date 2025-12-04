@@ -9,7 +9,6 @@ use bevy_reactor::TrackingScope;
 use thiserror::Error;
 
 use crate::{
-    compiler,
     decl::DeclKind,
     expr_type::ExprType,
     host::{EntityMember, Global, HostState},
@@ -145,19 +144,9 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
     }
 
     /// Run a compiled function by name.
-    pub fn run(
-        &mut self,
-        module: &compiler::CompiledModule,
-        function_name: &str,
-    ) -> Result<Value, VMError> {
+    pub fn run(&mut self, module: &crate::Module, function_name: &str) -> Result<Value, VMError> {
         if let Some(entry_fn) = module.module_decls.get(function_name) {
-            if let DeclKind::Function {
-                params: _,
-                ret: _,
-                is_native: _,
-                index,
-            } = &entry_fn.kind
-            {
+            if let DeclKind::Function { index, .. } = &entry_fn.kind {
                 self.iptr = module.functions[*index].code.as_ptr();
             }
             self.start()
