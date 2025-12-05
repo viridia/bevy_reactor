@@ -131,6 +131,7 @@ Next:
 - structs
 - arrays
 - tuples
+- Bevy math types, such as Vec2, Vec4, Quat, Mat, etc.?
 
 Idea: a "heap" table in the vm that stores heap values of type Any. The value contains the
 index to this heap.

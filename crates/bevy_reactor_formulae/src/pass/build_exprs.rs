@@ -6,6 +6,7 @@ use crate::ast::{ASTNode, FloatSuffix, IntegerSuffix, NodeKind};
 use crate::decl::{Decl, DeclKind, DeclTable, Scope, ScopeType};
 use crate::expr_type::ExprType;
 use crate::host::HostState;
+use crate::string::get_string_methods;
 use bevy::{log::info, render::render_graph::Node, scene::ron::de};
 
 use crate::{
@@ -539,6 +540,9 @@ fn build_exprs<'a, 'e>(
                             ScopeType::Import => todo!(),
                             ScopeType::Param => todo!(),
                             ScopeType::Local => todo!(),
+                            ScopeType::Object | ScopeType::String => {
+                                unreachable!("Member defn should not be accssible as global")
+                            }
                         },
 
                         decl::DeclKind::Local { is_const: _, index } => Ok(out
@@ -807,6 +811,35 @@ fn build_exprs<'a, 'e>(
                                 // builder.push_immediate::<u32>(health_id as u32);
                             }
                             DeclKind::Function { index: _ } => todo!(),
+                            _ => panic!("Invalid entity member"),
+                        }
+                    } else {
+                        Err(CompilationError::UnknownField(
+                            ast.location,
+                            "Entity".to_string(),
+                            fname.to_string(),
+                        ))
+                    }
+                }
+
+                ExprType::String => {
+                    if let Some(field) = get_string_methods().get(fname) {
+                        match &field.kind {
+                            DeclKind::Global { is_const: _, index } => {
+                                // assign_types(arg_expr, &infer)?;
+                                Ok(out
+                                    .alloc(Expr::new(
+                                        ast.location,
+                                        ExprKind::EntityProp(base_expr, *index),
+                                    ))
+                                    .with_type(field.typ.clone()))
+                            }
+                            DeclKind::Function { index } => Ok(out
+                                .alloc(Expr::new(
+                                    ast.location,
+                                    ExprKind::MethodRef(ScopeType::String, base_expr, *index),
+                                ))
+                                .with_type(field.typ.clone())),
                             _ => panic!("Invalid entity member"),
                         }
                     } else {

@@ -10,6 +10,7 @@ pub mod location;
 pub(crate) mod oper;
 pub(crate) mod parser;
 mod pass;
+mod string;
 pub mod vm;
 
 pub use compiler::{CompilationError, compile_formula, compile_module};

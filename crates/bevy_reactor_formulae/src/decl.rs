@@ -1,7 +1,14 @@
+use std::sync::Arc;
+
 use bevy::platform::collections::HashMap;
 use smol_str::SmolStr;
 
-use crate::{expr_type::ExprType, location::TokenLocation};
+use crate::{
+    VM, Value,
+    expr_type::{ExprType, FunctionType},
+    location::TokenLocation,
+    vm::VMError,
+};
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum DeclVisibility {
@@ -91,6 +98,8 @@ pub enum ScopeType {
     Module,
     Import,
     Param,
+    Object,
+    String,
     Local,
 }
 
@@ -112,5 +121,53 @@ impl<'parent, 'decls> Scope<'parent, 'decls> {
         } else {
             None
         }
+    }
+}
+
+pub type ObjectMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
+
+/// Symbol table containing the methods and fields of a composite type such as a struct.
+#[derive(Default, Debug)]
+pub(crate) struct ObjectMembers {
+    /// Lookup scope for object properties and methods.
+    pub(crate) decls: DeclTable,
+
+    /// Properties of entities
+    pub(crate) methods: Vec<ObjectMethod>,
+}
+
+impl ObjectMembers {
+    pub fn get(&self, name: &str) -> Option<&Decl> {
+        self.decls.get(name)
+    }
+
+    pub fn add_method(
+        &mut self,
+        name: &'static str,
+        method: ObjectMethod,
+        params: Vec<FunctionParam>,
+        return_type: ExprType,
+    ) -> usize {
+        let name: SmolStr = name.into();
+        if self.decls.contains_key(&name) {
+            panic!("Entity method {name} is already defined.");
+        }
+
+        let index = self.methods.len();
+        self.methods.push(method);
+        self.decls.insert(
+            name,
+            Decl {
+                location: TokenLocation::default(),
+                visibility: DeclVisibility::Public,
+                typ: ExprType::Function(Arc::new(FunctionType {
+                    params,
+                    ret: return_type,
+                })),
+                kind: DeclKind::Function { index },
+            },
+        );
+
+        index
     }
 }

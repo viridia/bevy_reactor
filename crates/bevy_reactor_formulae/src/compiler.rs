@@ -477,6 +477,25 @@ mod tests {
     struct Health(f32);
 
     #[test]
+    fn compile_string_method() {
+        let host = HostState::default();
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "\"test\".len()",
+            &host,
+            ExprType::I32,
+        ))
+        .unwrap();
+        disassemble(&module.functions[0].code);
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
+        assert_eq!(result, Value::I32(4));
+    }
+
+    #[test]
     fn compile_module_with_func() {
         let host = Mutex::new(HostState::new());
         let module =

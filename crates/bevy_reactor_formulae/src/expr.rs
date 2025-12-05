@@ -30,6 +30,7 @@ pub(crate) enum ExprKind<'e> {
     ConstBool(bool),
     ConstString(SmolStr),
     FunctionRef(ScopeType, usize),
+    MethodRef(ScopeType, &'e mut Expr<'e>, usize),
     /// A local `let` statement
     LocalDecl(usize, Option<&'e mut Expr<'e>>),
     /// A reference to a function parameter.
@@ -93,6 +94,10 @@ impl<'e> Display for Expr<'e> {
             ExprKind::ConstBool(value) => value.fmt(f),
             ExprKind::ConstString(symbol) => write!(f, "String({symbol})"),
             ExprKind::FunctionRef(_ty, id) => write!(f, "Function({id})"),
+            ExprKind::MethodRef(_ty, base, id) => {
+                base.fmt(f)?;
+                write!(f, ".method({id})")
+            }
             ExprKind::LocalRef(id) => write!(f, "LocalRef({id})"),
             ExprKind::GlobalRef(id) => write!(f, "GlobalRef({id})"),
             ExprKind::Field(base, index) => {

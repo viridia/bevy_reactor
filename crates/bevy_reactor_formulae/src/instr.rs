@@ -6,6 +6,7 @@ pub const OP_CONST_I32: u8 = 5; // (imm i32)
 pub const OP_CONST_I64: u8 = 6; // (imm i64)
 pub const OP_CONST_F32: u8 = 7; // (imm f32)
 pub const OP_CONST_F64: u8 = 8; // (imm f64)
+pub const OP_CONST_STR: u8 = 9; // (imm u16, [bytes])
 
 // Stack manipulation
 pub const OP_DROP: u8 = 10;
@@ -38,10 +39,11 @@ pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS
 /// immediate: [u32, u32]: number of arguments, method index
 /// stack input: args
 /// stack output: result
-pub const OP_CALL: u8 = 72; // Call script function
-pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity
-pub const OP_CALL_HOST_METHOD: u8 = 71; // Call host method
-pub const OP_RET: u8 = 73; // transfers value from child stack to parent
+pub const OP_CALL: u8 = 70; // Call script function
+pub const OP_CALL_ENTITY_METHOD: u8 = 71; // Call method on entity
+pub const OP_CALL_HOST_METHOD: u8 = 72; // Call host method
+pub const OP_CALL_OBJECT_METHOD: u8 = 73; // Call method of object
+pub const OP_RET: u8 = 74; // transfers value from child stack to parent
 
 // Experimental
 // Typed Binops: all consume stack[2] and push result
@@ -141,6 +143,11 @@ impl InstructionBuilder {
         }
     }
 
+    /// Write a string as an immediate value.
+    pub fn push_immediate_string(&mut self, str: &str) {
+        self.code.extend_from_slice(str.as_bytes());
+    }
+
     /// Reserve space for an immediate operand, but don't write anything to it yet.
     /// Return the offset of the reserved value.
     pub fn reserve_immediate<T>(&mut self) -> usize {
@@ -209,14 +216,17 @@ impl<'a> InstructionReader<'a> {
         Self { code, offset: 0 }
     }
 
+    #[inline(always)]
     pub fn address(&self) -> usize {
         self.offset
     }
 
+    #[inline(always)]
     pub fn at_end(&self) -> bool {
         self.offset >= self.code.len()
     }
 
+    #[inline(always)]
     pub fn next_op(&mut self) -> u8 {
         assert!(self.offset < self.code.len());
         let op = self.code[self.offset];
@@ -281,6 +291,13 @@ pub fn disassemble(code: &[u8]) {
                 eprintln!("const f64 {val}");
             }
 
+            OP_CONST_STR => {
+                let len = reader.read_immediate::<u16>() as usize;
+                let s = &reader.code[reader.offset..reader.offset + len];
+                reader.offset += len;
+                eprintln!("const str \"{}\"", unsafe { str::from_utf8_unchecked(s) });
+            }
+
             OP_DROP => {
                 eprintln!("drop");
             }
@@ -324,7 +341,18 @@ pub fn disassemble(code: &[u8]) {
                 eprintln!("call module[{fn_index}] {num_params}",);
             }
 
-            // pub const OP_CALL: u8 = 72; // Call script function
+            OP_CALL_ENTITY_METHOD => {
+                let fn_index = reader.read_immediate::<u32>();
+                let num_params = reader.read_immediate::<u16>() as usize;
+                eprintln!("call entity[{fn_index}] {num_params}",);
+            }
+
+            OP_CALL_OBJECT_METHOD => {
+                let fn_index = reader.read_immediate::<u32>();
+                let num_params = reader.read_immediate::<u16>() as usize;
+                eprintln!("call object[{fn_index}] {num_params}",);
+            }
+
             // pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity
             // pub const OP_CALL_HOST_METHOD: u8 = 71; // Call host method
 

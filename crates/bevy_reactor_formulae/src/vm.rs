@@ -2,6 +2,7 @@ use std::{
     any::TypeId,
     cell::RefCell,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Sub},
+    sync::Arc,
 };
 
 use bevy::ecs::{component::Component, entity::Entity, world::World};
@@ -14,6 +15,7 @@ use crate::{
     expr_type::ExprType,
     host::{EntityMember, Global, HostState},
     instr,
+    string::get_string_methods,
 };
 
 // Values on the stack
@@ -26,6 +28,7 @@ pub enum Value {
     F32(f32),
     F64(f64),
     Entity(Entity),
+    String(Arc<String>),
 }
 
 impl Value {
@@ -38,6 +41,7 @@ impl Value {
             Value::F32(_) => ExprType::F32,
             Value::F64(_) => ExprType::F64,
             Value::Entity(_) => ExprType::Entity,
+            Value::String(_) => ExprType::String,
         }
     }
 
@@ -65,6 +69,8 @@ pub enum VMError {
     InvalidEntityProp(usize),
     #[error("Invalid entity method: {0}")]
     InvalidEntityMethod(usize),
+    #[error("Invalid method: {0}")]
+    InvalidMethod(usize),
     #[error("Function not found: {0}")]
     MissingFunction(String),
     #[error("Missing Component: {0:?}")]
@@ -267,6 +273,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_CONST_I64 as usize] = const_i64;
     table[instr::OP_CONST_F32 as usize] = const_f32;
     table[instr::OP_CONST_F64 as usize] = const_f64;
+    table[instr::OP_CONST_STR as usize] = const_str;
     table[instr::OP_DROP as usize] = drop1;
     table[instr::OP_DROP_N as usize] = drop_n;
     table[instr::OP_LOAD_PARAM as usize] = load_param;
@@ -283,6 +290,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
 
     table[instr::OP_CALL as usize] = call;
     table[instr::OP_CALL_ENTITY_METHOD as usize] = call_entity_method;
+    table[instr::OP_CALL_OBJECT_METHOD as usize] = call_object_method;
 
     table[instr::OP_ADD_I32 as usize] = add_i32;
     table[instr::OP_ADD_I64 as usize] = add_i64;
@@ -390,6 +398,16 @@ fn const_f32(vm: &mut VM) -> Result<(), VMError> {
 fn const_f64(vm: &mut VM) -> Result<(), VMError> {
     let val = vm.read_immediate::<f64>();
     vm.stack.push(Value::F64(val));
+    Ok(())
+}
+
+fn const_str(vm: &mut VM) -> Result<(), VMError> {
+    let len = vm.read_immediate::<u16>() as usize;
+    let s = unsafe { std::slice::from_raw_parts(vm.iptr, len) };
+    vm.iptr = unsafe { vm.iptr.add(len) };
+    vm.stack.push(Value::String(Arc::new(unsafe {
+        std::str::from_utf8_unchecked(s).to_string()
+    })));
     Ok(())
 }
 
@@ -579,6 +597,10 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
 fn call(vm: &mut VM) -> Result<(), VMError> {
     let fn_index = vm.read_immediate::<u32>() as usize;
     let num_params = vm.read_immediate::<u16>() as usize;
+    let stack_len = vm.stack.len();
+    if num_params > stack_len {
+        return Err(VMError::StackUnderflow);
+    }
     let iptr = unsafe { &*vm.module }.functions[fn_index].code.as_ptr();
     let new_stack = vm.stack.split_off(vm.stack.len() - num_params);
     vm.push_call_stack(new_stack);
@@ -591,11 +613,11 @@ fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
     let Value::Entity(entity) = arg else {
         return Err(VMError::NotAnEntity(arg.value_type()));
     };
-    let num_params = vm.read_immediate::<u16>() as usize;
     let method_index = vm.read_immediate::<u16>() as usize;
+    let num_params = vm.read_immediate::<u16>() as usize;
     let stack_len = vm.stack.len();
     if num_params > stack_len {
-        // return Err(VMError::NotAnEntity(arg.value_type()));
+        return Err(VMError::StackUnderflow);
     }
     let args = &vm.stack[stack_len - num_params..stack_len];
     let val = match vm.host.entity_members.get(method_index) {
@@ -605,6 +627,36 @@ fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
         }
         None => return Err(VMError::InvalidEntityMethod(method_index)),
     };
+    // Drop args
+    vm.stack.truncate(stack_len - num_params);
+    if !val.is_void() {
+        vm.stack.push(val);
+    }
+    Ok(())
+}
+
+fn call_object_method(vm: &mut VM) -> Result<(), VMError> {
+    let method_index = vm.read_immediate::<u16>() as usize;
+    let num_params = vm.read_immediate::<u16>() as usize;
+    let stack_len = vm.stack.len();
+    if num_params > stack_len {
+        return Err(VMError::StackUnderflow);
+    }
+
+    let this = vm.stack[stack_len - num_params].clone();
+    let table = match this {
+        Value::String(_) => get_string_methods(),
+        _ => {
+            panic!("Type does not have methods");
+        }
+    };
+
+    let args = &vm.stack[stack_len - num_params..stack_len];
+    if method_index > table.methods.len() {
+        return Err(VMError::InvalidMethod(method_index));
+    }
+    let val = (table.methods[method_index])(vm, args)?;
+
     // Drop args
     vm.stack.truncate(stack_len - num_params);
     if !val.is_void() {

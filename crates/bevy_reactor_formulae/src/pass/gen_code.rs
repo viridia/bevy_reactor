@@ -165,18 +165,18 @@ fn gen_expr<'cu>(
                 _ => panic!("Invalid float type: {:?}", expr.typ),
             };
         }
-        // ExprKind::ConstString(symbol) => {
-        //     let string = unit.decls.symbols.resolve(symbol);
-        //     let bytes = string.as_bytes();
-        //     let array_data_index = generator.next_data_index();
-        //     generator.data.passive(bytes.iter().copied());
-        //     out.instruction(&Instruction::I32Const(0));
-        //     out.instruction(&Instruction::I32Const(bytes.len() as i32));
-        //     out.instruction(&Instruction::ArrayNewData {
-        //         array_type_index: generator.get_string_type(),
-        //         array_data_index,
-        //     });
-        // }
+
+        ExprKind::ConstString(ref str) => {
+            let str_len = str.len();
+            if str_len > u16::MAX as usize {
+                panic!("String constants longer than 64k are not supported");
+            }
+
+            out.push_op(instr::OP_CONST_STR);
+            out.push_immediate(str_len as u16);
+            out.push_immediate_string(str);
+        }
+
         // ExprKind::FunctionRef(index) => {
         //     panic!("Cannot codegen function reference: {:?}", index);
         // }
@@ -314,10 +314,10 @@ fn gen_expr<'cu>(
         //     }
         // }
         ExprKind::Call(ref func, ref args) => {
-            for arg in args {
-                gen_expr(module, function, arg, out)?;
-            }
             if let ExprKind::FunctionRef(scope_type, index) = func.kind {
+                for arg in args {
+                    gen_expr(module, function, arg, out)?;
+                }
                 // println!("Call function: {}", index);
                 match scope_type {
                     decl::ScopeType::Host => {
@@ -328,11 +328,26 @@ fn gen_expr<'cu>(
                         out.push_op(instr::OP_CALL);
                         out.push_immediate::<u32>(index as u32);
                     }
+                    decl::ScopeType::Object | decl::ScopeType::String => {
+                        panic!("Method call without base expression");
+                    }
                     decl::ScopeType::Import => todo!(),
                     decl::ScopeType::Param => todo!(),
                     decl::ScopeType::Local => todo!(),
                 }
                 let num_args = args.len();
+                if num_args > u16::MAX as usize {
+                    panic!("Too many function arguments: {num_args}");
+                }
+                out.push_immediate::<u16>(num_args as u16);
+            } else if let ExprKind::MethodRef(_scope_type, base, index) = &func.kind {
+                gen_expr(module, function, base, out)?;
+                for arg in args {
+                    gen_expr(module, function, arg, out)?;
+                }
+                out.push_op(instr::OP_CALL_OBJECT_METHOD);
+                out.push_immediate::<u16>(*index as u16);
+                let num_args = args.len() + 1;
                 if num_args > u16::MAX as usize {
                     panic!("Too many function arguments: {num_args}");
                 }
