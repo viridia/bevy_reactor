@@ -222,7 +222,7 @@ pub async fn compile_formula(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VM, Value, expr_type::ExprType, host::HostState, vm::VMError};
+    use crate::{VM, Value, expr_type::ExprType, host::HostState, instr::disassemble, vm::VMError};
     use bevy::ecs::{
         component::{Component, Tick},
         entity::Entity,
@@ -491,7 +491,7 @@ mod tests {
     }
 
     #[test]
-    fn compile_module_with_call() {
+    fn compile_call() {
         let host = Mutex::new(HostState::new());
         let module = future::block_on(compile_module(
             "--str--",
@@ -509,5 +509,26 @@ mod tests {
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
         assert_eq!(result, Value::I32(20));
+    }
+
+    #[test]
+    fn compile_params() {
+        let host = Mutex::new(HostState::new());
+        let module = future::block_on(compile_module(
+            "--str--",
+            "
+            fn test2(i: i32) -> i32 { 20 + i }
+            fn test() -> i32 { test2(5) }
+            ",
+            &host,
+        ))
+        .unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let host = host.lock().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, "test").unwrap();
+        assert_eq!(result, Value::I32(25));
     }
 }

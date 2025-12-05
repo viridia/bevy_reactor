@@ -40,10 +40,9 @@ pub(crate) fn gen_module<'content>(
                 if let Some(body) = function.body {
                     gen_expr(module, function, body, &mut builder).unwrap();
                     if body.typ.is_void() {
-                        builder.push_op(instr::OP_RET_VOID);
-                    } else {
-                        builder.push_op(instr::OP_RET);
+                        builder.push_op(instr::OP_CONST_VOID);
                     }
+                    builder.push_op(instr::OP_RET);
                 }
                 module.functions[*index].code = builder.inner();
             }
@@ -181,10 +180,11 @@ fn gen_expr<'cu>(
         // ExprKind::FunctionRef(index) => {
         //     panic!("Cannot codegen function reference: {:?}", index);
         // }
-        // ExprKind::ParamRef(index) => {
-        //     let local = &generator.params[index];
-        //     local_get(local.local_index, &local.typ, out);
-        // }
+        ExprKind::ParamRef(index) => {
+            out.push_op(instr::OP_LOAD_PARAM);
+            out.push_immediate::<u32>(index as u32);
+        }
+
         // ExprKind::LocalRef(index) => {
         //     let local = &generator.locals[index];
         //     local_get(local.local_index, &local.typ, out);
@@ -332,7 +332,11 @@ fn gen_expr<'cu>(
                     decl::ScopeType::Param => todo!(),
                     decl::ScopeType::Local => todo!(),
                 }
-                out.push_immediate::<u32>(args.len() as u32);
+                let num_args = args.len();
+                if num_args > u16::MAX as usize {
+                    panic!("Too many function arguments: {num_args}");
+                }
+                out.push_immediate::<u16>(num_args as u16);
             } else {
                 panic!("Invalid function reference: {func:?}");
             }

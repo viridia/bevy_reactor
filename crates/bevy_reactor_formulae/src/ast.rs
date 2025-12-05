@@ -97,7 +97,6 @@ pub(crate) enum ASTDecl<'ast> {
         params: &'ast [&'ast ASTFunctionParam<'ast>],
         ret: Option<&'ast ASTNode<'ast>>,
         body: Option<&'ast ASTNode<'ast>>,
-        is_native: bool,
     },
     Let {
         name: SmolStr,
@@ -125,7 +124,6 @@ pub(crate) struct ASTFunctionParam<'a> {
     pub(crate) location: TokenLocation,
     pub(crate) name: SmolStr,
     pub(crate) typ: &'a ASTNode<'a>,
-    // pub(crate) value: &'a ASTNode<'a>,
 }
 
 /// AST for a structure field declaration

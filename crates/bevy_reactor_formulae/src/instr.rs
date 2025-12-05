@@ -1,8 +1,5 @@
-// Special opcodes for < comparison
-pub const OP_RET: u8 = 0; // transfers value from child stack to parent
-pub const OP_RET_VOID: u8 = 1; // doesn't transfer
-
 // Constants
+pub const OP_CONST_VOID: u8 = 2;
 pub const OP_CONST_TRUE: u8 = 3;
 pub const OP_CONST_FALSE: u8 = 4;
 pub const OP_CONST_I32: u8 = 5; // (imm i32)
@@ -44,6 +41,7 @@ pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS
 pub const OP_CALL: u8 = 72; // Call script function
 pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity
 pub const OP_CALL_HOST_METHOD: u8 = 71; // Call host method
+pub const OP_RET: u8 = 73; // transfers value from child stack to parent
 
 // Experimental
 // Typed Binops: all consume stack[2] and push result
@@ -196,6 +194,229 @@ impl InstructionBuilder {
         while len < aligned_addr {
             self.code.push(0);
             len += 1;
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct InstructionReader<'a> {
+    code: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> InstructionReader<'a> {
+    pub fn new(code: &'a [u8]) -> Self {
+        Self { code, offset: 0 }
+    }
+
+    pub fn address(&self) -> usize {
+        self.offset
+    }
+
+    pub fn at_end(&self) -> bool {
+        self.offset >= self.code.len()
+    }
+
+    pub fn next_op(&mut self) -> u8 {
+        assert!(self.offset < self.code.len());
+        let op = self.code[self.offset];
+        self.offset += 1;
+        op
+    }
+
+    /// Read an immediate value following the current instruction.
+    #[inline(always)]
+    fn read_immediate<T: Copy>(&mut self) -> T {
+        self.align_ip::<T>();
+        let val = unsafe { *(self.code.as_ptr().add(self.offset) as *const T) };
+        self.offset += std::mem::size_of::<T>();
+        val
+    }
+
+    #[inline(always)]
+    fn align_ip<T>(&mut self) {
+        let align = std::mem::align_of::<T>();
+        let offset = self.offset;
+        self.offset = (offset + (align - 1)) & !(align - 1);
+    }
+}
+
+/// Print a disassembly (for debugging).
+pub fn disassemble(code: &[u8]) {
+    let mut reader = InstructionReader::new(code);
+    while !reader.at_end() {
+        let offset = reader.address();
+        let op = reader.next_op();
+        eprint!("{offset}: ");
+        match op {
+            OP_CONST_TRUE => {
+                eprintln!("const true");
+            }
+
+            OP_CONST_FALSE => {
+                eprintln!("const false");
+            }
+
+            OP_CONST_I32 => {
+                let val = reader.read_immediate::<i32>();
+                eprintln!("const i32 {val}");
+            }
+
+            OP_CONST_I64 => {
+                let val = reader.read_immediate::<i64>();
+                eprintln!("const i64 {val}");
+            }
+
+            OP_CONST_F32 => {
+                let val = reader.read_immediate::<f32>();
+                eprintln!("const f32 {val}");
+            }
+
+            OP_CONST_F64 => {
+                let val = reader.read_immediate::<f64>();
+                eprintln!("const f64 {val}");
+            }
+
+            OP_DROP => {
+                eprintln!("drop");
+            }
+
+            OP_DROP_N => {
+                let val = reader.read_immediate::<f64>();
+                eprintln!("drop {val}");
+            }
+
+            OP_LOAD_PARAM => {
+                let val = reader.read_immediate::<u32>();
+                eprintln!("load param {val}");
+            }
+
+            OP_LOAD_LOCAL => {
+                let val = reader.read_immediate::<u32>();
+                eprintln!("load local {val}");
+            }
+
+            // pub const OP_LOAD_LOCAL: u8 = 21;
+            // pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
+            // pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u32, consumes TOS)
+
+            // // Binops: all consume TOS + 1 and push result
+            // pub const OP_LOGICAL_AND: u8 = 35;
+            // pub const OP_LOGICAL_OR: u8 = 36;
+            // pub const OP_SHL: u8 = 40;
+            // pub const OP_SHR: u8 = 41;
+
+            // // Unops: all consume TOS and push result
+            // pub const OP_LOG_NOT: u8 = 50;
+            // pub const OP_NEGATE: u8 = 51;
+            // pub const OP_COMPLEMENT: u8 = 52;
+
+            // // Control flow
+            // pub const OP_BRANCH: u8 = 62; // (imm i32 relative offset)
+            // pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS)
+            OP_CALL => {
+                let fn_index = reader.read_immediate::<u32>();
+                let num_params = reader.read_immediate::<u16>() as usize;
+                eprintln!("call module[{fn_index}] {num_params}",);
+            }
+
+            // pub const OP_CALL: u8 = 72; // Call script function
+            // pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity
+            // pub const OP_CALL_HOST_METHOD: u8 = 71; // Call host method
+
+            // // Experimental
+            // // Typed Binops: all consume stack[2] and push result
+            OP_ADD_I32 => {
+                eprintln!("add.i32");
+            }
+
+            OP_ADD_I64 => {
+                eprintln!("add.i64");
+            }
+
+            OP_ADD_F32 => {
+                eprintln!("add.f32");
+            }
+
+            OP_ADD_F64 => {
+                eprintln!("add.f64");
+            }
+
+            // pub const OP_SUB_I32: u8 = 104;
+            // pub const OP_SUB_I64: u8 = 105;
+            // pub const OP_SUB_F32: u8 = 106;
+            // pub const OP_SUB_F64: u8 = 107;
+
+            // pub const OP_MUL_I32: u8 = 108;
+            // pub const OP_MUL_I64: u8 = 109;
+            // pub const OP_MUL_F32: u8 = 110;
+            // pub const OP_MUL_F64: u8 = 111;
+
+            // pub const OP_DIV_I32: u8 = 112;
+            // pub const OP_DIV_I64: u8 = 113;
+            // pub const OP_DIV_F32: u8 = 114;
+            // pub const OP_DIV_F64: u8 = 115;
+
+            // pub const OP_REM_I32: u8 = 116;
+            // pub const OP_REM_I64: u8 = 117;
+            // pub const OP_REM_F32: u8 = 118;
+            // pub const OP_REM_F64: u8 = 119;
+
+            // // pub const OP_LOGICAL_AND: u8 = 120;
+            // // pub const OP_LOGICAL_OR: u8 = 121;
+
+            // pub const OP_BIT_AND_I32: u8 = 122;
+            // pub const OP_BIT_AND_I64: u8 = 123;
+
+            // pub const OP_BIT_OR_I32: u8 = 124;
+            // pub const OP_BIT_OR_I64: u8 = 125;
+
+            // pub const OP_BIT_XOR_I32: u8 = 126;
+            // pub const OP_BIT_XOR_I64: u8 = 127;
+
+            // // pub const OP_BIT_AND: u8 = 37;
+            // // pub const OP_BIT_OR: u8 = 38;
+            // // pub const OP_BIT_XOR: u8 = 39;
+            // // pub const OP_SHL: u8 = 40;
+            // // pub const OP_SHR: u8 = 41;
+
+            // pub const OP_EQ_I32: u8 = 150;
+            // pub const OP_EQ_I64: u8 = 151;
+            // pub const OP_EQ_F32: u8 = 152;
+            // pub const OP_EQ_F64: u8 = 152;
+
+            // pub const OP_NE_I32: u8 = 154;
+            // pub const OP_NE_I64: u8 = 155;
+            // pub const OP_NE_F32: u8 = 156;
+            // pub const OP_NE_F64: u8 = 157;
+
+            // pub const OP_LT_I32: u8 = 158;
+            // pub const OP_LT_I64: u8 = 159;
+            // pub const OP_LT_F32: u8 = 160;
+            // pub const OP_LT_F64: u8 = 161;
+
+            // pub const OP_LE_I32: u8 = 162;
+            // pub const OP_LE_I64: u8 = 163;
+            // pub const OP_LE_F32: u8 = 164;
+            // pub const OP_LE_F64: u8 = 165;
+
+            // pub const OP_GT_I32: u8 = 166;
+            // pub const OP_GT_I64: u8 = 167;
+            // pub const OP_GT_F32: u8 = 168;
+            // pub const OP_GT_F64: u8 = 169;
+
+            // pub const OP_GE_I32: u8 = 170;
+            // pub const OP_GE_I64: u8 = 171;
+            // pub const OP_GE_F32: u8 = 172;
+            // pub const OP_GE_F64: u8 = 173;
+            OP_RET => {
+                eprintln!("ret");
+            }
+
+            _ => {
+                eprintln!("invalid instruction {op} (or not implemented in disassembler)");
+                break;
+            }
         }
     }
 }

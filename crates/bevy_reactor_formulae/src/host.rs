@@ -237,10 +237,7 @@ impl HostState {
                     // TODO: fill in
                     ret: ExprType::None,
                 })),
-                kind: DeclKind::Function {
-                    is_native: true,
-                    index,
-                },
+                kind: DeclKind::Function { index },
             },
         );
 

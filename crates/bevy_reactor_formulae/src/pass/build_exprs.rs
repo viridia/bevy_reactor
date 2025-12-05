@@ -55,9 +55,6 @@ pub(crate) fn build_module_exprs<'ast, 'me>(
 //                 let mut local_scope = Scope::new(Some(&param_scope));
 //                 let mut locals_table: Vec<LocalDecl> = Vec::new();
 //                 let mut body_expr = if let Some(body_ast) = body_ast {
-//                     if function.is_native {
-//                         return Err(CompilationError::NativeFunctionHasBody(function.location));
-//                     }
 //                     build_exprs(
 //                         body_ast,
 //                         &mut local_scope,
@@ -66,9 +63,6 @@ pub(crate) fn build_module_exprs<'ast, 'me>(
 //                         &mut inference,
 //                     )?
 //                 } else {
-//                     if !function.is_native {
-//                         return Err(CompilationError::MissingBody(function.location));
-//                     }
 //                     Expr::new(decl_ast.location, ExprKind::Empty)
 //                 };
 //                 let function = &mut decls.functions[*findex];
@@ -149,7 +143,6 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
                 ret: ret_type.clone(),
             })),
             kind: DeclKind::Function {
-                is_native: false,
                 index: function_index,
             },
         };
@@ -226,7 +219,6 @@ fn create_decls<'ast, 'me>(
                         visibility: *visibility,
                         typ: ExprType::None,
                         kind: DeclKind::Function {
-                            is_native: false,
                             index: function_index,
                         },
                     };
@@ -537,10 +529,7 @@ fn build_exprs<'a, 'e>(
             match scope.lookup(name) {
                 Some((scope_type, decl)) => {
                     match &decl.kind {
-                        decl::DeclKind::Function {
-                            is_native: _,
-                            index,
-                        } => match scope_type {
+                        decl::DeclKind::Function { index } => match scope_type {
                             ScopeType::Host | ScopeType::Module => Ok(out
                                 .alloc(Expr::new(
                                     ast.location,
@@ -817,10 +806,7 @@ fn build_exprs<'a, 'e>(
                                 // builder.push_op(instr::OP_LOAD_ENTITY_PROP);
                                 // builder.push_immediate::<u32>(health_id as u32);
                             }
-                            DeclKind::Function {
-                                is_native: _,
-                                index: _,
-                            } => todo!(),
+                            DeclKind::Function { index: _ } => todo!(),
                             _ => panic!("Invalid entity member"),
                         }
                     } else {
@@ -1668,7 +1654,6 @@ mod tests {
                 params: arena.alloc_slice_copy(&[]),
                 ret: Some(ret_type_ast),
                 body: Some(body_ast),
-                is_native: false,
             })),
         });
 
@@ -1699,7 +1684,6 @@ mod tests {
                 params: arena.alloc_slice_copy(&[]),
                 ret: None,
                 body: None,
-                is_native: false,
             })),
         });
 

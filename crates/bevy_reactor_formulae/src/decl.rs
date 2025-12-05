@@ -35,9 +35,6 @@ pub enum DeclKind {
         index: usize,
     },
     Function {
-        // params: Vec<FunctionParam>,
-        // ret: ExprType,
-        is_native: bool,
         /// Index of this function in the host or module's functions table.
         index: usize,
     },

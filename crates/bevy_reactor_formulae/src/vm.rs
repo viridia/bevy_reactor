@@ -17,7 +17,7 @@ use crate::{
 };
 
 // Values on the stack
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Void,
     Bool(bool),
@@ -39,6 +39,10 @@ impl Value {
             Value::F64(_) => ExprType::F64,
             Value::Entity(_) => ExprType::Entity,
         }
+    }
+
+    pub fn is_void(&self) -> bool {
+        *self == Value::Void
     }
 }
 
@@ -157,23 +161,16 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
         loop {
             let op = unsafe { *self.iptr };
             // eprintln!("Opcode: {op}");
-            if op <= instr::OP_RET_VOID {
-                if op == instr::OP_RET_VOID {
-                    if self.call_stack.is_empty() {
-                        return Ok(Value::Void);
-                    } else {
-                        self.pop_call_stack();
-                        continue;
-                    }
+            if op == instr::OP_RET {
+                let ret_val = self.stack.pop().ok_or(VMError::StackUnderflow)?;
+                if self.call_stack.is_empty() {
+                    return Ok(ret_val);
                 } else {
-                    let res = self.stack.pop().ok_or(VMError::StackUnderflow)?;
-                    if self.call_stack.is_empty() {
-                        return Ok(res);
-                    } else {
-                        self.pop_call_stack();
-                        self.stack.push(res);
-                        continue;
+                    self.pop_call_stack();
+                    if !ret_val.is_void() {
+                        self.stack.push(ret_val);
                     }
+                    continue;
                 }
             }
             self.iptr = unsafe { self.iptr.add(1) };
@@ -406,14 +403,14 @@ fn drop_n(vm: &mut VM) -> Result<(), VMError> {
 
 fn load_param(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u32>() as usize;
-    let val = vm.stack[n];
+    let val = vm.stack[n].clone();
     vm.stack.push(val);
     Ok(())
 }
 
 fn load_local(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u32>() as usize;
-    let val = vm.stack[n];
+    let val = vm.stack[n].clone();
     vm.stack.push(val);
     Ok(())
 }
@@ -421,7 +418,7 @@ fn load_local(vm: &mut VM) -> Result<(), VMError> {
 fn load_global(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u32>() as usize;
     let val = match vm.host.vars.get(n) {
-        Some(Global::Const(val)) => *val,
+        Some(Global::Const(val)) => val.clone(),
         Some(Global::Property(accessor)) => accessor(vm)?,
         None => return Err(VMError::InvalidGlobalIndex(n)),
     };
@@ -449,7 +446,7 @@ macro_rules! impl_typed_binop {
         fn $name(vm: &mut VM) -> Result<(), VMError> {
             let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
             let lhs = vm.stack.last_mut().ok_or(VMError::StackUnderflow)?;
-            let val = if let (Value::$variant(l), Value::$variant(r)) = (*lhs, rhs) {
+            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs.clone(), rhs.clone()) {
                 Value::$variant(l.$op(r))
             } else {
                 return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
@@ -465,7 +462,7 @@ macro_rules! impl_relational_binop {
         fn $name(vm: &mut VM) -> Result<(), VMError> {
             let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
             let lhs = vm.stack.last_mut().ok_or(VMError::StackUnderflow)?;
-            let val = if let (Value::$variant(l), Value::$variant(r)) = (*lhs, rhs) {
+            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs.clone(), rhs.clone()) {
                 Value::Bool(l.$op(&r))
             } else {
                 return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
@@ -576,18 +573,39 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
 // pub const OP_COMPLEMENT: u8 = 52;
 
 fn call(vm: &mut VM) -> Result<(), VMError> {
-    let num_params = vm.read_immediate::<u32>() as usize;
     let fn_index = vm.read_immediate::<u32>() as usize;
+    let num_params = vm.read_immediate::<u16>() as usize;
     let iptr = unsafe { &*vm.module }.functions[fn_index].code.as_ptr();
-    // let params: *const Value = &vm.stack[vm.stack.len() - num_params];
     let new_stack = vm.stack.split_off(vm.stack.len() - num_params);
     vm.push_call_stack(new_stack);
-
-    // Stack and locals are cleared at this point
-    // vm.stack
-    //     .extend_from_slice(unsafe { std::slice::from_raw_parts(params, num_params) });
-    // TODO: Reserve locals
     vm.iptr = iptr;
+    Ok(())
+}
+
+fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
+    let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    let Value::Entity(entity) = arg else {
+        return Err(VMError::NotAnEntity(arg.value_type()));
+    };
+    let num_params = vm.read_immediate::<u16>() as usize;
+    let method_index = vm.read_immediate::<u16>() as usize;
+    let stack_len = vm.stack.len();
+    if num_params > stack_len {
+        // return Err(VMError::NotAnEntity(arg.value_type()));
+    }
+    let args = &vm.stack[stack_len - num_params..stack_len];
+    let val = match vm.host.entity_members.get(method_index) {
+        Some(EntityMember::Method(method)) => method(vm, entity, args)?,
+        Some(EntityMember::Property(_accessor)) => {
+            return Err(VMError::InvalidEntityMethod(method_index))?;
+        }
+        None => return Err(VMError::InvalidEntityMethod(method_index)),
+    };
+    // Drop args
+    vm.stack.truncate(stack_len - num_params);
+    if !val.is_void() {
+        vm.stack.push(val);
+    }
     Ok(())
 }
 
@@ -615,48 +633,23 @@ fn branch_if_false(vm: &mut VM) -> Result<(), VMError> {
     }
 }
 
-// fn ret(_vm: &mut VM) -> Result<(), VMError> {
-//     // `ret` is handled by the interpreter loop.
-//     unreachable!("`ret` instruction handler should not be called");
+fn ret(_vm: &mut VM) -> Result<(), VMError> {
+    // `ret` is handled by the interpreter loop.
+    unreachable!("`ret` instruction handler should not be called");
+}
+
+// fn ret_void(vm: &mut VM) -> Result<(), VMError> {
+//     vm.pop_call_stack();
+//     Ok(())
 // }
 
-fn ret(vm: &mut VM) -> Result<(), VMError> {
-    vm.pop_call_stack();
-    Ok(())
-}
-
-fn ret_val(vm: &mut VM) -> Result<(), VMError> {
-    let res = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    vm.pop_call_stack();
-    // TODO: Don't push if function is void return
-    vm.stack.push(res);
-    Ok(())
-}
-
-fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
-    let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let Value::Entity(entity) = arg else {
-        return Err(VMError::NotAnEntity(arg.value_type()));
-    };
-    let num_args = vm.read_immediate::<u32>() as usize;
-    let method_index = vm.read_immediate::<u32>() as usize;
-    let stack_len = vm.stack.len();
-    if num_args > stack_len {
-        // return Err(VMError::NotAnEntity(arg.value_type()));
-    }
-    let args = &vm.stack[stack_len - num_args..stack_len];
-    let val = match vm.host.entity_members.get(method_index) {
-        Some(EntityMember::Method(method)) => method(vm, entity, args)?,
-        Some(EntityMember::Property(_accessor)) => {
-            return Err(VMError::InvalidEntityMethod(method_index))?;
-        }
-        None => return Err(VMError::InvalidEntityMethod(method_index)),
-    };
-    // Drop args
-    vm.stack.truncate(stack_len - num_args);
-    vm.stack.push(val);
-    Ok(())
-}
+// fn ret(vm: &mut VM) -> Result<(), VMError> {
+//     let res = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+//     vm.pop_call_stack();
+//     // TODO: Don't push if function is void return
+//     vm.stack.push(res);
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod tests {
@@ -674,7 +667,7 @@ mod tests {
         let host = HostState::default();
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
-        builder.push_op(255);
+        builder.push_op(0);
         let code = builder.inner();
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.iptr = code.as_ptr();

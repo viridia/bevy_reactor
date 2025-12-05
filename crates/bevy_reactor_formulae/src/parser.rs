@@ -522,7 +522,6 @@ peg::parser! {
                 params: p,
                 ret,
                 body,
-                is_native: native,
             }))))
         }
 

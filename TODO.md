@@ -82,19 +82,22 @@
 
 Next:
 
-- parameters
+- local vars
+- string values
 - complex expressions
+
+  - e.g. if { 0 } ...
 
 - load module from asset (extension: .fmod or .crow)
 - function definitions
   - script [done]
-  - native
   - host
   - entity
+- type cast
 - inferred function adaptors
 - local vars
 - parameters
-  - script functions
+  - script functions [done]
   - native functions
   - entity methods
 - operators
@@ -109,7 +112,7 @@ Next:
   - return
   - break
   - continue
-  - match?
+  - match? (pattern matching is hard, and requires tuples and other things)
 - bblocks
 - complex types
   - string
@@ -120,20 +123,30 @@ Next:
   - parse
   - resolve
   - backend
+- record max stack size in function
 
-# Local vars:
+## Heap values:
 
-- vm.locals (not stack locations?)
+- strings
+- structs
+- arrays
+- tuples
 
-  /// Execution stack
-  stack: Vec<Value>,
+Idea: a "heap" table in the vm that stores heap values of type Any. The value contains the
+index to this heap.
 
-  /// Local vars
-  locals: Vec<Value>,
+Problems:
 
-  /// Instruction pointer
-  iptr: \*const u8,
+- we don't know when to destroy heap items, since values can be cloned, so there's no clear
+  ownership.
+  - unless we do garbage collection
 
-struct CallStackEntry {
+Alternate idea:
 
-}
+Value::Heap(Arc<dyn Any>)
+
+(This is probably the simplest approach)
+
+Alternate idea 3:
+
+Write my own Rc which uses an index instead of a pointer.
