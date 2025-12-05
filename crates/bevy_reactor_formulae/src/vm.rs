@@ -260,6 +260,7 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
 const fn build_jump_table() -> [InstrHandler; 256] {
     let mut table: [InstrHandler; 256] = [invalid; 256];
 
+    table[instr::OP_CONST_VOID as usize] = const_void;
     table[instr::OP_CONST_TRUE as usize] = const_true;
     table[instr::OP_CONST_FALSE as usize] = const_false;
     table[instr::OP_CONST_I32 as usize] = const_i32;
@@ -353,15 +354,18 @@ fn invalid(vm: &mut VM) -> Result<(), VMError> {
     Err(VMError::InvalidInstruction)
 }
 
+fn const_void(vm: &mut VM) -> Result<(), VMError> {
+    vm.stack.push(Value::Void);
+    Ok(())
+}
+
 fn const_true(vm: &mut VM) -> Result<(), VMError> {
     vm.stack.push(Value::Bool(true));
-    // vm.iptr = unsafe { vm.iptr.byte_add(1) };
     Ok(())
 }
 
 fn const_false(vm: &mut VM) -> Result<(), VMError> {
     vm.stack.push(Value::Bool(false));
-    // vm.iptr = unsafe { vm.iptr.byte_add(1) };
     Ok(())
 }
 

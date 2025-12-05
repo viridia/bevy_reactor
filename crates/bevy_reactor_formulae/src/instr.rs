@@ -1,5 +1,5 @@
 // Constants
-pub const OP_CONST_VOID: u8 = 2;
+pub const OP_CONST_VOID: u8 = 2; // Takes up a stack slot but represents no value.
 pub const OP_CONST_TRUE: u8 = 3;
 pub const OP_CONST_FALSE: u8 = 4;
 pub const OP_CONST_I32: u8 = 5; // (imm i32)
@@ -249,6 +249,10 @@ pub fn disassemble(code: &[u8]) {
         let op = reader.next_op();
         eprint!("{offset}: ");
         match op {
+            OP_CONST_VOID => {
+                eprintln!("void");
+            }
+
             OP_CONST_TRUE => {
                 eprintln!("const true");
             }

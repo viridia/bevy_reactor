@@ -531,4 +531,27 @@ mod tests {
         let result = vm.run(&module, "test").unwrap();
         assert_eq!(result, Value::I32(25));
     }
+
+    #[test]
+    fn compile_void_fn() {
+        let host = Mutex::new(HostState::new());
+        let module = future::block_on(compile_module(
+            "--str--",
+            "
+            fn test2(i: i32) {}
+            fn test() -> i32 { test2(0); 5 }
+            ",
+            &host,
+        ))
+        .unwrap();
+        // disassemble(&module.functions[0].code);
+        // disassemble(&module.functions[1].code);
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let host = host.lock().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, "test").unwrap();
+        assert_eq!(result, Value::I32(5));
+    }
 }
