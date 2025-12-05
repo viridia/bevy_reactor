@@ -24,7 +24,7 @@ pub(crate) fn assign_types<'e>(
         }
         ExprKind::ConstBool(_) => {}
         ExprKind::ConstString(_) => {}
-        ExprKind::FunctionRef(_) => {}
+        ExprKind::FunctionRef(_, _) => {}
         ExprKind::LocalRef(_) | ExprKind::GlobalRef(_) | ExprKind::ParamRef(_) => {}
         ExprKind::Field(base, _) | ExprKind::Index(base, _) | ExprKind::EntityProp(base, _) => {
             assign_types(base, inference)?;
@@ -165,7 +165,7 @@ pub(crate) fn assign_types<'e>(
         }
 
         ExprKind::If {
-            test,
+            condition: test,
             then_branch,
             else_branch,
         } => {

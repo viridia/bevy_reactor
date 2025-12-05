@@ -27,12 +27,10 @@ pub(crate) fn gen_module<'content>(
     for (_, decl) in module.module_decls.iter() {
         match &decl.kind {
             decl::DeclKind::Global {
-                typ: _,
                 is_const: _,
                 index: _,
             } => todo!(),
             decl::DeclKind::Local {
-                typ: _,
                 is_const: _,
                 index: _,
             } => unreachable!(),
@@ -41,7 +39,9 @@ pub(crate) fn gen_module<'content>(
                 let function = &module_exprs.functions[*index];
                 if let Some(body) = function.body {
                     gen_expr(module, function, body, &mut builder).unwrap();
-                    if !body.typ.is_void() {
+                    if body.typ.is_void() {
+                        builder.push_op(instr::OP_RET_VOID);
+                    } else {
                         builder.push_op(instr::OP_RET);
                     }
                 }
@@ -50,27 +50,6 @@ pub(crate) fn gen_module<'content>(
             _ => {}
         }
     }
-
-    // for sd in unit.decls.structs.iter() {
-    //     if sd.typ.is_record {
-    //         // let name_str = unit.symbols.resolve(sd.name);
-    //         // let mut fields = vec![];
-    //         // for field in &sd.fields {
-    //         //     fields.push(FieldType {
-    //         //         typ: generator.gen_type(&field.typ),
-    //         //         mutable: field.mutable,
-    //         //     });
-    //         // }
-    //         // let type_index = generator.next_type_index();
-    //         // generator
-    //         //     .type_names
-    //         //     .append(type_index, format!("{}.type", name_str).as_str());
-    //         // generator.types.ty().struct_type(fields);
-    //         // generator
-    //         //     .imports
-    //         //     .import("host", &name_str, EntityType::Struct(type_index));
-    //     }
-    // }
 
     // for fd in unit.decls.functions.iter() {
     //     let name_str = unit.decls.symbols.resolve(fd.name);
@@ -143,41 +122,6 @@ pub(crate) fn gen_module<'content>(
     //     }
     // }
 
-    // let mut names = NameSection::new();
-    // names.module(unit.filename());
-
-    // if !generator.type_names.is_empty() {
-    //     names.types(&generator.type_names);
-    // }
-
-    // names.locals(&generator.local_names);
-
-    // if !generator.function_names.is_empty() {
-    //     names.functions(&generator.function_names);
-    // }
-
-    // unit.module.section(&names);
-    // unit.module.section(&generator.types);
-    // if !generator.imports.is_empty() {
-    //     unit.module.section(&generator.imports);
-    // }
-    // unit.module.section(&generator.functions);
-    // unit.module.section(&generator.exports);
-    // if generator.next_data_index > 0 {
-    //     unit.module.section(&DataCountSection {
-    //         count: generator.next_data_index,
-    //     });
-    // }
-    // unit.module.section(&generator.codes);
-    // if generator.next_data_index > 0 {
-    //     unit.module.section(&generator.data);
-    // }
-
-    // println!(
-    //     "{}",
-    //     wasmprinter::print_bytes(unit.module.as_slice()).unwrap()
-    // );
-    // wasmparser::validate(unit.module.as_slice()).unwrap();
     Ok(())
 }
 
@@ -369,17 +313,31 @@ fn gen_expr<'cu>(
         //         _ => panic!("Invalid cast: {:?}", expr),
         //     }
         // }
-        // ExprKind::Call(ref func, ref args) => {
-        //     for arg in args {
-        //         gen_expr(unit, generator, arg, out)?;
-        //     }
-        //     if let ExprKind::FunctionRef(index) = func.kind {
-        //         // println!("Call function: {}", index);
-        //         out.instruction(&Instruction::Call(index as u32));
-        //     } else {
-        //         panic!("Invalid function reference: {:?}", func);
-        //     }
-        // }
+        ExprKind::Call(ref func, ref args) => {
+            for arg in args {
+                gen_expr(module, function, arg, out)?;
+            }
+            if let ExprKind::FunctionRef(scope_type, index) = func.kind {
+                // println!("Call function: {}", index);
+                match scope_type {
+                    decl::ScopeType::Host => {
+                        out.push_op(instr::OP_CALL_HOST_METHOD);
+                        out.push_immediate::<u32>(index as u32);
+                    }
+                    decl::ScopeType::Module => {
+                        out.push_op(instr::OP_CALL);
+                        out.push_immediate::<u32>(index as u32);
+                    }
+                    decl::ScopeType::Import => todo!(),
+                    decl::ScopeType::Param => todo!(),
+                    decl::ScopeType::Local => todo!(),
+                }
+                out.push_immediate::<u32>(args.len() as u32);
+            } else {
+                panic!("Invalid function reference: {func:?}");
+            }
+        }
+
         ExprKind::Block(ref vec, ref expr) => {
             for stmt in vec {
                 gen_expr(module, function, stmt, out)?;
@@ -397,11 +355,11 @@ fn gen_expr<'cu>(
         }
 
         ExprKind::If {
-            ref test,
+            ref condition,
             ref then_branch,
             ref else_branch,
         } => {
-            gen_expr(module, function, test, out)?;
+            gen_expr(module, function, condition, out)?;
             out.push_op(instr::OP_BRANCH_IF_FALSE);
             let false_branch = out.reserve_immediate::<i32>();
             gen_expr(module, function, then_branch, out)?;

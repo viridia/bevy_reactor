@@ -77,7 +77,7 @@ pub(crate) enum NodeKind<'a> {
     },
     ArrayType(&'a ASTNode<'a>),
     If {
-        test: &'a ASTNode<'a>,
+        condition: &'a ASTNode<'a>,
         then_block: &'a ASTNode<'a>,
         else_block: Option<&'a ASTNode<'a>>,
     },
@@ -94,7 +94,7 @@ pub(crate) enum ASTDecl<'ast> {
     Function {
         name: SmolStr,
         visibility: DeclVisibility,
-        params: &'ast [&'ast FunctionParam<'ast>],
+        params: &'ast [&'ast ASTFunctionParam<'ast>],
         ret: Option<&'ast ASTNode<'ast>>,
         body: Option<&'ast ASTNode<'ast>>,
         is_native: bool,
@@ -106,12 +106,11 @@ pub(crate) enum ASTDecl<'ast> {
         typ: Option<&'ast ASTNode<'ast>>,
         value: Option<&'ast ASTNode<'ast>>,
     },
-    // Struct {
-    //     name: Symbol,
-    //     visibility: DeclVisibility,
-    //     is_record: bool,
-    //     fields: &'a [&'a StructField<'a>],
-    // },
+    Struct {
+        name: SmolStr,
+        visibility: DeclVisibility,
+        fields: &'ast [&'ast ASTStructField<'ast>],
+    },
     // TupleStruct
     // TypeAlias {
     //     name: Symbol,
@@ -122,7 +121,7 @@ pub(crate) enum ASTDecl<'ast> {
 
 /// AST for a function parameter declaration
 #[derive(Debug)]
-pub(crate) struct FunctionParam<'a> {
+pub(crate) struct ASTFunctionParam<'a> {
     pub(crate) location: TokenLocation,
     pub(crate) name: SmolStr,
     pub(crate) typ: &'a ASTNode<'a>,
@@ -131,7 +130,7 @@ pub(crate) struct FunctionParam<'a> {
 
 /// AST for a structure field declaration
 #[derive(Debug)]
-pub(crate) struct StructField<'a> {
+pub(crate) struct ASTStructField<'a> {
     pub(crate) location: TokenLocation,
     pub(crate) name: SmolStr,
     pub(crate) typ: &'a ASTNode<'a>,

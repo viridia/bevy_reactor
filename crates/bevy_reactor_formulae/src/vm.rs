@@ -9,10 +9,11 @@ use bevy_reactor::TrackingScope;
 use thiserror::Error;
 
 use crate::{
+    Module,
     decl::DeclKind,
     expr_type::ExprType,
     host::{EntityMember, Global, HostState},
-    instr::{self, OP_RET},
+    instr,
 };
 
 // Values on the stack
@@ -64,6 +65,20 @@ pub enum VMError {
     MissingFunction(String),
     #[error("Missing Component: {0:?}")]
     MissingComponent(TypeId),
+    #[error("Function {0} expects {1} parameters, got {2}")]
+    IncorrectParamCount(String, usize, usize),
+}
+
+/// Saved state of VM for nested function calls
+struct CallStackEntry {
+    /// Module we are executing
+    pub module: *const Module,
+
+    /// Value stack
+    stack: Vec<Value>,
+
+    /// Instruction pointer
+    iptr: *const u8,
 }
 
 /// A virtual machine for evaluating formulae.
@@ -77,7 +92,13 @@ pub struct VM<'w, 'g, 'p> {
     /// Globals and entity members
     pub host: &'g HostState,
 
+    /// Module we are executing
+    pub module: *const Module,
+
     /// Execution stack
+    call_stack: Vec<CallStackEntry>,
+
+    /// Value stack: consists of [Value; num_params + num_locals + temporaries]
     stack: Vec<Value>,
 
     /// Instruction pointer
@@ -98,6 +119,8 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
             world,
             owner: Entity::PLACEHOLDER,
             host,
+            module: Default::default(),
+            call_stack: Vec::new(),
             stack: Vec::new(),
             iptr: Default::default(),
             tracking: RefCell::new(tracking),
@@ -134,19 +157,74 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
         loop {
             let op = unsafe { *self.iptr };
             // eprintln!("Opcode: {op}");
-            if op == OP_RET {
-                break;
+            if op <= instr::OP_RET_VOID {
+                if op == instr::OP_RET_VOID {
+                    if self.call_stack.is_empty() {
+                        return Ok(Value::Void);
+                    } else {
+                        self.pop_call_stack();
+                        continue;
+                    }
+                } else {
+                    let res = self.stack.pop().ok_or(VMError::StackUnderflow)?;
+                    if self.call_stack.is_empty() {
+                        return Ok(res);
+                    } else {
+                        self.pop_call_stack();
+                        self.stack.push(res);
+                        continue;
+                    }
+                }
             }
             self.iptr = unsafe { self.iptr.add(1) };
             VM::JUMP_TABLE[op as usize](self)?;
         }
-        Ok(*self.stack.last().unwrap_or(&Value::Void))
     }
 
     /// Run a compiled function by name.
     pub fn run(&mut self, module: &crate::Module, function_name: &str) -> Result<Value, VMError> {
         if let Some(entry_fn) = module.module_decls.get(function_name) {
             if let DeclKind::Function { index, .. } = &entry_fn.kind {
+                let ExprType::Function(ftype) = &entry_fn.typ else {
+                    panic!("Function should have a function type: {:?}.", entry_fn.typ)
+                };
+                if !ftype.params.is_empty() {
+                    return Err(VMError::IncorrectParamCount(
+                        function_name.to_string(),
+                        ftype.params.len(),
+                        0,
+                    ));
+                }
+                self.module = module;
+                self.iptr = module.functions[*index].code.as_ptr();
+            }
+            self.start()
+        } else {
+            Err(VMError::MissingFunction(function_name.to_string()))
+        }
+    }
+
+    /// Run a compiled function by name with arguments.
+    pub fn run_with(
+        &mut self,
+        module: &crate::Module,
+        function_name: &str,
+        params: &[Value],
+    ) -> Result<Value, VMError> {
+        if let Some(entry_fn) = module.module_decls.get(function_name) {
+            if let DeclKind::Function { index, .. } = &entry_fn.kind {
+                let ExprType::Function(ftype) = &entry_fn.typ else {
+                    panic!("Function should have a function type: {:?}.", entry_fn.typ)
+                };
+                if ftype.params.len() != params.len() {
+                    return Err(VMError::IncorrectParamCount(
+                        function_name.to_string(),
+                        ftype.params.len(),
+                        params.len(),
+                    ));
+                }
+                self.module = module;
+                self.stack.extend_from_slice(params);
                 self.iptr = module.functions[*index].code.as_ptr();
             }
             self.start()
@@ -164,6 +242,21 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
             .track_component::<C>(entity, self.world, comp.is_some());
         comp
     }
+
+    fn push_call_stack(&mut self, new_stack: Vec<Value>) {
+        self.call_stack.push(CallStackEntry {
+            module: self.module,
+            stack: std::mem::replace(&mut self.stack, new_stack),
+            iptr: self.iptr,
+        });
+    }
+
+    fn pop_call_stack(&mut self) {
+        let tos = self.call_stack.pop().unwrap();
+        self.module = tos.module;
+        self.stack = tos.stack;
+        self.iptr = tos.iptr;
+    }
 }
 
 // Build the jump table
@@ -179,6 +272,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_DROP as usize] = drop1;
     table[instr::OP_DROP_N as usize] = drop_n;
     table[instr::OP_LOAD_PARAM as usize] = load_param;
+    table[instr::OP_LOAD_LOCAL as usize] = load_local;
     table[instr::OP_LOAD_GLOBAL as usize] = load_global;
     table[instr::OP_LOAD_ENTITY_PROP as usize] = load_entity_prop;
 
@@ -189,6 +283,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_BRANCH as usize] = branch;
     table[instr::OP_BRANCH_IF_FALSE as usize] = branch_if_false;
 
+    table[instr::OP_CALL as usize] = call;
     table[instr::OP_CALL_ENTITY_METHOD as usize] = call_entity_method;
 
     table[instr::OP_ADD_I32 as usize] = add_i32;
@@ -309,12 +404,18 @@ fn drop_n(vm: &mut VM) -> Result<(), VMError> {
     Ok(())
 }
 
-fn load_param(_vm: &mut VM) -> Result<(), VMError> {
-    // let n = vm.read_immediate::<u32>() as usize;
-    // let final_length = vm.stack.len().saturating_sub(n);
-    // vm.stack.truncate(final_length);
-    // Ok(())
-    todo!();
+fn load_param(vm: &mut VM) -> Result<(), VMError> {
+    let n = vm.read_immediate::<u32>() as usize;
+    let val = vm.stack[n];
+    vm.stack.push(val);
+    Ok(())
+}
+
+fn load_local(vm: &mut VM) -> Result<(), VMError> {
+    let n = vm.read_immediate::<u32>() as usize;
+    let val = vm.stack[n];
+    vm.stack.push(val);
+    Ok(())
 }
 
 fn load_global(vm: &mut VM) -> Result<(), VMError> {
@@ -347,13 +448,13 @@ macro_rules! impl_typed_binop {
     ($name:ident, $variant:ident, $type:ty, $op:ident) => {
         fn $name(vm: &mut VM) -> Result<(), VMError> {
             let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-            let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs, rhs) {
+            let lhs = vm.stack.last_mut().ok_or(VMError::StackUnderflow)?;
+            let val = if let (Value::$variant(l), Value::$variant(r)) = (*lhs, rhs) {
                 Value::$variant(l.$op(r))
             } else {
                 return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
             };
-            vm.stack.push(val);
+            *lhs = val;
             Ok(())
         }
     };
@@ -363,13 +464,13 @@ macro_rules! impl_relational_binop {
     ($name:ident, $variant:ident, $type:ty, $op:ident) => {
         fn $name(vm: &mut VM) -> Result<(), VMError> {
             let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-            let lhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs, rhs) {
+            let lhs = vm.stack.last_mut().ok_or(VMError::StackUnderflow)?;
+            let val = if let (Value::$variant(l), Value::$variant(r)) = (*lhs, rhs) {
                 Value::Bool(l.$op(&r))
             } else {
                 return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
             };
-            vm.stack.push(val);
+            *lhs = val;
             Ok(())
         }
     };
@@ -473,7 +574,22 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
 // pub const OP_LOG_NOT: u8 = 50;
 // pub const OP_NEGATE: u8 = 51;
 // pub const OP_COMPLEMENT: u8 = 52;
-// pub const OP_CALL: u8 = 60; // (imm i32 num arguments, consumes TOS + num arguments)
+
+fn call(vm: &mut VM) -> Result<(), VMError> {
+    let num_params = vm.read_immediate::<u32>() as usize;
+    let fn_index = vm.read_immediate::<u32>() as usize;
+    let iptr = unsafe { &*vm.module }.functions[fn_index].code.as_ptr();
+    // let params: *const Value = &vm.stack[vm.stack.len() - num_params];
+    let new_stack = vm.stack.split_off(vm.stack.len() - num_params);
+    vm.push_call_stack(new_stack);
+
+    // Stack and locals are cleared at this point
+    // vm.stack
+    //     .extend_from_slice(unsafe { std::slice::from_raw_parts(params, num_params) });
+    // TODO: Reserve locals
+    vm.iptr = iptr;
+    Ok(())
+}
 
 fn branch(vm: &mut VM) -> Result<(), VMError> {
     let offset = vm.read_immediate::<i32>();
@@ -499,9 +615,22 @@ fn branch_if_false(vm: &mut VM) -> Result<(), VMError> {
     }
 }
 
-fn ret(_vm: &mut VM) -> Result<(), VMError> {
-    // `ret` is handled by the interpreter loop.
-    unreachable!("`ret` instruction handler should not be called");
+// fn ret(_vm: &mut VM) -> Result<(), VMError> {
+//     // `ret` is handled by the interpreter loop.
+//     unreachable!("`ret` instruction handler should not be called");
+// }
+
+fn ret(vm: &mut VM) -> Result<(), VMError> {
+    vm.pop_call_stack();
+    Ok(())
+}
+
+fn ret_val(vm: &mut VM) -> Result<(), VMError> {
+    let res = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    vm.pop_call_stack();
+    // TODO: Don't push if function is void return
+    vm.stack.push(res);
+    Ok(())
 }
 
 fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {

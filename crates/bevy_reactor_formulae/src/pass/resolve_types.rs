@@ -13,14 +13,14 @@ pub(crate) fn resolve_types<'a>(
     match &ast.kind {
         NodeKind::ArrayType(_member) => todo!(),
         NodeKind::Ident(ident) => {
-            let Some(decl) = scope.lookup(ident.as_str()) else {
+            let Some((_, decl)) = scope.lookup(ident.as_str()) else {
                 return Err(CompilationError::UnknownType(
                     ast.location,
                     ident.to_string(),
                 ));
             };
             match &decl.kind {
-                decl::DeclKind::TypeAlias(typ) => Ok(typ.clone()),
+                decl::DeclKind::TypeAlias => Ok(decl.typ.clone()),
                 // decl::Decl::Struct(sindex) => {
                 //     Ok(ExprType::Struct(decls.structs[*sindex].typ.clone()))
                 // }

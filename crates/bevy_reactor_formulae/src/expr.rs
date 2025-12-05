@@ -1,11 +1,24 @@
 use smol_str::SmolStr;
 
 use crate::{
+    decl::ScopeType,
     expr_type::ExprType,
     location::TokenLocation,
     oper::{BinaryOp, UnaryOp},
 };
 use core::fmt::Display;
+
+// #[derive(Debug)]
+// pub(crate) enum Callable {
+//     /// A global function provided by the host environment.
+//     Host(usize),
+//     /// A function defined in the current module.
+//     Global(usize),
+//     /// A function imported from another module,
+//     Imported { module: usize, function: usize },
+//     // TODO: Entity method
+//     // TODO: Other method
+// }
 
 /// Content of an Expression node.
 #[derive(Debug)]
@@ -16,7 +29,7 @@ pub(crate) enum ExprKind<'e> {
     ConstFloat(f64),
     ConstBool(bool),
     ConstString(SmolStr),
-    FunctionRef(usize),
+    FunctionRef(ScopeType, usize),
     /// A local `let` statement
     LocalDecl(usize, Option<&'e mut Expr<'e>>),
     /// A reference to a function parameter.
@@ -51,7 +64,7 @@ pub(crate) enum ExprKind<'e> {
     Cast(&'e mut Expr<'e>),
     Block(Vec<&'e mut Expr<'e>>, Option<&'e mut Expr<'e>>),
     If {
-        test: &'e mut Expr<'e>,
+        condition: &'e mut Expr<'e>,
         then_branch: &'e mut Expr<'e>,
         else_branch: Option<&'e mut Expr<'e>>,
     },
@@ -79,7 +92,7 @@ impl<'e> Display for Expr<'e> {
             }
             ExprKind::ConstBool(value) => value.fmt(f),
             ExprKind::ConstString(symbol) => write!(f, "String({symbol})"),
-            ExprKind::FunctionRef(id) => write!(f, "Function({id})"),
+            ExprKind::FunctionRef(_ty, id) => write!(f, "Function({id})"),
             ExprKind::LocalRef(id) => write!(f, "LocalRef({id})"),
             ExprKind::GlobalRef(id) => write!(f, "GlobalRef({id})"),
             ExprKind::Field(base, index) => {
@@ -149,17 +162,17 @@ impl<'e> Display for Expr<'e> {
                 write!(f, "}}")
             }
             ExprKind::If {
-                test,
+                condition: test,
                 then_branch,
                 else_branch,
             } => {
                 write!(f, "if ")?;
-                test.fmt(f);
+                test.fmt(f)?;
                 write!(f, " ")?;
-                then_branch.fmt(f);
+                then_branch.fmt(f)?;
                 if let Some(e) = else_branch {
                     write!(f, " else ")?;
-                    e.fmt(f);
+                    e.fmt(f)?;
                 }
                 Ok(())
             }

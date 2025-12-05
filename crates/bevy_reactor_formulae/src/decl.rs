@@ -1,5 +1,3 @@
-// use std::sync::Arc;
-
 use bevy::platform::collections::HashMap;
 use smol_str::SmolStr;
 
@@ -15,38 +13,35 @@ pub enum DeclVisibility {
 #[derive(Debug)]
 pub struct Decl {
     pub location: TokenLocation,
-    // pub name: SmolStr,
     pub visibility: DeclVisibility,
+    pub typ: ExprType,
     pub kind: DeclKind,
 }
 
 #[derive(Debug)]
 pub enum DeclKind {
     Global {
-        typ: ExprType,
         is_const: bool,
         /// Index of this variable in the host or module's variables table.
         index: usize,
     },
     Local {
-        typ: ExprType,
         is_const: bool,
         /// Index of this variable in the local variables table.
         index: usize,
     },
     Param {
-        typ: ExprType,
         /// Index of this variable in the current function's parameter list.
         index: usize,
     },
     Function {
-        params: Vec<FunctionParam>,
-        ret: ExprType,
+        // params: Vec<FunctionParam>,
+        // ret: ExprType,
         is_native: bool,
         /// Index of this function in the host or module's functions table.
         index: usize,
     },
-    TypeAlias(ExprType),
+    TypeAlias,
 }
 
 // #[derive(Debug)]
@@ -92,16 +87,27 @@ pub struct FunctionParam {
 
 pub type DeclTable = HashMap<SmolStr, Decl>;
 
+/// What kind of scope this is.
+#[derive(Debug, Clone, Copy)]
+pub enum ScopeType {
+    Host,
+    Module,
+    Import,
+    Param,
+    Local,
+}
+
 #[derive(Debug)]
 pub(crate) struct Scope<'parent, 'decls> {
     pub(crate) parent: Option<&'parent Scope<'parent, 'parent>>,
     pub(crate) decls: &'decls DeclTable,
+    pub(crate) scope_type: ScopeType,
 }
 
 impl<'parent, 'decls> Scope<'parent, 'decls> {
-    pub fn lookup(&self, name: &str) -> Option<&Decl> {
+    pub fn lookup(&self, name: &str) -> Option<(ScopeType, &Decl)> {
         if let Some(decl) = self.decls.get(name) {
-            return Some(decl);
+            return Some((self.scope_type, decl));
         }
 
         if let Some(parent) = self.parent {

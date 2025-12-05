@@ -1,5 +1,5 @@
 use crate::ast::{
-    ASTDecl, ASTNode, FloatSuffix, FunctionParam, IntegerSuffix, NodeKind, StructField,
+    ASTDecl, ASTFunctionParam, ASTNode, ASTStructField, FloatSuffix, IntegerSuffix, NodeKind,
 };
 use crate::decl;
 use crate::oper::{BinaryOp, UnaryOp};
@@ -365,7 +365,6 @@ peg::parser! {
         }
 
         pub rule expr() -> &'a ASTNode<'a> = l:binop() { l } / expected!("expression")
-        // pub rule expr_stmt() -> &'a ASTNode<'a> = e:expr() _ (";" / expected!("semicolon")) { e }
 
         rule empty_stmt() -> &'a ASTNode<'a> = ";" {
             arena.alloc(ASTNode::new((0, 0), NodeKind::Empty))
@@ -412,10 +411,12 @@ peg::parser! {
                 }))))
             }
 
+        pub rule condition() -> &'a ASTNode<'a> = e:expr() { e } / expected!("condition")
+
         pub(crate) rule if_stmt() -> &'a ASTNode<'a> =
             start:position!()
             "if"
-            _ test:expr()
+            _ condition:condition()
             _ then_block:block()
             else_block: (
                 _ "else"
@@ -428,7 +429,7 @@ peg::parser! {
             {
                 let location = (start, end);
                 arena.alloc(ASTNode::new(location, NodeKind::If {
-                    test, then_block, else_block
+                    condition, then_block, else_block
                 }))
             }
 
@@ -472,20 +473,20 @@ peg::parser! {
         rule visiblity() -> decl::DeclVisibility =
             "pub" { decl::DeclVisibility::Public } / { decl::DeclVisibility::Private }
 
-        rule param_decl() -> &'a FunctionParam<'a> =
+        rule param_decl() -> &'a ASTFunctionParam<'a> =
             start:position!()
             id:name() _ ":" _ ty:type_expr()
             end:position!()
         {
             let location = (start, end);
-            arena.alloc(FunctionParam {
+            arena.alloc(ASTFunctionParam {
                 location: (start, end).into(),
                 name: id,
                 typ: ty,
             })
         }
 
-        pub rule param_list() -> &'a[&'a FunctionParam<'a>] =
+        pub rule param_list() -> &'a[&'a ASTFunctionParam<'a>] =
             "(" _
             params:(
                 p0:param_decl() _
@@ -525,20 +526,20 @@ peg::parser! {
             }))))
         }
 
-        rule struct_field() -> &'a StructField<'a> =
+        rule struct_field() -> &'a ASTStructField<'a> =
             start:position!()
             id:name() _ ":" _ ty:type_expr()
             end:position!()
         {
             let location = (start, end);
-            arena.alloc(StructField {
+            arena.alloc(ASTStructField {
                 location: (start, end).into(),
                 name: id,
                 typ: ty,
             })
         }
 
-        pub rule struct_field_list() -> &'a[&'a StructField<'a>] =
+        pub rule struct_field_list() -> &'a[&'a ASTStructField<'a>] =
             "{" _
             fields:(
                 p0:struct_field() _
@@ -556,12 +557,11 @@ peg::parser! {
 
         rule struct_defn() -> &'a ASTNode<'a> =
             visibility:visiblity() _
-            is_record:("struct" { false } / "record" { true }) _ id:name() _
+            "struct" _ id:name() _
             fields:struct_field_list()
         {
-            todo!();
-            // let decl = arena.alloc(ASTDecl::Struct { name: id, visibility, is_record, fields });
-            // arena.alloc(ASTNode::new((0, 0), NodeKind::Decl(decl)))
+            let decl = arena.alloc(ASTDecl::Struct { name: id, visibility, fields });
+            arena.alloc(ASTNode::new((0, 0), NodeKind::Decl(decl)))
         }
 
         pub rule import_name_list() -> &'a[SmolStr] =
@@ -881,7 +881,7 @@ mod tests {
             Ok(ASTNode {
                 kind:
                     NodeKind::If {
-                        test,
+                        condition: test,
                         then_block,
                         else_block,
                     },
@@ -907,7 +907,7 @@ mod tests {
             Ok(ASTNode {
                 kind:
                     NodeKind::If {
-                        test,
+                        condition: test,
                         then_block,
                         else_block,
                     },

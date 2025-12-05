@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::Module;
 use crate::ast::{ASTNode, FloatSuffix, IntegerSuffix, NodeKind};
-use crate::decl::{Decl, DeclKind, DeclTable, Scope};
+use crate::decl::{Decl, DeclKind, DeclTable, Scope, ScopeType};
 use crate::expr_type::ExprType;
 use crate::host::HostState;
 use bevy::{log::info, render::render_graph::Node, scene::ron::de};
@@ -109,6 +109,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         let host_scope = Scope {
             parent: None,
             decls: &host.global_decls,
+            scope_type: ScopeType::Host,
         };
 
         // Multiple declarations of the same function are not allowed.
@@ -143,9 +144,11 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         let fd = decl::Decl {
             location: ast.location,
             visibility: DeclVisibility::Private,
-            kind: DeclKind::Function {
+            typ: ExprType::Function(Arc::new(FunctionType {
                 params: Vec::new(),
                 ret: ret_type.clone(),
+            })),
+            kind: DeclKind::Function {
                 is_native: false,
                 index: function_index,
             },
@@ -160,6 +163,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         let module_scope = Scope {
             parent: Some(&host_scope),
             decls: &module.module_decls,
+            scope_type: ScopeType::Module,
         };
 
         // Scope for the function parameters from within the function body.
@@ -167,6 +171,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         let param_scope = Scope {
             parent: Some(&module_scope),
             decls: &param_decls,
+            scope_type: ScopeType::Param,
         };
 
         let body_expr = build_block(
@@ -219,9 +224,8 @@ fn create_decls<'ast, 'me>(
                     let fd = decl::Decl {
                         location: ast_decl.location,
                         visibility: *visibility,
+                        typ: ExprType::None,
                         kind: DeclKind::Function {
-                            params: Vec::new(),
-                            ret: ExprType::default(),
                             is_native: false,
                             index: function_index,
                         },
@@ -257,30 +261,32 @@ fn create_decls<'ast, 'me>(
 
                     // decls.globals.push(gd);
                     // scope.insert(*name, decl::Decl::Global(index));
-                } // ASTDecl::Struct {
-                  //     name, visibility, ..
-                  // } => {
-                  //     // Multiple declarations of the same function are not allowed.
-                  //     if scope.contains(*name) {
-                  //         let name_str = decls.symbols.resolve(*name);
-                  //         return Err(CompilationError::NameRedefinition(
-                  //             ast_decl.location,
-                  //             name_str,
-                  //         ));
-                  //     }
+                }
+                ASTDecl::Struct {
+                    name, visibility, ..
+                } => {
+                    //     // Multiple declarations of the same function are not allowed.
+                    //     if scope.contains(*name) {
+                    //         let name_str = decls.symbols.resolve(*name);
+                    //         return Err(CompilationError::NameRedefinition(
+                    //             ast_decl.location,
+                    //             name_str,
+                    //         ));
+                    //     }
 
-                  //     let index = decls.structs.len();
-                  //     let sd = decl::StructDecl {
-                  //         location: ast_decl.location,
-                  //         name: *name,
-                  //         visibility: *visibility,
-                  //         typ: Arc::new(StructType::default()),
-                  //         index,
-                  //     };
+                    //     let index = decls.structs.len();
+                    //     let sd = decl::StructDecl {
+                    //         location: ast_decl.location,
+                    //         name: *name,
+                    //         visibility: *visibility,
+                    //         typ: Arc::new(StructType::default()),
+                    //         index,
+                    //     };
 
-                  //     decls.structs.push(sd);
-                  //     scope.insert(*name, decl::Decl::Struct(index));
-                  // } // ASTDecl::TypeAlias { .. } => todo!(),
+                    //     decls.structs.push(sd);
+                    //     scope.insert(*name, decl::Decl::Struct(index));
+                    todo!("{name} {visibility:?}");
+                } // } // ASTDecl::TypeAlias { .. } => todo!(),
             },
             _ => panic!("Invalid AST node for declaration: {:?}", ast_decl.kind),
         }
@@ -298,6 +304,7 @@ pub(crate) fn resolve_decl_types<'ast>(
     let host_scope = Scope {
         parent: None,
         decls: &host.global_decls,
+        scope_type: ScopeType::Host,
     };
 
     for ast_decl in ast_decls {
@@ -313,6 +320,7 @@ pub(crate) fn resolve_decl_types<'ast>(
                     let module_scope = Scope {
                         parent: Some(&host_scope),
                         decls: &module.module_decls,
+                        scope_type: ScopeType::Module,
                     };
 
                     let ret_type = match ret_ast {
@@ -333,49 +341,38 @@ pub(crate) fn resolve_decl_types<'ast>(
                     }
 
                     let decl = module.module_decls.get_mut(name).unwrap();
-                    let DeclKind::Function {
-                        params: fd_params,
-                        ret: fd_ret,
-                        ..
-                    } = &mut decl.kind
-                    else {
-                        panic!("Expected function declaration");
-                    };
-
-                    *fd_params = params_mapped;
-                    *fd_ret = ret_type;
+                    decl.typ = ExprType::Function(Arc::new(FunctionType {
+                        params: params_mapped,
+                        ret: ret_type,
+                    }));
                 }
                 ASTDecl::Let { .. } => todo!(),
-                // ASTDecl::Struct {
-                //     name,
-                //     is_record,
-                //     fields,
-                //     ..
-                // } => {
-                //     let decl = scope.get(*name).unwrap();
-                //     let decl::Decl::Struct(sindex) = decl else {
-                //         unreachable!()
-                //     };
+                ASTDecl::Struct { name, fields, .. } => {
+                    //     let decl = scope.get(*name).unwrap();
+                    //     let decl::Decl::Struct(sindex) = decl else {
+                    //         unreachable!()
+                    //     };
 
-                //     let mut stype = StructType {
-                //         name: *name,
-                //         is_record: *is_record,
-                //         fields: Vec::with_capacity(fields.len()),
-                //     };
+                    //     let mut stype = StructType {
+                    //         name: *name,
+                    //         is_record: *is_record,
+                    //         fields: Vec::with_capacity(fields.len()),
+                    //     };
 
-                //     for (i, f) in fields.iter().enumerate() {
-                //         let typ = resolve_types(decls, scope, f.typ)?;
-                //         stype.fields.push(decl::FieldDecl {
-                //             location: f.location,
-                //             name: f.name,
-                //             typ,
-                //             index: i,
-                //         });
-                //     }
+                    //     for (i, f) in fields.iter().enumerate() {
+                    //         let typ = resolve_types(decls, scope, f.typ)?;
+                    //         stype.fields.push(decl::FieldDecl {
+                    //             location: f.location,
+                    //             name: f.name,
+                    //             typ,
+                    //             index: i,
+                    //         });
+                    //     }
 
-                //     let sd = &mut decls.structs[*sindex];
-                //     sd.typ = Arc::new(stype);
-                // } // ASTDecl::TypeAlias { .. } => todo!(),
+                    //     let sd = &mut decls.structs[*sindex];
+                    //     sd.typ = Arc::new(stype);
+                    todo!("Struct {name} {fields:?}");
+                } // ASTDecl::TypeAlias { .. } => todo!(),
             },
             _ => panic!("Invalid AST node for declaration: {:?}", ast_decl.kind),
         }
@@ -394,6 +391,7 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
     let host_scope = Scope {
         parent: None,
         decls: &host.global_decls,
+        scope_type: ScopeType::Host,
     };
 
     for ast_decl in ast_decls {
@@ -402,15 +400,16 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
         {
             let decl = module.module_decls.get_mut(name).unwrap();
             let DeclKind::Function {
-                params: fd_params,
-                ret: fd_ret,
-                index: fd_index,
-                ..
+                index: fd_index, ..
             } = &mut decl.kind
             else {
                 panic!("Expected function declaration");
             };
-            let fd_ret = fd_ret.clone();
+
+            let ExprType::Function(ftype) = &decl.typ else {
+                panic!("Expected function type");
+            };
+            let fd_ret = ftype.ret.clone();
             let fd_index = *fd_index;
 
             let Some(body_ast) = body else {
@@ -419,16 +418,14 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
 
             // Build parameter scope
             let mut param_decls = DeclTable::default();
-            for param in fd_params {
+            for param in ftype.params.iter() {
                 param_decls.insert(
                     param.name.clone(),
                     Decl {
                         location: param.location,
                         visibility: DeclVisibility::Public,
-                        kind: DeclKind::Param {
-                            typ: param.typ.clone(),
-                            index: param.index,
-                        },
+                        typ: param.typ.clone(),
+                        kind: DeclKind::Param { index: param.index },
                     },
                 );
             }
@@ -436,11 +433,13 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
             let module_scope = Scope {
                 parent: Some(&host_scope),
                 decls: &module.module_decls,
+                scope_type: ScopeType::Module,
             };
 
             let param_scope = Scope {
                 parent: Some(&module_scope),
                 decls: &param_decls,
+                scope_type: ScopeType::Param,
             };
 
             let mut local_decls = DeclTable::default();
@@ -528,50 +527,51 @@ fn build_exprs<'a, 'e>(
             .alloc(Expr::new(ast.location, ExprKind::ConstBool(*value)))
             .with_type(ExprType::Boolean)),
 
-        NodeKind::Ident(name) => match parent_scope.lookup(name) {
-            Some(decl) => {
-                match &decl.kind {
-                    decl::DeclKind::Function {
-                        params: _,
-                        ret: _,
-                        is_native: _,
-                        index: _,
-                    } => {
-                        todo!();
-                        // let function = &decls.functions[*findex];
-                        // // println!("Calling function: {:?}", function.index);
-                        // Ok(
-                        //     Expr::new(ast.location, ExprKind::FunctionRef(function.function_index))
-                        //         .with_type(ExprType::Function(function.typ.clone())),
-                        // )
+        NodeKind::Ident(name) => {
+            let scope = Scope {
+                parent: Some(parent_scope),
+                decls: current_scope,
+                scope_type: ScopeType::Local,
+            };
+
+            match scope.lookup(name) {
+                Some((scope_type, decl)) => {
+                    match &decl.kind {
+                        decl::DeclKind::Function {
+                            is_native: _,
+                            index,
+                        } => match scope_type {
+                            ScopeType::Host | ScopeType::Module => Ok(out
+                                .alloc(Expr::new(
+                                    ast.location,
+                                    ExprKind::FunctionRef(scope_type, *index),
+                                ))
+                                .with_type(decl.typ.clone())),
+                            ScopeType::Import => todo!(),
+                            ScopeType::Param => todo!(),
+                            ScopeType::Local => todo!(),
+                        },
+
+                        decl::DeclKind::Local { is_const: _, index } => Ok(out
+                            .alloc(Expr::new(ast.location, ExprKind::LocalRef(*index)))
+                            .with_type(decl.typ.clone())),
+                        decl::DeclKind::Global { is_const: _, index } => Ok(out
+                            .alloc(Expr::new(ast.location, ExprKind::GlobalRef(*index)))
+                            .with_type(decl.typ.clone())),
+                        decl::DeclKind::Param { index } => Ok(out
+                            .alloc(Expr::new(ast.location, ExprKind::ParamRef(*index)))
+                            .with_type(decl.typ.clone())),
+                        // Struct (constructor)
+                        // Enum (constructor)
+                        _ => todo!("Ident: {:?}", decl),
                     }
-                    decl::DeclKind::Local {
-                        typ,
-                        is_const: _,
-                        index,
-                    } => Ok(out
-                        .alloc(Expr::new(ast.location, ExprKind::LocalRef(*index)))
-                        .with_type(typ.clone())),
-                    decl::DeclKind::Global {
-                        typ,
-                        is_const: _,
-                        index,
-                    } => Ok(out
-                        .alloc(Expr::new(ast.location, ExprKind::GlobalRef(*index)))
-                        .with_type(typ.clone())),
-                    decl::DeclKind::Param { typ, index } => Ok(out
-                        .alloc(Expr::new(ast.location, ExprKind::ParamRef(*index)))
-                        .with_type(typ.clone())),
-                    // Struct (constructor)
-                    // Enum (constructor)
-                    _ => todo!("Ident: {:?}", decl),
                 }
+                None => Err(CompilationError::UnknownSymbol(
+                    ast.location,
+                    name.to_string(),
+                )),
             }
-            None => Err(CompilationError::UnknownSymbol(
-                ast.location,
-                name.to_string(),
-            )),
-        },
+        }
 
         NodeKind::QName(_name) => panic!("Should already be resolved"),
 
@@ -806,24 +806,18 @@ fn build_exprs<'a, 'e>(
                 ExprType::Entity => {
                     if let Some(field) = host.entity_decls.get(fname) {
                         match &field.kind {
-                            DeclKind::Global {
-                                typ,
-                                is_const: _,
-                                index,
-                            } => {
+                            DeclKind::Global { is_const: _, index } => {
                                 // assign_types(arg_expr, &infer)?;
                                 Ok(out
                                     .alloc(Expr::new(
                                         ast.location,
                                         ExprKind::EntityProp(base_expr, *index),
                                     ))
-                                    .with_type(typ.clone()))
+                                    .with_type(field.typ.clone()))
                                 // builder.push_op(instr::OP_LOAD_ENTITY_PROP);
                                 // builder.push_immediate::<u32>(health_id as u32);
                             }
                             DeclKind::Function {
-                                params: _,
-                                ret: _,
                                 is_native: _,
                                 index: _,
                             } => todo!(),
@@ -961,6 +955,7 @@ fn build_exprs<'a, 'e>(
             let block_parent_scope = Scope {
                 parent: Some(parent_scope),
                 decls: current_scope,
+                scope_type: ScopeType::Local,
             };
 
             build_block(
@@ -1062,12 +1057,12 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::If {
-            test,
+            condition,
             then_block,
             else_block,
         } => {
-            let test_expr = build_exprs(
-                test,
+            let condition_expr = build_exprs(
+                condition,
                 host,
                 parent_scope,
                 current_scope,
@@ -1075,7 +1070,11 @@ fn build_exprs<'a, 'e>(
                 inference,
                 out,
             )?;
-            inference.add_constraint(ExprType::Boolean, test_expr.typ.clone(), test.location);
+            inference.add_constraint(
+                ExprType::Boolean,
+                condition_expr.typ.clone(),
+                condition.location,
+            );
 
             let then_branch = build_exprs(
                 then_block,
@@ -1105,7 +1104,7 @@ fn build_exprs<'a, 'e>(
                     .alloc(Expr::new(
                         ast.location,
                         ExprKind::If {
-                            test: test_expr,
+                            condition: condition_expr,
                             then_branch,
                             else_branch: Some(else_branch),
                         },
@@ -1122,7 +1121,7 @@ fn build_exprs<'a, 'e>(
                     .alloc(Expr::new(
                         ast.location,
                         ExprKind::If {
-                            test: test_expr,
+                            condition: condition_expr,
                             then_branch,
                             else_branch: None,
                         },
@@ -1208,6 +1207,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1238,6 +1238,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1268,6 +1269,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1299,6 +1301,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1330,6 +1333,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1360,6 +1364,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1390,6 +1395,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1429,6 +1435,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1478,6 +1485,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1526,6 +1534,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1570,6 +1579,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;
@@ -1610,6 +1620,7 @@ mod tests {
         let scope = Scope {
             parent: None,
             decls: &DeclTable::default(),
+            scope_type: ScopeType::Host,
         };
         let mut current_scope = DeclTable::default();
         let mut locals = 0;

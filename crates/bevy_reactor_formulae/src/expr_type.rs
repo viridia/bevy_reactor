@@ -37,7 +37,6 @@ pub struct FunctionType {
 // #[derive(Debug, PartialEq, Default, Clone)]
 // pub struct StructType {
 //     pub name: Symbol,
-//     pub is_record: bool,
 //     pub fields: Vec<FieldDecl>,
 // }
 
@@ -45,7 +44,6 @@ pub struct FunctionType {
 // #[derive(Debug, Default, PartialEq, Clone)]
 // pub struct TupleStructType {
 //     pub name: Symbol,
-//     pub is_record: bool,
 //     pub fields: Vec<ExprType>,
 // }
 
@@ -109,19 +107,11 @@ impl Display for ExprType {
                 }
                 Ok(())
             } // ExprType::Struct(stype) => {
-              //     if stype.is_record {
-              //         write!(f, "record")?;
-              //     } else {
-              //         write!(f, "struct")?;
-              //     }
+              //     write!(f, "struct")?;
               //     Ok(())
               // }
               // ExprType::TupleStruct(stype) => {
-              //     if stype.is_record {
-              //         write!(f, "tuple_record")?;
-              //     } else {
-              //         write!(f, "tuple_struct")?;
-              //     }
+              //     write!(f, "tuple_struct")?;
               //     Ok(())
               // }
         }

@@ -82,8 +82,12 @@
 
 Next:
 
+- parameters
+- complex expressions
+
 - load module from asset (extension: .fmod or .crow)
 - function definitions
+  - script [done]
   - native
   - host
   - entity
@@ -99,12 +103,13 @@ Next:
   - unary
 - type alias
 - control flow
-  - if
+  - if [done]
   - for
   - loop
   - return
   - break
   - continue
+  - match?
 - bblocks
 - complex types
   - string
@@ -115,3 +120,20 @@ Next:
   - parse
   - resolve
   - backend
+
+# Local vars:
+
+- vm.locals (not stack locations?)
+
+  /// Execution stack
+  stack: Vec<Value>,
+
+  /// Local vars
+  locals: Vec<Value>,
+
+  /// Instruction pointer
+  iptr: \*const u8,
+
+struct CallStackEntry {
+
+}

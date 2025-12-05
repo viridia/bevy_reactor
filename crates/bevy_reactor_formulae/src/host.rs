@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use bevy::{ecs::entity::Entity, platform::collections::HashMap};
 use smol_str::SmolStr;
 
 use crate::{
     VM, Value,
     decl::{Decl, DeclKind, DeclTable, DeclVisibility},
-    expr_type::ExprType,
+    expr_type::{ExprType, FunctionType},
     location::TokenLocation,
     vm::VMError,
 };
@@ -127,7 +129,8 @@ impl HostState {
             Decl {
                 location: TokenLocation::default(),
                 visibility: DeclVisibility::Public,
-                kind: DeclKind::TypeAlias(typ),
+                typ,
+                kind: DeclKind::TypeAlias,
             },
         );
     }
@@ -146,8 +149,8 @@ impl HostState {
             Decl {
                 location: TokenLocation::default(),
                 visibility: DeclVisibility::Public,
+                typ: var_type,
                 kind: DeclKind::Global {
-                    typ: var_type,
                     is_const: true,
                     index,
                 },
@@ -175,8 +178,8 @@ impl HostState {
             Decl {
                 location: TokenLocation::default(),
                 visibility: DeclVisibility::Public,
+                typ,
                 kind: DeclKind::Global {
-                    typ,
                     is_const: true,
                     index,
                 },
@@ -204,8 +207,8 @@ impl HostState {
             Decl {
                 location: TokenLocation::default(),
                 visibility: DeclVisibility::Public,
+                typ,
                 kind: DeclKind::Global {
-                    typ,
                     is_const: true,
                     index,
                 },
@@ -228,11 +231,13 @@ impl HostState {
             Decl {
                 location: TokenLocation::default(),
                 visibility: DeclVisibility::Public,
-                kind: DeclKind::Function {
+                typ: ExprType::Function(Arc::new(FunctionType {
                     // TODO: fill in
                     params: Default::default(),
                     // TODO: fill in
                     ret: ExprType::None,
+                })),
+                kind: DeclKind::Function {
                     is_native: true,
                     index,
                 },

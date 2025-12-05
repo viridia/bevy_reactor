@@ -1,10 +1,14 @@
+// Special opcodes for < comparison
+pub const OP_RET: u8 = 0; // transfers value from child stack to parent
+pub const OP_RET_VOID: u8 = 1; // doesn't transfer
+
 // Constants
-pub const OP_CONST_TRUE: u8 = 1;
-pub const OP_CONST_FALSE: u8 = 2;
-pub const OP_CONST_I32: u8 = 3; // (imm i32)
-pub const OP_CONST_I64: u8 = 4; // (imm i64)
-pub const OP_CONST_F32: u8 = 5; // (imm f32)
-pub const OP_CONST_F64: u8 = 6; // (imm f64)
+pub const OP_CONST_TRUE: u8 = 3;
+pub const OP_CONST_FALSE: u8 = 4;
+pub const OP_CONST_I32: u8 = 5; // (imm i32)
+pub const OP_CONST_I64: u8 = 6; // (imm i64)
+pub const OP_CONST_F32: u8 = 7; // (imm f32)
+pub const OP_CONST_F64: u8 = 8; // (imm f64)
 
 // Stack manipulation
 pub const OP_DROP: u8 = 10;
@@ -12,8 +16,9 @@ pub const OP_DROP_N: u8 = 11; // (imm u32)
 
 // Dereference
 pub const OP_LOAD_PARAM: u8 = 20;
-pub const OP_LOAD_GLOBAL: u8 = 21; // (imm u32)
-pub const OP_LOAD_ENTITY_PROP: u8 = 22; // (imm u32, consumes TOS)
+pub const OP_LOAD_LOCAL: u8 = 21;
+pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
+pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u32, consumes TOS)
 
 // Binops: all consume TOS + 1 and push result
 pub const OP_LOGICAL_AND: u8 = 35;
@@ -27,20 +32,21 @@ pub const OP_NEGATE: u8 = 51;
 pub const OP_COMPLEMENT: u8 = 52;
 
 // Control flow
-pub const OP_RET: u8 = 61;
 pub const OP_BRANCH: u8 = 62; // (imm i32 relative offset)
 pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS)
 
 // Method calls
 
 /// Call a registered method on an entity
-/// immediate: [i32, usize]: number of arguments, method index
+/// immediate: [u32, u32]: number of arguments, method index
 /// stack input: args
 /// stack output: result
-pub const OP_CALL_ENTITY_METHOD: u8 = 70;
+pub const OP_CALL: u8 = 72; // Call script function
+pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity
+pub const OP_CALL_HOST_METHOD: u8 = 71; // Call host method
 
 // Experimental
-// Typed Binops: all consume TOS + 1 and push result
+// Typed Binops: all consume stack[2] and push result
 pub const OP_ADD_I32: u8 = 100;
 pub const OP_ADD_I64: u8 = 101;
 pub const OP_ADD_F32: u8 = 102;

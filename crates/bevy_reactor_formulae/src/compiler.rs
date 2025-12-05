@@ -120,27 +120,6 @@ pub(crate) struct ModuleExprs<'ex> {
 //     //     Ok(())
 //     // }
 
-//     // pub(crate) fn define_intrinsics(&mut self) {
-//     //     let symbols = &self.decls.symbols;
-//     //     let intrinsic_scope = &mut self.intrinsic_scope;
-//     //     intrinsic_scope.insert(symbols.intern("i32"), Decl::TypeAlias(ExprType::I32));
-//     //     intrinsic_scope.insert(symbols.intern("i64"), Decl::TypeAlias(ExprType::I64));
-//     //     intrinsic_scope.insert(symbols.intern("f32"), Decl::TypeAlias(ExprType::F32));
-//     //     intrinsic_scope.insert(symbols.intern("f64"), Decl::TypeAlias(ExprType::F64));
-//     //     intrinsic_scope.insert(symbols.intern("bool"), Decl::TypeAlias(ExprType::Boolean));
-//     //     intrinsic_scope.insert(symbols.intern("String"), Decl::TypeAlias(ExprType::String));
-//     // }
-
-//     fn parse_file<'ast>(
-//         &mut self,
-//         src: &str,
-//         arena: &'ast Bump,
-//     ) -> Result<&'ast ASTNode<'ast>, CompilationError> {
-//         let ast = formula_parser::module(src, arena).map_err(transform_parse_error)?;
-
-//         Ok(ast)
-//     }
-
 //     // / Load and resolve imported symbols from other modules.
 //     // async fn resolve_imports(&mut self) -> Result<(), CompilationError> {
 //     //     // TODO: Implement
@@ -502,6 +481,27 @@ mod tests {
         let host = Mutex::new(HostState::new());
         let module =
             future::block_on(compile_module("--str--", "fn test() -> i32 { 20 }", &host)).unwrap();
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let host = host.lock().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, "test").unwrap();
+        assert_eq!(result, Value::I32(20));
+    }
+
+    #[test]
+    fn compile_module_with_call() {
+        let host = Mutex::new(HostState::new());
+        let module = future::block_on(compile_module(
+            "--str--",
+            "
+            fn test2() -> i32 { 20 }
+            fn test() -> i32 { test2() }
+            ",
+            &host,
+        ))
+        .unwrap();
 
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
