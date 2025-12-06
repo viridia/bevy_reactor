@@ -1,11 +1,14 @@
 use std::{
-    any::TypeId,
+    any::{Any, TypeId},
     cell::RefCell,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Sub},
     sync::Arc,
 };
 
-use bevy::ecs::{component::Component, entity::Entity, world::World};
+use bevy::{
+    ecs::{component::Component, entity::Entity, world::World},
+    reflect::{PartialReflect, ReflectRef},
+};
 use bevy_reactor::TrackingScope;
 use thiserror::Error;
 
@@ -29,6 +32,7 @@ pub enum Value {
     F64(f64),
     Entity(Entity),
     String(Arc<String>),
+    WorldRef(usize),
 }
 
 impl Value {
@@ -42,6 +46,7 @@ impl Value {
             Value::F64(_) => ExprType::F64,
             Value::Entity(_) => ExprType::Entity,
             Value::String(_) => ExprType::String,
+            Value::WorldRef(_) => todo!(),
         }
     }
 
@@ -63,6 +68,8 @@ pub enum VMError {
     InvalidAssignment,
     #[error("Value is not an entity: {0}")]
     NotAnEntity(ExprType),
+    #[error("Invalid type for operation: {0}")]
+    InvalidType(ExprType),
     #[error("Invalid global index: {0}")]
     InvalidGlobalIndex(usize),
     #[error("Invalid entity prop: {0}")]
@@ -92,21 +99,26 @@ struct CallStackEntry {
 }
 
 /// A virtual machine for evaluating formulae.
-pub struct VM<'w, 'g, 'p> {
+pub struct VM<'world, 'host, 'p> {
     /// Bevy World
-    pub world: &'w World,
+    pub world: &'world World,
 
     /// Entity upon which this script is attached.
     pub owner: Entity,
 
     /// Globals and entity members
-    pub host: &'g HostState,
+    pub host: &'host HostState,
 
     /// Module we are executing
     pub module: *const Module,
 
     /// Execution stack
     call_stack: Vec<CallStackEntry>,
+
+    /// Reflected values.
+    /// TODO: Need garbage collection
+    /// TODO: Would be better to use an arena for this and other temporaries.
+    world_refs: RefCell<Vec<&'world dyn PartialReflect>>,
 
     /// Value stack: consists of [Value; num_params + num_locals + temporaries]
     stack: Vec<Value>,
@@ -120,17 +132,22 @@ pub struct VM<'w, 'g, 'p> {
 
 type InstrHandler = fn(&mut VM) -> Result<(), VMError>;
 
-impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
+impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
     const JUMP_TABLE: [InstrHandler; 256] = build_jump_table();
 
     // Initialize a new virtual machine.
-    pub fn new(world: &'w World, host: &'g HostState, tracking: &'p mut TrackingScope) -> Self {
+    pub fn new(
+        world: &'world World,
+        host: &'host HostState,
+        tracking: &'p mut TrackingScope,
+    ) -> Self {
         Self {
             world,
             owner: Entity::PLACEHOLDER,
             host,
             module: Default::default(),
             call_stack: Vec::new(),
+            world_refs: RefCell::new(Vec::new()),
             stack: Vec::new(),
             iptr: Default::default(),
             tracking: RefCell::new(tracking),
@@ -243,12 +260,20 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
 
     /// Return a reference to the Component `C` on the given entity. Calling this function
     /// adds the component as a dependency of the current tracking scope.
-    pub fn component<C: Component>(&self, entity: Entity) -> Option<&C> {
+    pub fn component<C: Component>(&self, entity: Entity) -> Option<&'world C> {
         let comp = self.world.entity(entity).get::<C>();
         self.tracking
             .borrow_mut()
             .track_component::<C>(entity, self.world, comp.is_some());
         comp
+    }
+
+    /// Construct a `Value` containing a `PartialReflect`.
+    pub fn reflected_value(&self, reflected: &'world dyn PartialReflect) -> Value {
+        let mut world_refs = self.world_refs.borrow_mut();
+        let index = world_refs.len();
+        world_refs.push(reflected);
+        Value::WorldRef(index)
     }
 
     fn push_call_stack(&mut self, new_stack: Vec<Value>) {
@@ -285,6 +310,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_LOAD_LOCAL as usize] = load_local;
     table[instr::OP_LOAD_GLOBAL as usize] = load_global;
     table[instr::OP_LOAD_ENTITY_PROP as usize] = load_entity_prop;
+    table[instr::OP_LOAD_FIELD as usize] = load_field;
     table[instr::OP_STORE_LOCAL as usize] = store_local;
 
     table[instr::OP_LOGICAL_AND as usize] = log_and;
@@ -451,7 +477,7 @@ fn store_local(vm: &mut VM) -> Result<(), VMError> {
 }
 
 fn load_global(vm: &mut VM) -> Result<(), VMError> {
-    let n = vm.read_immediate::<u32>() as usize;
+    let n = vm.read_immediate::<u16>() as usize;
     let val = match vm.host.vars.get(n) {
         Some(Global::Const(val)) => val.clone(),
         Some(Global::Property(accessor)) => accessor(vm)?,
@@ -466,7 +492,7 @@ fn load_entity_prop(vm: &mut VM) -> Result<(), VMError> {
     let Value::Entity(entity) = arg else {
         return Err(VMError::NotAnEntity(arg.value_type()));
     };
-    let prop_index = vm.read_immediate::<u32>() as usize;
+    let prop_index = vm.read_immediate::<u16>() as usize;
     let val = match vm.host.entity_members.get(prop_index) {
         Some(EntityMember::Property(accessor)) => accessor(vm, entity)?,
         Some(EntityMember::Method(_)) => return Err(VMError::InvalidEntityProp(prop_index)),
@@ -474,6 +500,39 @@ fn load_entity_prop(vm: &mut VM) -> Result<(), VMError> {
     };
     vm.stack.push(val);
     Ok(())
+}
+
+fn load_field(vm: &mut VM) -> Result<(), VMError> {
+    let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    if let Value::WorldRef(world_index) = arg {
+        let field_index = vm.read_immediate::<u16>() as usize;
+        let reflect = vm.world_refs.borrow()[world_index];
+        let reflect_ref = reflect.reflect_ref();
+        match reflect_ref {
+            ReflectRef::Struct(rstruct) => {
+                let field = rstruct.field_at(field_index);
+                let Some(field) = field else {
+                    panic!("Invalid struct field index");
+                };
+                let val = if let Some(val) = field.try_downcast_ref::<i32>() {
+                    Value::I32(*val)
+                } else if let Some(val) = field.try_downcast_ref::<i64>() {
+                    Value::I64(*val)
+                } else if let Some(val) = field.try_downcast_ref::<f32>() {
+                    Value::F32(*val)
+                } else if let Some(val) = field.try_downcast_ref::<f64>() {
+                    Value::F64(*val)
+                } else {
+                    vm.reflected_value(field)
+                };
+                vm.stack.push(val);
+                Ok(())
+            }
+            _ => Err(VMError::InvalidType(arg.value_type())),
+        }
+    } else {
+        Err(VMError::InvalidType(arg.value_type()))
+    }
 }
 
 macro_rules! impl_typed_binop {
@@ -921,9 +980,9 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_LOAD_GLOBAL);
-        builder.push_immediate::<u32>(self_id as u32);
+        builder.push_immediate::<u16>(self_id as u16);
         builder.push_op(instr::OP_LOAD_ENTITY_PROP);
-        builder.push_immediate::<u32>(health_id as u32);
+        builder.push_immediate::<u16>(health_id as u16);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
         let mut vm = VM::new(&world, &host, &mut tracking);

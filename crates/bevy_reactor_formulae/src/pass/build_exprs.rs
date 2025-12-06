@@ -8,6 +8,8 @@ use crate::expr_type::ExprType;
 use crate::host::HostState;
 use crate::pass::build_exprs;
 use crate::string::get_string_methods;
+use bevy::log::tracing_subscriber::field;
+use bevy::reflect::TypeInfo;
 use bevy::{log::info, render::render_graph::Node, scene::ron::de};
 
 use crate::{
@@ -695,8 +697,6 @@ fn build_exprs<'a, 'e>(
                                         ExprKind::EntityProp(base_expr, *index),
                                     ))
                                     .with_type(field.typ.clone()))
-                                // builder.push_op(instr::OP_LOAD_ENTITY_PROP);
-                                // builder.push_immediate::<u32>(health_id as u32);
                             }
                             DeclKind::Function { index: _ } => todo!(),
                             _ => panic!("Invalid entity member"),
@@ -754,6 +754,32 @@ fn build_exprs<'a, 'e>(
                 //         ))
                 //     }
                 // }
+                ExprType::Reflected(type_info) => match type_info {
+                    TypeInfo::Struct(struct_info) => {
+                        if let Some(field) = struct_info.field(fname)
+                            && let Some(index) = struct_info.index_of(fname)
+                        {
+                            Ok(out
+                                .alloc(Expr::new(ast.location, ExprKind::Field(base_expr, index)))
+                                .with_type(ExprType::from_type_info(field.type_info().unwrap())))
+                        } else {
+                            Err(CompilationError::UnknownField(
+                                ast.location,
+                                "Entity".to_string(),
+                                fname.to_string(),
+                            ))
+                        }
+                    }
+                    TypeInfo::TupleStruct(_tuple_struct_info) => todo!(),
+                    TypeInfo::Tuple(_tuple_info) => todo!(),
+                    TypeInfo::List(_list_info) => todo!(),
+                    TypeInfo::Array(_array_info) => todo!(),
+                    TypeInfo::Map(_map_info) => todo!(),
+                    TypeInfo::Set(_set_info) => todo!(),
+                    TypeInfo::Enum(_enum_info) => todo!(),
+                    TypeInfo::Opaque(_opaque_info) => todo!(),
+                },
+
                 _ => Err(CompilationError::NoFields(
                     ast.location,
                     base_expr.typ.clone(),

@@ -226,14 +226,44 @@ pub async fn compile_formula(
 mod tests {
     use super::*;
     use crate::{VM, Value, expr_type::ExprType, host::HostState, vm::VMError};
-    use bevy::ecs::{
-        component::{Component, Tick},
-        entity::Entity,
-        world::World,
+    use bevy::{
+        ecs::{
+            component::{Component, Tick},
+            entity::Entity,
+            world::World,
+        },
+        math::Vec3,
+        reflect::{Reflect, Typed},
     };
     use bevy_reactor::TrackingScope;
     use futures_lite::future;
     use std::any::Any;
+
+    #[derive(Component)]
+    struct Health(f32);
+
+    #[derive(Component)]
+    struct Position(Vec3);
+
+    fn get_self(vm: &VM) -> Result<Value, VMError> {
+        Ok(Value::Entity(vm.owner))
+    }
+
+    fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
+        if let Some(&Health(h)) = vm.component::<Health>(actor) {
+            Ok(Value::F32(h))
+        } else {
+            Err(VMError::MissingComponent(Health.type_id()))
+        }
+    }
+
+    fn entity_position(vm: &VM, actor: Entity) -> Result<Value, VMError> {
+        if let Some(Position(h)) = vm.component::<Position>(actor) {
+            Ok(vm.reflected_value(h.as_reflect()))
+        } else {
+            Err(VMError::MissingComponent(Health.type_id()))
+        }
+    }
 
     #[test]
     fn compile_int_lit() {
@@ -427,6 +457,36 @@ mod tests {
     }
 
     #[test]
+    fn compile_reflected_type() {
+        let mut world = World::new();
+        let actor = world.spawn(Position(Vec3::new(1.0, 2.0, 3.0)));
+        let actor_id = actor.id();
+        let mut host = HostState::default();
+        host.add_global_prop("self", get_self, ExprType::Entity);
+        host.add_entity_prop(
+            "position",
+            entity_position,
+            ExprType::Reflected(Vec3::type_info()),
+        );
+        // host.add_type_alias("Vec3", ExprType::Reflected(Vec3::type_info()));
+
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "self.position.x",
+            &host,
+            ExprType::F32,
+        ))
+        .unwrap();
+        // disassemble(&module.functions[0].code);
+
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.owner = actor_id;
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
+        assert_eq!(result, Value::F32(1.0));
+    }
+
+    #[test]
     fn compile_block_result() {
         let host = HostState::default();
         let module =
@@ -463,21 +523,6 @@ mod tests {
         let result = vm.run(&module, Module::DEFAULT).unwrap();
         assert_eq!(result, Value::F32(2.0));
     }
-
-    fn get_self(vm: &VM) -> Result<Value, VMError> {
-        Ok(Value::Entity(vm.owner))
-    }
-
-    fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
-        if let Some(&Health(h)) = vm.component::<Health>(actor) {
-            Ok(Value::F32(h))
-        } else {
-            Err(VMError::MissingComponent(Health.type_id()))
-        }
-    }
-
-    #[derive(Component)]
-    struct Health(f32);
 
     #[test]
     fn compile_string_method() {

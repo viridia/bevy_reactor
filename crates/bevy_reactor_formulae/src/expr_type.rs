@@ -1,10 +1,12 @@
 use core::fmt::Display;
 use std::sync::Arc;
 
+use bevy::{ecs::entity::Entity, reflect::TypeInfo};
+
 use crate::decl::FunctionParam;
 
 /// Represents the type of an expression.
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Debug, Default, Clone)]
 pub enum ExprType {
     #[default]
     None, // No type specified
@@ -21,9 +23,41 @@ pub enum ExprType {
     // Tuple(Arc<[ExprType]>),
     // Array(Arc<ExprType>),
     Function(Arc<FunctionType>),
+    Reflected(&'static TypeInfo),
     // Struct(Arc<StructType>),
     // TupleStruct(Arc<TupleStructType>),
     // TODO: Struct, Record, Option, Enum
+}
+
+impl ExprType {
+    pub fn from_type_info(type_info: &'static TypeInfo) -> Self {
+        if type_info.is::<bool>() {
+            ExprType::Boolean
+        } else if type_info.is::<i32>() {
+            ExprType::I32
+        } else if type_info.is::<i64>() {
+            ExprType::I64
+        } else if type_info.is::<f32>() {
+            ExprType::F32
+        } else if type_info.is::<f64>() {
+            ExprType::F64
+        } else if type_info.is::<Entity>() {
+            ExprType::Entity
+        } else {
+            ExprType::Reflected(type_info)
+        }
+    }
+}
+
+impl PartialEq for ExprType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Infer(l0), Self::Infer(r0)) => l0 == r0,
+            (Self::Function(l0), Self::Function(r0)) => l0 == r0,
+            (Self::Reflected(_l0), Self::Reflected(_r0)) => todo!(),
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 /// Type data for a function
@@ -83,6 +117,7 @@ impl Display for ExprType {
             ExprType::F64 => write!(f, "f64"),
             ExprType::String => write!(f, "String"),
             ExprType::Entity => write!(f, "Entity"),
+            ExprType::Reflected(type_info) => write!(f, "{}", type_info.type_path()),
             // ExprType::Tuple(types) => {
             //     write!(f, "(")?;
             //     for (i, ty) in types.iter().enumerate() {

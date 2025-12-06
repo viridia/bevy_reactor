@@ -15,9 +15,10 @@ pub const OP_DROP_N: u8 = 11; // (imm u32)
 // Dereference
 pub const OP_LOAD_PARAM: u8 = 20;
 pub const OP_LOAD_LOCAL: u8 = 21;
-pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
-pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u32, consumes TOS)
-pub const OP_STORE_LOCAL: u8 = 24;
+pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u16)
+pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u16, consumes TOS)
+pub const OP_LOAD_FIELD: u8 = 24; // (imm u16, consumes TOS)
+pub const OP_STORE_LOCAL: u8 = 25;
 
 // Binops: all consume TOS + 1 and push result
 pub const OP_LOGICAL_AND: u8 = 35;
@@ -318,9 +319,24 @@ pub fn disassemble(code: &[u8]) {
                 eprintln!("load local {val}");
             }
 
+            OP_LOAD_GLOBAL => {
+                let val = reader.read_immediate::<u16>();
+                eprintln!("load global {val}");
+            }
+
+            OP_LOAD_ENTITY_PROP => {
+                let val = reader.read_immediate::<u16>();
+                eprintln!("load entity prop {val}");
+            }
+
+            OP_LOAD_FIELD => {
+                let val = reader.read_immediate::<u16>();
+                eprintln!("load field {val}");
+            }
+
             // pub const OP_LOAD_LOCAL: u8 = 21;
             // pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
-            // pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u32, consumes TOS)
+            // pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u16, consumes TOS)
             OP_STORE_LOCAL => {
                 let val = reader.read_immediate::<u16>();
                 eprintln!("store local {val}");

@@ -38,7 +38,7 @@ pub enum ModuleLoaderError {
     // ParseAssetPath(#[from] bevy::asset::ParseAssetPathError),
     // #[error("Unable to read asset bytes: {0}")]
     // ReadAssetBytesError(#[from] bevy::asset::ReadAssetBytesError),
-    #[error("{0}")]
+    #[error(transparent)]
     Compilation(#[from] compiler::CompilationError),
 }
 

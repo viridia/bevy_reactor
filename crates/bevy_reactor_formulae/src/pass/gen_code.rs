@@ -119,24 +119,34 @@ fn gen_expr<'cu>(
             local_get(function, index, out);
         }
 
-        // ExprKind::Field(ref base, field_index) => {
-        //     // gen_expr(unit, generator, base, out)?;
-        //     let field = match &base.typ {
-        //         ExprType::Struct(stype) => &stype.fields[field_index],
-        //         _ => panic!("Invalid field access: {:?}", base.typ),
-        //     };
-        //     match base.kind {
-        //         ExprKind::LocalRef(index) => {
-        //             let local = &generator.locals[index];
-        //             local_get(local.local_index + field.index, &field.typ, out);
-        //         }
-        //         _ => todo!(),
-        //     }
-        // }
+        ExprKind::Field(ref base, field_index) => {
+            gen_expr(module, function, base, out)?;
+            match base.typ {
+                ExprType::Reflected(_) => {
+                    out.push_op(instr::OP_LOAD_FIELD);
+                    out.push_immediate::<u16>(field_index as u16);
+                }
+                _ => panic!("Invalid type for field access"),
+            }
+
+            // let field = match &base.typ {
+            //     ExprType::Struct(stype) => &stype.fields[field_index],
+            //     _ => panic!("Invalid field access: {:?}", base.typ),
+            // };
+
+            // match base.kind {
+            //     ExprKind::LocalRef(index) => {
+            //         let local = &generator.locals[index];
+            //         local_get(local.local_index + field.index, &field.typ, out);
+            //     }
+            //     _ => todo!(),
+            // }
+        }
+
         ExprKind::EntityProp(ref base, field_index) => {
             gen_expr(module, function, base, out)?;
             out.push_op(instr::OP_LOAD_ENTITY_PROP);
-            out.push_immediate::<u32>(field_index as u32);
+            out.push_immediate::<u16>(field_index as u16);
         }
 
         // ExprKind::Index(ref base, _field_index) => {
@@ -145,7 +155,7 @@ fn gen_expr<'cu>(
         // }
         ExprKind::GlobalRef(index) => {
             out.push_op(instr::OP_LOAD_GLOBAL);
-            out.push_immediate::<u32>(index as u32);
+            out.push_immediate::<u16>(index as u16);
         }
 
         // ExprKind::LocalDecl(index, ref init) => {
