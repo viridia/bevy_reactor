@@ -32,7 +32,7 @@ pub(crate) enum ExprKind<'e> {
     FunctionRef(ScopeType, usize),
     MethodRef(ScopeType, &'e mut Expr<'e>, usize),
     /// A local `let` statement
-    LocalDecl(usize, Option<&'e mut Expr<'e>>),
+    // LocalDecl(usize, Option<&'e mut Expr<'e>>),
     /// A reference to a function parameter.
     ParamRef(usize),
     /// A reference to a local variable.
@@ -113,14 +113,14 @@ impl<'e> Display for Expr<'e> {
                 write!(f, ".{index}")
             }
             ExprKind::ParamRef(id) => write!(f, "ParamRef({id})"),
-            ExprKind::LocalDecl(id, init) => {
-                write!(f, "Local({id}")?;
-                if let Some(init) = init {
-                    write!(f, " = ")?;
-                    init.fmt(f)?;
-                }
-                write!(f, ")")
-            }
+            // ExprKind::LocalDecl(id, init) => {
+            //     write!(f, "Local({id}")?;
+            //     if let Some(init) = init {
+            //         write!(f, " = ")?;
+            //         init.fmt(f)?;
+            //     }
+            //     write!(f, ")")
+            // }
             ExprKind::BinaryExpr { op, lhs, rhs } => {
                 // TODO: Parens if necessary.
                 lhs.fmt(f)?;

@@ -32,11 +32,11 @@ pub(crate) fn assign_types<'e>(
         ExprKind::Field(base, _) | ExprKind::Index(base, _) | ExprKind::EntityProp(base, _) => {
             assign_types(base, inference)?;
         }
-        ExprKind::LocalDecl(_, init) => {
-            if let Some(init) = init {
-                assign_types(init, inference)?;
-            }
-        }
+        // ExprKind::LocalDecl(_, init) => {
+        //     if let Some(init) = init {
+        //         assign_types(init, inference)?;
+        //     }
+        // }
         ExprKind::BinaryExpr { op, lhs, rhs } => {
             assign_types(lhs, inference)?;
             assign_types(rhs, inference)?;

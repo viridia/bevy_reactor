@@ -91,11 +91,14 @@ impl CompilationError {
 #[derive(Default, Debug)]
 pub struct CompiledFunction {
     pub(crate) code: Vec<u8>,
+    pub(crate) num_locals: usize,
 }
 
 #[derive(Default, Debug)]
 pub(crate) struct FunctionBody<'ex> {
     pub(crate) body: Option<&'ex Expr<'ex>>,
+    pub(crate) num_params: usize,
+    pub(crate) locals: Vec<ExprType>,
     // locals: Vec<Decl2>,
 }
 
@@ -222,7 +225,7 @@ pub async fn compile_formula(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VM, Value, expr_type::ExprType, host::HostState, instr::disassemble, vm::VMError};
+    use crate::{VM, Value, expr_type::ExprType, host::HostState, vm::VMError};
     use bevy::ecs::{
         component::{Component, Tick},
         entity::Entity,
@@ -486,7 +489,7 @@ mod tests {
             ExprType::I32,
         ))
         .unwrap();
-        disassemble(&module.functions[0].code);
+        // disassemble(&module.functions[0].code);
 
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
@@ -572,5 +575,30 @@ mod tests {
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
         assert_eq!(result, Value::I32(5));
+    }
+
+    #[test]
+    fn compile_local_var() {
+        let host = Mutex::new(HostState::new());
+        let module = future::block_on(compile_module(
+            "--str--",
+            "
+            fn test() -> i32 {
+                let x = 19;
+                let y = 1;
+                x + y
+            }
+            ",
+            &host,
+        ))
+        .unwrap();
+        // disassemble(&module.functions[0].code);
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let host = host.lock().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, "test").unwrap();
+        assert_eq!(result, Value::I32(20));
     }
 }

@@ -198,8 +198,10 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
                         0,
                     ));
                 }
+                let function = &module.functions[*index];
                 self.module = module;
-                self.iptr = module.functions[*index].code.as_ptr();
+                self.stack.resize(function.num_locals, Value::Void);
+                self.iptr = function.code.as_ptr();
             }
             self.start()
         } else {
@@ -226,9 +228,12 @@ impl<'w, 'g, 'p> VM<'w, 'g, 'p> {
                         params.len(),
                     ));
                 }
+                let function = &module.functions[*index];
                 self.module = module;
                 self.stack.extend_from_slice(params);
-                self.iptr = module.functions[*index].code.as_ptr();
+                self.stack
+                    .resize(self.stack.len() + function.num_locals, Value::Void);
+                self.iptr = function.code.as_ptr();
             }
             self.start()
         } else {
@@ -280,6 +285,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_LOAD_LOCAL as usize] = load_local;
     table[instr::OP_LOAD_GLOBAL as usize] = load_global;
     table[instr::OP_LOAD_ENTITY_PROP as usize] = load_entity_prop;
+    table[instr::OP_STORE_LOCAL as usize] = store_local;
 
     table[instr::OP_LOGICAL_AND as usize] = log_and;
     table[instr::OP_LOGICAL_OR as usize] = log_or;
@@ -431,9 +437,16 @@ fn load_param(vm: &mut VM) -> Result<(), VMError> {
 }
 
 fn load_local(vm: &mut VM) -> Result<(), VMError> {
-    let n = vm.read_immediate::<u32>() as usize;
+    let n = vm.read_immediate::<u16>() as usize;
     let val = vm.stack[n].clone();
     vm.stack.push(val);
+    Ok(())
+}
+
+fn store_local(vm: &mut VM) -> Result<(), VMError> {
+    let n = vm.read_immediate::<u16>() as usize;
+    let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    vm.stack[n] = arg;
     Ok(())
 }
 
@@ -601,13 +614,17 @@ fn call(vm: &mut VM) -> Result<(), VMError> {
     if num_params > stack_len {
         return Err(VMError::StackUnderflow);
     }
-    let iptr = unsafe { &*vm.module }.functions[fn_index].code.as_ptr();
-    let new_stack = vm.stack.split_off(vm.stack.len() - num_params);
+    let func = &unsafe { &*vm.module }.functions[fn_index];
+    let iptr = func.code.as_ptr();
+    let num_locals = func.num_locals;
+    let mut new_stack = vm.stack.split_off(vm.stack.len() - num_params);
+    new_stack.resize(new_stack.len() + num_locals, Value::Void);
     vm.push_call_stack(new_stack);
     vm.iptr = iptr;
     Ok(())
 }
 
+// TODO: combine this with `call_object_method`.
 fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let Value::Entity(entity) = arg else {
@@ -693,19 +710,6 @@ fn ret(_vm: &mut VM) -> Result<(), VMError> {
     // `ret` is handled by the interpreter loop.
     unreachable!("`ret` instruction handler should not be called");
 }
-
-// fn ret_void(vm: &mut VM) -> Result<(), VMError> {
-//     vm.pop_call_stack();
-//     Ok(())
-// }
-
-// fn ret(vm: &mut VM) -> Result<(), VMError> {
-//     let res = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-//     vm.pop_call_stack();
-//     // TODO: Don't push if function is void return
-//     vm.stack.push(res);
-//     Ok(())
-// }
 
 #[cfg(test)]
 mod tests {

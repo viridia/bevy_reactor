@@ -6,6 +6,7 @@ use crate::ast::{ASTNode, FloatSuffix, IntegerSuffix, NodeKind};
 use crate::decl::{Decl, DeclKind, DeclTable, Scope, ScopeType};
 use crate::expr_type::ExprType;
 use crate::host::HostState;
+use crate::pass::build_exprs;
 use crate::string::get_string_methods;
 use bevy::{log::info, render::render_graph::Node, scene::ron::de};
 
@@ -41,54 +42,6 @@ pub(crate) fn build_module_exprs<'ast, 'me>(
         panic!("Invalid AST node for compilation unit: {:?}", ast.kind);
     }
 }
-
-// pub(crate) fn _build_module_exprs<'ast>(ast: &'ast ASTNode<'ast>) -> Result<(), CompilationError> {
-//     // Resolve types for all declarations.
-//     if let NodeKind::Module(ast_decls) = &ast.kind {
-//         // Build function body expressions.
-//         for decl_ast in *ast_decls {
-//             if let NodeKind::Decl(ASTDecl::Function {
-//                 name,
-//                 body: body_ast,
-//                 ..
-//             }) = &decl_ast.kind
-//             {
-//                 let mut local_scope = Scope::new(Some(&param_scope));
-//                 let mut locals_table: Vec<LocalDecl> = Vec::new();
-//                 let mut body_expr = if let Some(body_ast) = body_ast {
-//                     build_exprs(
-//                         body_ast,
-//                         &mut local_scope,
-//                         decls,
-//                         &mut locals_table,
-//                         &mut inference,
-//                     )?
-//                 } else {
-//                     Expr::new(decl_ast.location, ExprKind::Empty)
-//                 };
-//                 let function = &mut decls.functions[*findex];
-//                 if body_ast.is_some() {
-//                     inference.add_constraint(
-//                         function.typ.ret.clone(),
-//                         body_expr.typ.clone(),
-//                         body_expr.location,
-//                     );
-//                     inference.solve_constraints()?;
-//                     assign_types(&mut body_expr, &inference)?;
-//                     for local in locals_table.iter_mut() {
-//                         local.typ = inference.substitute(&local.typ);
-//                     }
-//                 }
-//                 function.body = body_expr;
-//                 function.locals = locals_table;
-//             }
-//         }
-
-//         Ok(())
-//     } else {
-//         panic!("Invalid AST node for compilation unit: {:?}", ast.kind);
-//     }
-// }
 
 pub(crate) fn build_formula_exprs<'ast, 'me>(
     host: &HostState,
@@ -147,11 +100,13 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
                 index: function_index,
             },
         };
-        module_exprs.functions.push(FunctionBody { body: None });
+        let mut function = FunctionBody {
+            body: None,
+            locals: Vec::new(),
+            num_params: 0,
+        };
 
         let mut inference: TypeInference = Default::default();
-        let mut local_index: usize = 0;
-        // let mut locals_table: Vec<LocalDecl> = Vec::new();
 
         // Scope for the whole module.
         let module_scope = Scope {
@@ -168,11 +123,12 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
             scope_type: ScopeType::Param,
         };
 
+        // let function = &mut module_exprs.functions[function_index];
         let body_expr = build_block(
             ast,
             host,
             &param_scope,
-            &mut local_index,
+            &mut function,
             &mut inference,
             expr_arena,
             &non_hoisted,
@@ -182,8 +138,13 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         inference.add_constraint(ret_type.clone(), body_expr.typ.clone(), body_expr.location);
         inference.solve_constraints()?;
         assign_types(body_expr, &inference)?;
-        module_exprs.functions[function_index].body = Some(body_expr);
+        function.body = Some(body_expr);
 
+        for local_type in function.locals.iter_mut() {
+            inference.replace_type_vars(local_type);
+        }
+
+        module_exprs.functions.push(function);
         module.module_decls.insert(Module::DEFAULT.into(), fd);
         Ok(module_exprs)
     } else {
@@ -223,7 +184,11 @@ fn create_decls<'ast, 'me>(
                             index: function_index,
                         },
                     };
-                    module_exprs.functions.push(FunctionBody { body: None });
+                    module_exprs.functions.push(FunctionBody {
+                        body: None,
+                        locals: Vec::new(),
+                        num_params: 0,
+                    });
                     module.module_decls.insert(name.clone(), fd);
                 }
 
@@ -339,6 +304,7 @@ pub(crate) fn resolve_decl_types<'ast>(
                         ret: ret_type,
                     }));
                 }
+
                 ASTDecl::Let { .. } => todo!(),
                 ASTDecl::Struct { name, fields, .. } => {
                     //     let decl = scope.get(*name).unwrap();
@@ -435,34 +401,27 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
                 scope_type: ScopeType::Param,
             };
 
-            let mut local_decls = DeclTable::default();
-
             let mut inference: TypeInference = Default::default();
-            let mut local_index: usize = 0;
+            // let mut local_index: usize = 0;
+            let function = &mut module_exprs.functions[fd_index];
             let body_expr = build_exprs(
                 body_ast,
                 host,
                 &param_scope,
-                &mut local_decls,
-                &mut local_index,
+                function,
                 &mut inference,
                 expr_arena,
             )?;
 
-            // fn build_exprs<'a, 'e>(
-            //     ast: &'a ASTNode<'a>,
-            //     host: &HostState,
-            //     parent_scope: &decl::Scope,
-            //     current_scope: &mut decl::DeclTable,
-            //     locals: &mut usize,
-            //     inference: &mut TypeInference,
-            //     out: &'e bumpalo::Bump,
-            // ) -> Result<&'e mut Expr<'e>, CompilationError> {
-
             inference.add_constraint(fd_ret, body_expr.typ.clone(), body_expr.location);
             inference.solve_constraints()?;
             assign_types(body_expr, &inference)?;
-            module_exprs.functions[fd_index].body = Some(body_expr);
+            for local_type in function.locals.iter_mut() {
+                inference.replace_type_vars(local_type);
+            }
+            function.body = Some(body_expr);
+            function.num_params = param_decls.len();
+            // fb.num_locals = local_index;
         }
     }
 
@@ -472,9 +431,8 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
 fn build_exprs<'a, 'e>(
     ast: &'a ASTNode<'a>,
     host: &HostState,
-    parent_scope: &decl::Scope,
-    current_scope: &mut decl::DeclTable,
-    locals: &mut usize,
+    scope: &decl::Scope,
+    function: &mut FunctionBody,
     inference: &mut TypeInference,
     out: &'e bumpalo::Bump,
 ) -> Result<&'e mut Expr<'e>, CompilationError> {
@@ -521,12 +479,6 @@ fn build_exprs<'a, 'e>(
             .with_type(ExprType::Boolean)),
 
         NodeKind::Ident(name) => {
-            let scope = Scope {
-                parent: Some(parent_scope),
-                decls: current_scope,
-                scope_type: ScopeType::Local,
-            };
-
             match scope.lookup(name) {
                 Some((scope_type, decl)) => {
                     match &decl.kind {
@@ -569,24 +521,8 @@ fn build_exprs<'a, 'e>(
         NodeKind::QName(_name) => panic!("Should already be resolved"),
 
         NodeKind::BinaryExpr { op, lhs, rhs } => {
-            let lhs_expr = build_exprs(
-                lhs,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
-            let rhs_expr = build_exprs(
-                rhs,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let lhs_expr = build_exprs(lhs, host, scope, function, inference, out)?;
+            let rhs_expr = build_exprs(rhs, host, scope, function, inference, out)?;
             let ty = match op {
                 BinaryOp::Add
                 | BinaryOp::Sub
@@ -650,24 +586,8 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::Assign { lhs, rhs } => {
-            let lhs_expr = build_exprs(
-                lhs,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
-            let rhs_expr = build_exprs(
-                rhs,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let lhs_expr = build_exprs(lhs, host, scope, function, inference, out)?;
+            let rhs_expr = build_exprs(rhs, host, scope, function, inference, out)?;
 
             inference.add_constraint(
                 lhs_expr.typ.clone(),
@@ -686,24 +606,8 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::AssignOp { op, lhs, rhs } => {
-            let lhs_expr = build_exprs(
-                lhs,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
-            let rhs_expr = build_exprs(
-                rhs,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let lhs_expr = build_exprs(lhs, host, scope, function, inference, out)?;
+            let rhs_expr = build_exprs(rhs, host, scope, function, inference, out)?;
             match op {
                 BinaryOp::Add
                 | BinaryOp::Sub
@@ -750,15 +654,7 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::UnaryExpr { op, arg } => {
-            let arg_expr = build_exprs(
-                arg,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let arg_expr = build_exprs(arg, host, scope, function, inference, out)?;
             let arg_expr = out.alloc(arg_expr);
             let ty = match op {
                 UnaryOp::Not => {
@@ -785,15 +681,7 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::FieldName(base, fname) => {
-            let base_expr = build_exprs(
-                base,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let base_expr = build_exprs(base, host, scope, function, inference, out)?;
             #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 ExprType::Entity => {
@@ -874,15 +762,7 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::FieldIndex(base, _index) => {
-            let base_expr = build_exprs(
-                base,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let base_expr = build_exprs(base, host, scope, function, inference, out)?;
             #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 // ExprType::TupleStruct(tstype) => {
@@ -907,100 +787,18 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::Empty => Ok(out.alloc(Expr::new(ast.location, ExprKind::Empty))),
-        NodeKind::Decl(decl) => match decl {
-            ASTDecl::Let {
-                name,
-                typ,
-                value,
-                is_const: _,
-                visibility: _,
-                ..
-            } => {
-                let typ = match typ {
-                    Some(typ) => Some(resolve_types(parent_scope, typ)?),
-                    None => None,
-                };
-                let value_expr = match value {
-                    Some(value) => Some(build_exprs(
-                        value,
-                        host,
-                        parent_scope,
-                        current_scope,
-                        locals,
-                        inference,
-                        out,
-                    )?),
-                    None => None,
-                };
-                let ty = match (typ, &value_expr) {
-                    (Some(typ), Some(value)) => {
-                        inference.add_constraint(typ.clone(), value.typ.clone(), value.location);
-                        typ
-                    }
-                    (Some(typ), None) => typ,
-                    (None, Some(value)) => value.typ.clone(),
-                    (None, None) => {
-                        return Err(CompilationError::MissingType(
-                            ast.location,
-                            name.to_string(),
-                        ));
-                    }
-                };
-
-                todo!();
-                // let index = locals.len();
-                // let local = decl::LocalDecl {
-                //     location: ast.location,
-                //     visibility: *visibility,
-                //     name: *name,
-                //     typ: ty.clone(),
-                //     is_const: *is_const,
-                //     index,
-                //     local_index: 0,
-                // };
-                // locals.push(local);
-                // scope.insert(*name, decl::Decl::Local(index));
-                // Ok(out
-                //     .alloc(Expr::new(
-                //         ast.location,
-                //         ExprKind::LocalDecl(index, value_expr),
-                //     ))
-                //     .with_type(ExprType::Void))
-            }
-            _ => todo!("Decl: {:?}", decl),
-        },
+        NodeKind::Decl(_decl) => {
+            panic!("Local declarations should only appear at block level.");
+        }
 
         NodeKind::Block(stmts, result) => {
-            let block_parent_scope = Scope {
-                parent: Some(parent_scope),
-                decls: current_scope,
-                scope_type: ScopeType::Local,
-            };
-
-            build_block(
-                ast,
-                host,
-                &block_parent_scope,
-                locals,
-                inference,
-                out,
-                stmts,
-                result,
-            )
+            build_block(ast, host, scope, function, inference, out, stmts, result)
         }
 
         NodeKind::Cast { arg, typ } => {
             let mut infer = TypeInference::default();
-            let to_typ = resolve_types(parent_scope, typ)?;
-            let arg_expr = build_exprs(
-                arg,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                &mut infer,
-                out,
-            )?;
+            let to_typ = resolve_types(scope, typ)?;
+            let arg_expr = build_exprs(arg, host, scope, function, &mut infer, out)?;
             infer.solve_constraints()?;
 
             if to_typ == arg_expr.typ {
@@ -1020,26 +818,10 @@ fn build_exprs<'a, 'e>(
         }
 
         NodeKind::Call(func, args) => {
-            let func_expr = build_exprs(
-                func,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let func_expr = build_exprs(func, host, scope, function, inference, out)?;
             let mut arg_exprs = Vec::<&mut Expr>::new();
             for arg in args.iter() {
-                let arg_expr = build_exprs(
-                    arg,
-                    host,
-                    parent_scope,
-                    current_scope,
-                    locals,
-                    inference,
-                    out,
-                )?;
+                let arg_expr = build_exprs(arg, host, scope, function, inference, out)?;
                 arg_exprs.push(arg_expr);
             }
 
@@ -1080,41 +862,17 @@ fn build_exprs<'a, 'e>(
             then_block,
             else_block,
         } => {
-            let condition_expr = build_exprs(
-                condition,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let condition_expr = build_exprs(condition, host, scope, function, inference, out)?;
             inference.add_constraint(
                 ExprType::Boolean,
                 condition_expr.typ.clone(),
                 condition.location,
             );
 
-            let then_branch = build_exprs(
-                then_block,
-                host,
-                parent_scope,
-                current_scope,
-                locals,
-                inference,
-                out,
-            )?;
+            let then_branch = build_exprs(then_block, host, scope, function, inference, out)?;
 
             if let Some(else_block) = else_block {
-                let else_branch = build_exprs(
-                    else_block,
-                    host,
-                    parent_scope,
-                    current_scope,
-                    locals,
-                    inference,
-                    out,
-                )?;
+                let else_branch = build_exprs(else_block, host, scope, function, inference, out)?;
                 let ty = inference.fresh_typevar();
                 // Both sides must be the same, which is also the result type.
                 inference.add_constraint(ty.clone(), then_branch.typ.clone(), then_block.location);
@@ -1159,8 +917,8 @@ fn build_exprs<'a, 'e>(
 fn build_block<'a, 'e>(
     ast: &'a ASTNode<'a>,
     host: &HostState,
-    parent_scope: &decl::Scope,
-    locals: &mut usize,
+    scope: &decl::Scope,
+    function: &mut FunctionBody,
     inference: &mut TypeInference,
     out: &'e bumpalo::Bump,
     stmts: &[&ASTNode<'_>],
@@ -1170,12 +928,12 @@ fn build_block<'a, 'e>(
 
     let mut local_decls = DeclTable::default();
     for stmt in stmts {
-        let stmt_expr = build_exprs(
+        let stmt_expr = build_stmt(
             stmt,
             host,
-            parent_scope,
+            scope,
             &mut local_decls,
-            locals,
+            function,
             inference,
             out,
         )?;
@@ -1183,12 +941,12 @@ fn build_block<'a, 'e>(
     }
 
     let result_expr = match result {
-        Some(result) => Some(build_exprs(
+        Some(result) => Some(build_stmt(
             result,
             host,
-            parent_scope,
+            scope,
             &mut local_decls,
-            locals,
+            function,
             inference,
             out,
         )?),
@@ -1209,6 +967,99 @@ fn build_block<'a, 'e>(
         ))
         .with_type(result_type))
 }
+
+fn build_stmt<'a, 'e>(
+    ast: &'a ASTNode<'a>,
+    host: &HostState,
+    parent_scope: &decl::Scope,
+    block_scope: &mut decl::DeclTable,
+    function: &mut FunctionBody,
+    inference: &mut TypeInference,
+    out: &'e bumpalo::Bump,
+) -> Result<&'e mut Expr<'e>, CompilationError> {
+    match &ast.kind {
+        NodeKind::Decl(decl) => match decl {
+            ASTDecl::Let {
+                name,
+                typ,
+                value,
+                is_const,
+                visibility,
+            } => {
+                let typ = match typ {
+                    Some(typ) => Some(resolve_types(parent_scope, typ)?),
+                    None => None,
+                };
+                let value_expr = match value {
+                    Some(value) => Some(build_exprs(
+                        value,
+                        host,
+                        parent_scope,
+                        function,
+                        inference,
+                        out,
+                    )?),
+                    None => None,
+                };
+                let typ = match (typ, &value_expr) {
+                    (Some(typ), Some(value)) => {
+                        inference.add_constraint(typ.clone(), value.typ.clone(), value.location);
+                        typ
+                    }
+                    (Some(typ), None) => typ,
+                    (None, Some(value)) => value.typ.clone(),
+                    (None, None) => {
+                        return Err(CompilationError::MissingType(
+                            ast.location,
+                            name.to_string(),
+                        ));
+                    }
+                };
+
+                let local_index = function.locals.len();
+                function.locals.push(typ.clone());
+
+                block_scope.insert(
+                    name.clone(),
+                    Decl {
+                        location: ast.location,
+                        visibility: *visibility,
+                        typ: typ.clone(),
+                        kind: DeclKind::Local {
+                            is_const: *is_const,
+                            index: local_index,
+                        },
+                    },
+                );
+
+                if let Some(init) = value_expr {
+                    Ok(out.alloc(Expr::new(
+                        ast.location,
+                        ExprKind::Assign {
+                            lhs: out
+                                .alloc(Expr::new(ast.location, ExprKind::LocalRef(local_index)))
+                                .with_type(typ),
+                            rhs: init,
+                        },
+                    )))
+                } else {
+                    Ok(out.alloc(Expr::new(ast.location, ExprKind::Empty)))
+                }
+            }
+            _ => todo!("Decl: {:?}", decl),
+        },
+
+        _ => {
+            let block_scope = Scope {
+                parent: Some(parent_scope),
+                scope_type: ScopeType::Local,
+                decls: block_scope,
+            };
+            build_exprs(ast, host, &block_scope, function, inference, out)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::location::TokenLocation;
@@ -1228,19 +1079,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(expr.kind, ExprKind::ConstInteger(42)));
@@ -1259,19 +1101,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert_eq!(expr.typ, ExprType::I32);
@@ -1290,19 +1123,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(expr.kind, ExprKind::ConstFloat(_)));
@@ -1322,19 +1146,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(expr.kind, ExprKind::ConstBool(true)));
@@ -1354,19 +1169,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert_eq!(expr.typ, ExprType::String);
@@ -1385,19 +1191,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(expr.kind, ExprKind::Empty));
@@ -1416,19 +1213,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -1456,19 +1244,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(
@@ -1506,19 +1285,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert!(matches!(
@@ -1555,19 +1325,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
         assert!(result.is_ok());
         let expr = result.unwrap();
         assert_eq!(expr.typ, ExprType::Boolean);
@@ -1600,19 +1361,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
 
         assert!(result.is_ok());
         let expr = result.unwrap();
@@ -1641,19 +1393,10 @@ mod tests {
             decls: &DeclTable::default(),
             scope_type: ScopeType::Host,
         };
-        let mut current_scope = DeclTable::default();
-        let mut locals = 0;
+        let mut function = FunctionBody::default();
         let mut inference = TypeInference::default();
 
-        let result = build_exprs(
-            &ast,
-            &host,
-            &scope,
-            &mut current_scope,
-            &mut locals,
-            &mut inference,
-            &arena,
-        );
+        let result = build_exprs(&ast, &host, &scope, &mut function, &mut inference, &arena);
 
         assert!(result.is_ok());
         let expr = result.unwrap();

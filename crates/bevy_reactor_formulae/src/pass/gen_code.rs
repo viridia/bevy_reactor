@@ -1,6 +1,6 @@
 use core::result;
 
-use bevy::scene::ron::de;
+use bevy::{math::ops::exp, scene::ron::de};
 
 use crate::{
     Module,
@@ -9,7 +9,7 @@ use crate::{
     decl::{self, FunctionParam, Scope},
     expr::{Expr, ExprKind},
     expr_type::ExprType,
-    instr::{self, InstructionBuilder, OP_CONST_I32},
+    instr::{self, InstructionBuilder, OP_CONST_I32, OP_LOAD_LOCAL},
     oper::{BinaryOp, UnaryOp},
 };
 
@@ -22,6 +22,7 @@ pub(crate) fn gen_module<'content>(
         .functions
         .resize_with(module_exprs.functions.len(), || CompiledFunction {
             code: Vec::new(),
+            num_locals: 0,
         });
 
     for (_, decl) in module.module_decls.iter() {
@@ -45,88 +46,17 @@ pub(crate) fn gen_module<'content>(
                     builder.push_op(instr::OP_RET);
                 }
                 module.functions[*index].code = builder.inner();
+                module.functions[*index].num_locals = function.locals.len();
             }
             _ => {}
         }
     }
-
-    // for fd in unit.decls.functions.iter() {
-    //     let name_str = unit.decls.symbols.resolve(fd.name);
-    //     let mut ret_types: Vec<ValType> = Vec::new();
-    //     if !fd.typ.ret.is_void() {
-    //         generator.gen_val_types(&fd.typ.ret, &mut ret_types);
-    //     };
-
-    //     let mut param_types: Vec<ValType> = Vec::new();
-    //     for param in &fd.typ.params {
-    //         generator.gen_val_types(&param.typ, &mut param_types);
-    //     }
-
-    //     let type_index = generator.next_type_index();
-    //     generator
-    //         .function_names
-    //         .append(fd.function_index as u32, &name_str);
-    //     generator
-    //         .type_names
-    //         .append(type_index, format!("{}.type", name_str).as_str());
-    //     generator.types.ty().function(param_types, ret_types);
-    //     if fd.is_native {
-    //         generator
-    //             .imports
-    //             .import("host", &name_str, EntityType::Function(type_index));
-    //     } else {
-    //         generator.functions.function(type_index);
-    //         if fd.visibility == decl::DeclVisibility::Public {
-    //             generator
-    //                 .exports
-    //                 .export(&name_str, ExportKind::Func, fd.function_index as u32);
-    //         }
-    //         let mut locals: Vec<ValType> = vec![];
-    //         for local in &fd.locals {
-    //             generator.gen_val_types(&local.typ, &mut locals);
-    //         }
-    //         let mut locals_compressed: Vec<(u32, ValType)> = Vec::new();
-    //         if !locals.is_empty() {
-    //             let mut current_type = &locals[0];
-    //             let mut count = 1;
-    //             for local in locals.iter().skip(1) {
-    //                 if local == current_type {
-    //                     count += 1;
-    //                 } else {
-    //                     locals_compressed.push((count, *current_type));
-    //                     current_type = local;
-    //                     count = 1;
-    //                 }
-    //             }
-    //             locals_compressed.push((count, *current_type));
-    //         }
-    //         let mut f = Function::new(locals_compressed);
-    //         generator.params.clone_from(&fd.typ.params);
-    //         generator.locals.clone_from(&fd.locals);
-    //         let mut local_offset = 0;
-    //         for param in generator.params.iter_mut() {
-    //             param.local_index = local_offset;
-    //             local_offset += param.typ.value_count();
-    //         }
-    //         for local in generator.locals.iter_mut() {
-    //             local.local_index = local_offset;
-    //             local_offset += local.typ.value_count();
-    //         }
-    //         gen_expr(unit, &mut generator, &fd.body, &mut f)?;
-    //         if !fd.body.typ.is_void() {
-    //             f.instruction(&Instruction::Return);
-    //         }
-    //         f.instruction(&Instruction::End);
-    //         generator.codes.function(&f);
-    //     }
-    // }
 
     Ok(())
 }
 
 fn gen_expr<'cu>(
     module: &'cu Module,
-    // module_contents: &'cu mut ModuleContents<'cu>,
     function: &'cu FunctionBody,
     expr: &'cu Expr,
     out: &mut InstructionBuilder,
@@ -185,10 +115,10 @@ fn gen_expr<'cu>(
             out.push_immediate::<u32>(index as u32);
         }
 
-        // ExprKind::LocalRef(index) => {
-        //     let local = &generator.locals[index];
-        //     local_get(local.local_index, &local.typ, out);
-        // }
+        ExprKind::LocalRef(index) => {
+            local_get(function, index, out);
+        }
+
         // ExprKind::Field(ref base, field_index) => {
         //     // gen_expr(unit, generator, base, out)?;
         //     let field = match &base.typ {
@@ -235,10 +165,10 @@ fn gen_expr<'cu>(
             gen_binop(&expr.typ, op, &lhs.typ, &rhs.typ, out);
         }
 
-        // ExprKind::Assign { ref lhs, ref rhs } => {
-        //     // gen_expr(unit, generator, rhs, out)?;
-        //     gen_assign(unit, generator, lhs, rhs, None, out)?;
-        // }
+        ExprKind::Assign { ref lhs, ref rhs } => {
+            // gen_expr(unit, generator, rhs, out)?;
+            gen_assign(module, function, lhs, rhs, None, out)?;
+        }
 
         // ExprKind::AssignOp {
         //     op,
@@ -404,179 +334,190 @@ fn gen_expr<'cu>(
     Ok(())
 }
 
-// fn local_get(mut local_index: usize, typ: &ExprType, out: &mut wasm_encoder::Function) {
-//     match typ {
-//         ExprType::None | ExprType::Void => {}
-//         ExprType::IUnsized | ExprType::Infer(_) => unreachable!(),
-//         ExprType::Boolean | ExprType::I32 | ExprType::I64 | ExprType::F32 | ExprType::F64 => {
-//             out.instruction(&Instruction::LocalGet(local_index as u32));
-//         }
-//         ExprType::String => {
-//             out.instruction(&Instruction::LocalGet(local_index as u32));
-//         }
-//         ExprType::Array(_element) => {
-//             todo!();
-//         }
-//         ExprType::Struct(stype) => {
-//             if stype.is_record {
-//                 out.instruction(&Instruction::LocalGet(local_index as u32));
-//             } else {
-//                 for field in &stype.fields {
-//                     local_get(local_index, &field.typ, out);
-//                     local_index += field.typ.value_count();
-//                 }
-//             }
-//         }
-//         ExprType::TupleStruct(stype) => {
-//             if stype.is_record {
-//                 out.instruction(&Instruction::LocalGet(local_index as u32));
-//             } else {
-//                 for typ in &stype.fields {
-//                     local_get(local_index, typ, out);
-//                     local_index += typ.value_count();
-//                 }
-//             }
-//         }
-//         ExprType::Tuple(members) => {
-//             for member in members.iter() {
-//                 local_get(local_index, member, out);
-//                 local_index += member.value_count();
-//             }
-//         }
-//         ExprType::Function(_ftype) => {
-//             todo!();
-//         }
-//     }
-// }
+fn local_get(function: &FunctionBody, local_index: usize, out: &mut InstructionBuilder) {
+    let local_type = &function.locals[local_index];
+    match local_type {
+        ExprType::None | ExprType::Void => {}
+        ExprType::IUnsized | ExprType::Infer(_) => unreachable!("Unknown type for local"),
+        ExprType::Boolean
+        | ExprType::I32
+        | ExprType::I64
+        | ExprType::F32
+        | ExprType::F64
+        | ExprType::String => {
+            out.push_op(instr::OP_LOAD_LOCAL);
+            out.push_immediate::<u16>((local_index + function.num_params) as u16);
+        }
+        // ExprType::Array(_element) => {
+        //     todo!();
+        // }
+        // ExprType::Struct(stype) => {
+        //     if stype.is_record {
+        //         out.instruction(&Instruction::LocalGet(local_index as u32));
+        //     } else {
+        //         for field in &stype.fields {
+        //             local_get(local_index, &field.typ, out);
+        //             local_index += field.typ.value_count();
+        //         }
+        //     }
+        // }
+        // ExprType::TupleStruct(stype) => {
+        //     if stype.is_record {
+        //         out.instruction(&Instruction::LocalGet(local_index as u32));
+        //     } else {
+        //         for typ in &stype.fields {
+        //             local_get(local_index, typ, out);
+        //             local_index += typ.value_count();
+        //         }
+        //     }
+        // }
+        // ExprType::Tuple(members) => {
+        //     for member in members.iter() {
+        //         local_get(local_index, member, out);
+        //         local_index += member.value_count();
+        //     }
+        // }
+        ExprType::Function(_ftype) => {
+            todo!();
+        }
+        _ => todo!(),
+    }
+}
 
-// fn local_set(mut local_index: usize, typ: &ExprType, out: &mut wasm_encoder::Function) {
-//     match typ {
-//         ExprType::None | ExprType::Void => {}
-//         ExprType::IUnsized | ExprType::Infer(_) => unreachable!(),
-//         ExprType::Boolean | ExprType::I32 | ExprType::I64 | ExprType::F32 | ExprType::F64 => {
-//             out.instruction(&Instruction::LocalSet(local_index as u32));
-//         }
-//         ExprType::String => {
-//             out.instruction(&Instruction::LocalSet(local_index as u32));
-//         }
-//         ExprType::Array(_element) => {
-//             todo!();
-//         }
-//         ExprType::Struct(stype) => {
-//             if stype.is_record {
-//                 out.instruction(&Instruction::LocalSet(local_index as u32));
-//             } else {
-//                 for field in stype.fields.iter().rev() {
-//                     local_set(local_index, &field.typ, out);
-//                     local_index += field.typ.value_count();
-//                 }
-//             }
-//         }
-//         ExprType::TupleStruct(stype) => {
-//             if stype.is_record {
-//                 out.instruction(&Instruction::LocalSet(local_index as u32));
-//             } else {
-//                 for typ in stype.fields.iter().rev() {
-//                     local_set(local_index, typ, out);
-//                     local_index += typ.value_count();
-//                 }
-//             }
-//         }
-//         ExprType::Tuple(members) => {
-//             for member in members.iter().rev() {
-//                 local_set(local_index, member, out);
-//                 local_index += member.value_count();
-//             }
-//         }
-//         ExprType::Function(_ftype) => {
-//             todo!();
-//         }
-//     }
-// }
+fn local_set(function: &FunctionBody, local_index: usize, out: &mut InstructionBuilder) {
+    let local_type = &function.locals[local_index];
+    match local_type {
+        ExprType::None | ExprType::Void => {}
+        ExprType::IUnsized | ExprType::Infer(_) => unreachable!(),
+        ExprType::Boolean
+        | ExprType::I32
+        | ExprType::I64
+        | ExprType::F32
+        | ExprType::F64
+        | ExprType::String => {
+            out.push_op(instr::OP_STORE_LOCAL);
+            out.push_immediate::<u16>((local_index + function.num_params) as u16);
+        }
+        // ExprType::Array(_element) => {
+        //     todo!();
+        // }
+        // ExprType::Struct(stype) => {
+        //     if stype.is_record {
+        //         out.instruction(&Instruction::LocalSet(local_index as u32));
+        //     } else {
+        //         for field in stype.fields.iter().rev() {
+        //             local_set(local_index, &field.typ, out);
+        //             local_index += field.typ.value_count();
+        //         }
+        //     }
+        // }
+        // ExprType::TupleStruct(stype) => {
+        //     if stype.is_record {
+        //         out.instruction(&Instruction::LocalSet(local_index as u32));
+        //     } else {
+        //         for typ in stype.fields.iter().rev() {
+        //             local_set(local_index, typ, out);
+        //             local_index += typ.value_count();
+        //         }
+        //     }
+        // }
+        // ExprType::Tuple(members) => {
+        //     for member in members.iter().rev() {
+        //         local_set(local_index, member, out);
+        //         local_index += member.value_count();
+        //     }
+        // }
+        ExprType::Function(_ftype) => {
+            todo!();
+        }
+        _ => todo!(),
+    }
+}
 
-// fn gen_assign(
-//     unit: &CompilationUnit,
-//     generator: &mut CodeGenerator,
-//     lvalue: &Expr,
-//     rvalue: &Expr,
-//     op: Option<BinaryOp>,
-//     out: &mut wasm_encoder::Function,
-// ) -> Result<(), CompilationError> {
-//     match lvalue.kind {
-//         ExprKind::ParamRef(_)
-//         | ExprKind::LocalRef(_)
-//         | ExprKind::GlobalRef(_)
-//         | ExprKind::Field(_, _)
-//         | ExprKind::Index(_, _) => {
-//             let (lvalue, lvalue_type) = expr_to_lvalue(unit, generator, lvalue, out)?;
-//             match lvalue {
-//                 LValue::Local(local_index) => {
-//                     if op.is_some() {
-//                         local_get(local_index, &lvalue_type, out);
-//                     }
-//                     gen_expr(unit, generator, rvalue, out)?;
-//                     if let Some(bop) = op {
-//                         gen_binop(&lvalue_type, bop, out);
-//                     }
-//                     local_set(local_index, &lvalue_type, out);
-//                 }
-//                 _ => todo!(),
-//             }
-//         }
-//         _ => return Err(CompilationError::InvalidAssignmentTarget(lvalue.location)),
-//     }
+fn gen_assign<'cu>(
+    module: &'cu Module,
+    function: &'cu FunctionBody,
+    lhs: &Expr,
+    rhs: &Expr,
+    op: Option<BinaryOp>,
+    out: &mut InstructionBuilder,
+) -> Result<(), CompilationError> {
+    match lhs.kind {
+        ExprKind::ParamRef(_)
+        | ExprKind::LocalRef(_)
+        | ExprKind::GlobalRef(_)
+        | ExprKind::Field(_, _)
+        | ExprKind::Index(_, _) => {
+            let (lvalue, lvalue_type) = expr_to_lvalue(function, lhs, out)?;
+            match lvalue {
+                LValue::Local(local_index) => {
+                    if op.is_some() {
+                        local_get(function, local_index, out);
+                    }
+                    gen_expr(module, function, rhs, out)?;
+                    if let Some(bop) = op {
+                        gen_binop(&lvalue_type, bop, &lhs.typ, &rhs.typ, out);
+                        // gen_binop(&expr.typ, op, &lhs.typ, &rhs.typ, out);
+                    }
+                    local_set(function, local_index, out);
+                }
+                _ => todo!(),
+            }
+        }
+        _ => return Err(CompilationError::InvalidAssignmentTarget(lhs.location)),
+    }
 
-//     Ok(())
-// }
+    Ok(())
+}
 
-// enum LValue {
-//     Local(usize),
-//     #[allow(unused)]
-//     Global(usize),
-//     // Memory?
-//     // Reference?
-// }
+enum LValue {
+    Local(usize),
+    #[allow(unused)]
+    Global(usize),
+    // Memory?
+    // Reference?
+}
 
-// fn expr_to_lvalue(
-//     unit: &CompilationUnit,
-//     generator: &mut CodeGenerator,
-//     expr: &Expr,
-//     out: &mut wasm_encoder::Function,
-// ) -> Result<(LValue, ExprType), CompilationError> {
-//     match expr.kind {
-//         ExprKind::ParamRef(index) => {
-//             let param = &generator.params[index];
-//             Ok((LValue::Local(param.local_index), param.typ.clone()))
-//         }
-//         ExprKind::LocalRef(index) => {
-//             let local = &generator.locals[index];
-//             Ok((LValue::Local(local.local_index), local.typ.clone()))
-//         }
-//         ExprKind::GlobalRef(_index) => todo!(),
-//         ExprKind::Field(ref base, field_index) => {
-//             let (base_lvalue, base_type) = expr_to_lvalue(unit, generator, base, out)?;
-//             match base_type {
-//                 ExprType::Struct(stype) => {
-//                     if stype.is_record {
-//                         gen_expr(unit, generator, base, out)?;
-//                         todo!();
-//                     } else {
-//                         let field = &stype.fields[field_index];
-//                         match base_lvalue {
-//                             LValue::Local(local_index) => {
-//                                 Ok((LValue::Local(local_index + field.index), field.typ.clone()))
-//                             }
-//                             _ => todo!(),
-//                         }
-//                     }
-//                 }
-//                 _ => panic!("Invalid field access: {:?}", base_type),
-//             }
-//         }
-//         ExprKind::Index(ref _expr, _) => todo!(),
-//         _ => panic!("Invalid lvalue: {:?}", expr),
-//     }
-// }
+fn expr_to_lvalue(
+    function: &FunctionBody,
+    expr: &Expr,
+    _out: &mut InstructionBuilder,
+) -> Result<(LValue, ExprType), CompilationError> {
+    match expr.kind {
+        ExprKind::ParamRef(index) => {
+            // let param = &generator.params[index];
+            Ok((LValue::Local(index), expr.typ.clone()))
+        }
+        ExprKind::LocalRef(index) => {
+            // let local = &generator.locals[index];
+            Ok((LValue::Local(index), expr.typ.clone()))
+        }
+        ExprKind::GlobalRef(_index) => todo!(),
+        ExprKind::Field(ref _base, _field_index) => todo!(),
+        // ExprKind::Field(ref base, field_index) => {
+        //     let (base_lvalue, base_type) = expr_to_lvalue(unit, generator, base, out)?;
+        //     match base_type {
+        //         ExprType::Struct(stype) => {
+        //             if stype.is_record {
+        //                 gen_expr(unit, generator, base, out)?;
+        //                 todo!();
+        //             } else {
+        //                 let field = &stype.fields[field_index];
+        //                 match base_lvalue {
+        //                     LValue::Local(local_index) => {
+        //                         Ok((LValue::Local(local_index + field.index), field.typ.clone()))
+        //                     }
+        //                     _ => todo!(),
+        //                 }
+        //             }
+        //         }
+        //         _ => panic!("Invalid field access: {:?}", base_type),
+        //     }
+        // }
+        ExprKind::Index(ref _expr, _) => todo!(),
+        _ => panic!("Invalid lvalue: {expr:?}"),
+    }
+}
 
 fn gen_binop(
     typ: &ExprType,

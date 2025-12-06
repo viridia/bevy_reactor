@@ -133,8 +133,8 @@ Next:
 - tuples
 - Bevy math types, such as Vec2, Vec4, Quat, Mat, etc.?
 
-Idea: a "heap" table in the vm that stores heap values of type Any. The value contains the
-index to this heap.
+Idea: a "heap" table in the vm that stores heap values of type `dyn PartialReflect`. The value
+contains the index to this heap.
 
 Problems:
 
@@ -144,9 +144,12 @@ Problems:
 
 Alternate idea:
 
-Value::Heap(Arc<dyn Any>)
+Value::Heap(Arc<dyn PartialReflect>)
 
-(This is probably the simplest approach)
+This is probably the simplest approach. Main problems are:
+
+- If we want to mutate stuff we will have to wrap every value in a mutex (ick).
+- We haven't worked out by-value vs. by-reference semantics for operations
 
 Alternate idea 3:
 

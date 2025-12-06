@@ -17,6 +17,7 @@ pub const OP_LOAD_PARAM: u8 = 20;
 pub const OP_LOAD_LOCAL: u8 = 21;
 pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
 pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u32, consumes TOS)
+pub const OP_STORE_LOCAL: u8 = 24;
 
 // Binops: all consume TOS + 1 and push result
 pub const OP_LOGICAL_AND: u8 = 35;
@@ -313,13 +314,17 @@ pub fn disassemble(code: &[u8]) {
             }
 
             OP_LOAD_LOCAL => {
-                let val = reader.read_immediate::<u32>();
+                let val = reader.read_immediate::<u16>();
                 eprintln!("load local {val}");
             }
 
             // pub const OP_LOAD_LOCAL: u8 = 21;
             // pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
             // pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u32, consumes TOS)
+            OP_STORE_LOCAL => {
+                let val = reader.read_immediate::<u16>();
+                eprintln!("store local {val}");
+            }
 
             // // Binops: all consume TOS + 1 and push result
             // pub const OP_LOGICAL_AND: u8 = 35;
