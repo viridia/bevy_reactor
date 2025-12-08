@@ -7,7 +7,6 @@ use crate::decl::{Decl, DeclKind, DeclTable, Scope, ScopeType};
 use crate::expr_type::ExprType;
 use crate::host::HostState;
 use crate::pass::build_exprs;
-use crate::string::get_string_methods;
 use bevy::ecs::entity::Entity;
 use bevy::log::tracing_subscriber::field;
 use bevy::reflect::TypeInfo;
@@ -686,11 +685,11 @@ fn build_exprs<'a, 'e>(
             #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 ExprType::Entity => {
-                    let nt = host.get_native_type::<Entity>();
+                    let nt = host.get_host_type::<Entity>();
                     let Some(entity_type) = nt else {
                         panic!("'Entity' type has not been registered");
                     };
-                    if let Some(field) = entity_type.instance_decls.get(fname) {
+                    if let Some(field) = entity_type.decls.get(fname) {
                         match &field.kind {
                             DeclKind::Global { is_const: _, index } => {
                                 // assign_types(arg_expr, &infer)?;
@@ -714,7 +713,10 @@ fn build_exprs<'a, 'e>(
                 }
 
                 ExprType::String => {
-                    if let Some(field) = get_string_methods().get(fname) {
+                    let string_type = host
+                        .get_host_type::<String>()
+                        .expect("String host type not registered");
+                    if let Some(field) = string_type.decls.get(fname) {
                         match &field.kind {
                             DeclKind::Global { is_const: _, index } => {
                                 // assign_types(arg_expr, &infer)?;
@@ -736,7 +738,7 @@ fn build_exprs<'a, 'e>(
                     } else {
                         Err(CompilationError::UnknownField(
                             ast.location,
-                            "Entity".to_string(),
+                            "String".to_string(),
                             fname.to_string(),
                         ))
                     }

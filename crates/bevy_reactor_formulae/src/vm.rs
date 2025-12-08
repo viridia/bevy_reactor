@@ -1,5 +1,5 @@
 use std::{
-    any::TypeId,
+    any::{Any, TypeId},
     cell::RefCell,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Sub},
     sync::Arc,
@@ -16,9 +16,8 @@ use crate::{
     Module,
     decl::DeclKind,
     expr_type::ExprType,
-    host::{Global, HostState, NativeMember},
+    host::{Global, HostState, HostTypeMember},
     instr,
-    string::get_string_methods,
 };
 
 // Values on the stack
@@ -73,9 +72,9 @@ pub enum VMError {
     #[error("Invalid global index: {0}")]
     InvalidGlobalIndex(usize),
     #[error("Invalid entity prop: {0}")]
-    InvalidEntityProp(usize),
+    InvalidNativeProp(usize),
     #[error("Invalid entity method: {0}")]
-    InvalidEntityMethod(usize),
+    InvalidNativeMethod(usize),
     #[error("Invalid method: {0}")]
     InvalidMethod(usize),
     #[error("Function not found: {0}")]
@@ -321,8 +320,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_BRANCH_IF_FALSE as usize] = branch_if_false;
 
     table[instr::OP_CALL as usize] = call;
-    table[instr::OP_CALL_NATIVE_METHOD as usize] = call_native_method;
-    table[instr::OP_CALL_OBJECT_METHOD as usize] = call_object_method;
+    table[instr::OP_CALL_HOST_METHOD as usize] = call_host_method;
 
     table[instr::OP_ADD_I32 as usize] = add_i32;
     table[instr::OP_ADD_I64 as usize] = add_i64;
@@ -490,12 +488,31 @@ fn load_global(vm: &mut VM) -> Result<(), VMError> {
 fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let prop_index = vm.read_immediate::<u16>() as usize;
-    let val = match vm.host.native_members.get(prop_index) {
-        Some(NativeMember::Property(accessor)) => accessor(vm, arg)?,
-        Some(NativeMember::Method(_)) | Some(NativeMember::StaticMethod(_)) => {
-            return Err(VMError::InvalidEntityProp(prop_index));
+
+    let host_type = match arg {
+        Value::String(_) => vm
+            .host
+            .get_host_type::<String>()
+            .expect("String type not registered"),
+        Value::Entity(_) => vm
+            .host
+            .get_host_type::<Entity>()
+            .expect("Entity type not registered"),
+        Value::WorldRef(wref) => vm
+            .host
+            .get_host_type_by_id(wref.type_id())
+            .expect("Unknown host type"),
+        _ => {
+            panic!("Type does not have properties");
         }
-        None => return Err(VMError::InvalidEntityProp(prop_index)),
+    };
+
+    let val = match host_type.members.get(prop_index) {
+        Some(HostTypeMember::Property(accessor)) => accessor(vm, arg)?,
+        Some(HostTypeMember::Method(_)) | Some(HostTypeMember::StaticMethod(_)) => {
+            return Err(VMError::InvalidNativeProp(prop_index));
+        }
+        None => return Err(VMError::InvalidNativeProp(prop_index)),
     };
     vm.stack.push(val);
     Ok(())
@@ -682,32 +699,7 @@ fn call(vm: &mut VM) -> Result<(), VMError> {
     Ok(())
 }
 
-// TODO: combine this with `call_object_method`.
-fn call_native_method(vm: &mut VM) -> Result<(), VMError> {
-    // let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let method_index = vm.read_immediate::<u16>() as usize;
-    let num_params = vm.read_immediate::<u16>() as usize;
-    let stack_len = vm.stack.len();
-    if num_params > stack_len {
-        return Err(VMError::StackUnderflow);
-    }
-    let args = &vm.stack[stack_len - num_params..stack_len];
-    let val = match vm.host.native_members.get(method_index) {
-        Some(NativeMember::Method(method)) => method(vm, args)?,
-        Some(NativeMember::StaticMethod(_)) | Some(NativeMember::Property(_)) => {
-            return Err(VMError::InvalidEntityMethod(method_index))?;
-        }
-        None => return Err(VMError::InvalidEntityMethod(method_index)),
-    };
-    // Drop args
-    vm.stack.truncate(stack_len - num_params);
-    if !val.is_void() {
-        vm.stack.push(val);
-    }
-    Ok(())
-}
-
-fn call_object_method(vm: &mut VM) -> Result<(), VMError> {
+fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
     let method_index = vm.read_immediate::<u16>() as usize;
     let num_params = vm.read_immediate::<u16>() as usize;
     let stack_len = vm.stack.len();
@@ -716,18 +708,35 @@ fn call_object_method(vm: &mut VM) -> Result<(), VMError> {
     }
 
     let this = vm.stack[stack_len - num_params].clone();
-    let table = match this {
-        Value::String(_) => get_string_methods(),
+    let host_type = match this {
+        Value::String(_) => vm
+            .host
+            .get_host_type::<String>()
+            .expect("String type not registered"),
+        Value::Entity(_) => vm
+            .host
+            .get_host_type::<Entity>()
+            .expect("Entity type not registered"),
+        Value::WorldRef(wref) => vm
+            .host
+            .get_host_type_by_id(wref.type_id())
+            .expect("Unknown host type"),
         _ => {
             panic!("Type does not have methods");
         }
     };
 
     let args = &vm.stack[stack_len - num_params..stack_len];
-    if method_index > table.methods.len() {
+    if method_index > host_type.members.len() {
         return Err(VMError::InvalidMethod(method_index));
     }
-    let val = (table.methods[method_index])(vm, args)?;
+    let val = match host_type.members.get(method_index) {
+        Some(HostTypeMember::Method(method)) => method(vm, args)?,
+        Some(HostTypeMember::StaticMethod(_)) | Some(HostTypeMember::Property(_)) => {
+            return Err(VMError::InvalidNativeMethod(method_index))?;
+        }
+        None => return Err(VMError::InvalidNativeMethod(method_index)),
+    };
 
     // Drop args
     vm.stack.truncate(stack_len - num_params);
@@ -768,8 +777,6 @@ fn ret(_vm: &mut VM) -> Result<(), VMError> {
 
 #[cfg(test)]
 mod tests {
-    use std::any::Any;
-
     use bevy::ecs::component::{Component, Tick};
 
     use crate::{expr_type::ExprType, instr};
@@ -962,9 +969,6 @@ mod tests {
     // - drop
     // - drop_n
 
-    #[derive(Component)]
-    struct Health(f32);
-
     #[test]
     fn test_global() {
         let mut world = World::new();
@@ -972,35 +976,21 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         let self_id = host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_native_type::<Entity>("Entity");
-        let health_id = host.add_native_property::<Entity>("health", entity_health, ExprType::F32);
+        host.add_host_type::<Entity>("Entity");
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_LOAD_GLOBAL);
         builder.push_immediate::<u16>(self_id as u16);
-        builder.push_op(instr::OP_LOAD_NATIVE_PROP);
-        builder.push_immediate::<u16>(health_id as u16);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.owner = actor_id;
         vm.iptr = code.as_ptr();
         let result = vm.start().unwrap();
-        assert_eq!(result, Value::F32(22.0));
+        assert_eq!(result, Value::Entity(actor_id));
     }
 
     fn get_self(vm: &VM) -> Result<Value, VMError> {
         Ok(Value::Entity(vm.owner))
-    }
-
-    fn entity_health(vm: &VM, actor: Value) -> Result<Value, VMError> {
-        let Value::Entity(entity) = actor else {
-            panic!("Not an entity");
-        };
-        if let Some(&Health(h)) = vm.component::<Health>(entity) {
-            Ok(Value::F32(h))
-        } else {
-            Err(VMError::MissingComponent(Health.type_id()))
-        }
     }
 }

@@ -27,6 +27,7 @@ use crate::{compiler::CompiledFunction, decl::DeclTable};
 #[derive(Default, Debug)]
 pub struct Module {
     /// Name of the asset or file containing the source of this module.
+    #[allow(dead_code)]
     pub(crate) path: String,
 
     /// Top-level declarations in this module.

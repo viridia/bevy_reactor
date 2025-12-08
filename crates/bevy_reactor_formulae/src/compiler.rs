@@ -445,8 +445,8 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_native_type::<Entity>("Entity");
-        host.add_native_property::<Entity>("health", entity_health, ExprType::F32);
+        host.add_host_type::<Entity>("Entity")
+            .add_property("health", entity_health, ExprType::F32);
 
         let module = future::block_on(compile_formula(
             "--str--",
@@ -470,8 +470,7 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_native_type::<Entity>("Entity");
-        host.add_native_property::<Entity>(
+        host.add_host_type::<Entity>("Entity").add_property(
             "position",
             entity_position,
             ExprType::Reflected(Vec3::type_info()),
@@ -513,8 +512,8 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_native_type::<Entity>("Entity");
-        host.add_native_property::<Entity>("health", entity_health, ExprType::F32);
+        host.add_host_type::<Entity>("Entity")
+            .add_property("health", entity_health, ExprType::F32);
 
         let module = future::block_on(compile_formula(
             "--str--",
@@ -534,7 +533,7 @@ mod tests {
 
     #[test]
     fn compile_string_method() {
-        let host = HostState::default();
+        let host = HostState::new();
         let module = future::block_on(compile_formula(
             "--str--",
             "\"test\".len()",

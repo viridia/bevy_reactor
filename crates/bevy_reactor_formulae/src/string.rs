@@ -1,18 +1,18 @@
 //! String type and methods.
 
-use std::sync::OnceLock;
+// use std::sync::OnceLock;
 
-use crate::{VM, Value, decl::ObjectMembers, expr_type::ExprType, vm::VMError};
+use crate::{HostState, VM, Value, expr_type::ExprType, vm::VMError};
 
-static STRING_METHODS: OnceLock<ObjectMembers> = OnceLock::new();
+// static STRING_METHODS: OnceLock<ObjectMembers> = OnceLock::new();
 
-pub(crate) fn get_string_methods() -> &'static ObjectMembers {
-    STRING_METHODS.get_or_init(|| {
-        let mut table = ObjectMembers::default();
-        table.add_method("len", string_len, Vec::new(), ExprType::I32);
-        table
-    })
-}
+// pub(crate) fn get_string_methods() -> &'static ObjectMembers {
+//     STRING_METHODS.get_or_init(|| {
+//         let mut table = ObjectMembers::default();
+//         table.add_method("len", string_len, Vec::new(), ExprType::I32);
+//         table
+//     })
+// }
 
 /// string.len()
 fn string_len(_vm: &VM, args: &[Value]) -> Result<Value, VMError> {
@@ -25,4 +25,13 @@ fn string_len(_vm: &VM, args: &[Value]) -> Result<Value, VMError> {
             args[0].value_type(),
         ))
     }
+}
+
+pub(crate) fn init_string_methods(host: &mut HostState) {
+    host.get_host_type_mut::<String>().unwrap().add_method(
+        "len",
+        string_len,
+        Vec::new(),
+        ExprType::I32,
+    );
 }

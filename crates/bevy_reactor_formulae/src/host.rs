@@ -1,45 +1,113 @@
-use std::any::TypeId;
+use std::{any::TypeId, sync::Arc};
 
-use bevy::{platform::collections::HashMap, reflect::Typed};
+use bevy::{ecs::entity::Entity, platform::collections::HashMap, reflect::Typed};
 use smol_str::SmolStr;
 
 use crate::{
     VM, Value,
-    decl::{Decl, DeclKind, DeclTable, DeclVisibility},
-    expr_type::ExprType,
+    decl::{Decl, DeclKind, DeclTable, DeclVisibility, FunctionParam},
+    expr_type::{ExprType, FunctionType, Param},
     location::TokenLocation,
+    string::init_string_methods,
     vm::VMError,
 };
 
-#[derive(Default, Debug)]
-pub struct SymbolTable<T> {
-    by_name: HashMap<&'static str, usize>,
-    by_index: Vec<T>,
+pub type HostTypeProperty = fn(&VM, this: Value) -> Result<Value, VMError>;
+pub type HostTypeMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum HostTypeMember {
+    /// A property, such as `actor.health`
+    Property(HostTypeProperty),
+    /// A method, such as `actor.has_threat()`
+    Method(HostTypeMethod),
+    /// A method, such as `actor.has_threat()`
+    StaticMethod(HostTypeMethod),
 }
 
-impl<T> SymbolTable<T> {
-    pub fn empty() -> Self {
-        Self {
-            by_name: HashMap::default(),
-            by_index: Vec::new(),
+/// Symbol table containing the methods and fields of a composite type such as a struct.
+#[derive(Default, Debug)]
+pub struct HostType {
+    /// Lookup scope for object properties and methods.
+    pub(crate) decls: DeclTable,
+
+    /// Properties of entities
+    pub(crate) members: Vec<HostTypeMember>,
+}
+
+impl HostType {
+    pub fn get(&self, name: &str) -> Option<&Decl> {
+        self.decls.get(name)
+    }
+
+    /// Add a property to this type.
+    pub fn add_property(
+        &mut self,
+        name: impl Into<SmolStr>,
+        accessor: HostTypeProperty,
+        typ: ExprType,
+    ) -> &mut Self {
+        let name: SmolStr = name.into();
+        if self.decls.contains_key(&name) {
+            panic!("Object member {name} is already defined.");
         }
+
+        let index = self.members.len();
+        self.members.push(HostTypeMember::Property(accessor));
+        self.decls.insert(
+            name,
+            Decl {
+                location: TokenLocation::default(),
+                visibility: DeclVisibility::Public,
+                typ,
+                kind: DeclKind::Global {
+                    is_const: true,
+                    index,
+                },
+            },
+        );
+
+        self
     }
 
-    pub fn insert(&mut self, name: &'static str, value: T) -> usize {
-        let id = self.by_index.len();
-        self.by_name.insert(name, id);
-        self.by_index.push(value);
-        id
-    }
+    /// Add a native method to this type.
+    pub fn add_method(
+        &mut self,
+        name: &'static str,
+        method: HostTypeMethod,
+        params: Vec<Param>,
+        return_type: ExprType,
+    ) -> &mut Self {
+        let name: SmolStr = name.into();
+        if self.decls.contains_key(&name) {
+            panic!("Object member {name} is already defined.");
+        }
 
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.by_index.get(index)
-    }
+        let index = self.members.len();
+        self.members.push(HostTypeMember::Method(method));
+        self.decls.insert(
+            name,
+            Decl {
+                location: TokenLocation::default(),
+                visibility: DeclVisibility::Public,
+                typ: ExprType::Function(Arc::new(FunctionType {
+                    params: params
+                        .iter()
+                        .enumerate()
+                        .map(|(index, p)| FunctionParam {
+                            location: TokenLocation::default(),
+                            name: p.name.clone(),
+                            typ: p.ty.clone(),
+                            index,
+                        })
+                        .collect(),
+                    ret: return_type,
+                })),
+                kind: DeclKind::Function { index },
+            },
+        );
 
-    pub fn iter(&self) -> impl Iterator<Item = (&'static str, usize)> {
-        self.by_name
-            .iter()
-            .map(move |(&name, &index)| (name, index))
+        self
     }
 }
 
@@ -60,101 +128,6 @@ impl Default for Global {
     }
 }
 
-pub type NativePropertyAccessor = fn(&VM, this: Value) -> Result<Value, VMError>;
-pub type NativeMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum NativeMember {
-    /// A property, such as `actor.health`
-    Property(NativePropertyAccessor),
-    /// A method, such as `actor.has_threat()`
-    Method(NativeMethod),
-    /// A method, such as `actor.has_threat()`
-    StaticMethod(NativeMethod),
-}
-
-impl Default for NativeMember {
-    fn default() -> Self {
-        NativeMember::Property(default_native_property)
-    }
-}
-
-fn default_native_property(_: &VM, _this: Value) -> Result<Value, VMError> {
-    panic!("Default property handler")
-}
-
-#[derive(Default, Debug)]
-pub struct NativeType {
-    /// Lookup scope for instance members.
-    pub(crate) instance_decls: DeclTable,
-
-    /// Lookup scope for static members.
-    pub(crate) static_decls: DeclTable,
-}
-
-impl NativeType {
-    // pub fn add_method(
-    //     &mut self,
-    //     name: &'static str,
-    //     method: NativeMethod,
-    //     result_type: ExprType,
-    // ) -> usize {
-    //     let name: SmolStr = name.into();
-    //     if self.instance_decls.contains_key(&name) {
-    //         panic!("Member property {name} is already defined.");
-    //     }
-
-    //     let index = self.instance_decls.len();
-    //     self.members.push(NativeMember::Method(method));
-    //     self.instance_decls.insert(
-    //         name,
-    //         Decl {
-    //             location: TokenLocation::default(),
-    //             visibility: DeclVisibility::Public,
-    //             typ: ExprType::Function(Arc::new(FunctionType {
-    //                 // TODO: fill in
-    //                 params: Default::default(),
-    //                 // TODO: fill in
-    //                 ret: result_type,
-    //             })),
-    //             kind: DeclKind::Function { index },
-    //         },
-    //     );
-
-    //     index
-    // }
-
-    // pub fn add_static_method(
-    //     &mut self,
-    //     name: &'static str,
-    //     method: NativeStaticMethod,
-    //     result_type: ExprType,
-    // ) -> usize {
-    //     let name: SmolStr = name.into();
-    //     if self.static_decls.contains_key(&name) {
-    //         panic!("Member property {name} is already defined.");
-    //     }
-
-    //     let index = self.static_decls.len();
-    //     self.static_methods.push(method);
-    //     self.static_decls.insert(
-    //         name,
-    //         Decl {
-    //             location: TokenLocation::default(),
-    //             visibility: DeclVisibility::Public,
-    //             typ: ExprType::Function(Arc::new(FunctionType {
-    //                 // TODO: fill in
-    //                 params: Default::default(),
-    //                 ret: result_type,
-    //             })),
-    //             kind: DeclKind::Function { index },
-    //         },
-    //     );
-
-    //     index
-    // }
-}
-
 /// Contains global definitions and method registrations for the compiler and VM.
 #[derive(Default, Debug)]
 pub struct HostState {
@@ -165,25 +138,15 @@ pub struct HostState {
     pub(crate) vars: Vec<Global>,
 
     /// List of known native types
-    pub(crate) native_types: Vec<NativeType>,
-
-    /// Map of type ids to native type indices.
-    types_by_id: HashMap<TypeId, usize>,
-
-    /// Members of native types
-    pub(crate) native_members: Vec<NativeMember>,
+    pub(crate) host_types: HashMap<TypeId, HostType>,
 }
 
 impl HostState {
     pub fn new() -> Self {
         let mut this = Self {
             global_decls: DeclTable::default(),
-            // entity_decls: DeclTable::default(),
-            native_types: Vec::new(),
-            types_by_id: HashMap::new(),
+            host_types: HashMap::new(),
             vars: Vec::new(),
-            // entity_members: Vec::new(),
-            native_members: Vec::new(),
         };
 
         // Builtin type definitions.
@@ -192,9 +155,13 @@ impl HostState {
         this.add_type_alias("f32", ExprType::F32);
         this.add_type_alias("f64", ExprType::F64);
         this.add_type_alias("bool", ExprType::Boolean);
-        this.add_type_alias("String", ExprType::String);
+        // this.add_type_alias("String", ExprType::String);
         // this.add_type_alias("Entity", ExprType::Entity);
 
+        this.add_host_type::<Entity>("Entity");
+        this.add_host_type::<String>("String");
+
+        init_string_methods(&mut this);
         this
     }
 
@@ -323,16 +290,16 @@ impl HostState {
     //     index
     // }
 
-    pub fn add_native_type<T: Typed>(&mut self, name: &'static str) {
+    pub fn add_host_type<T: Typed>(&mut self, name: &'static str) -> &mut HostType {
         let name: SmolStr = name.into();
         if self.global_decls.contains_key(&name) {
             panic!("Host symbol {name} is already defined.");
         }
 
         let index = self.global_decls.len();
-        let type_index = self.native_types.len();
-        self.types_by_id.insert(TypeId::of::<T>(), type_index);
-        self.native_types.push(NativeType::default());
+        self.host_types
+            .entry(TypeId::of::<T>())
+            .insert(HostType::default());
         self.global_decls.insert(
             name,
             Decl {
@@ -342,52 +309,22 @@ impl HostState {
                 kind: DeclKind::NativeType { index },
             },
         );
+
+        self.host_types.get_mut(&TypeId::of::<T>()).unwrap()
     }
 
-    pub(crate) fn get_native_type<T: Typed>(&self) -> Option<&NativeType> {
-        self.types_by_id
-            .get(&TypeId::of::<T>())
-            .map(|id| &self.native_types[*id])
+    /// Returns the `HostType` table for a native type.
+    pub fn get_host_type<T: Typed>(&self) -> Option<&HostType> {
+        self.host_types.get(&TypeId::of::<T>())
     }
 
-    pub(crate) fn get_native_type_mut<T: Typed>(&mut self) -> Option<&mut NativeType> {
-        self.types_by_id
-            .get(&TypeId::of::<T>())
-            .map(|id| &mut self.native_types[*id])
+    /// Returns the mutable `HostType` table for a native type.
+    pub fn get_host_type_mut<T: Typed>(&mut self) -> Option<&mut HostType> {
+        self.host_types.get_mut(&TypeId::of::<T>())
     }
 
-    pub fn add_native_property<T: Typed>(
-        &mut self,
-        name: impl Into<SmolStr>,
-        accessor: NativePropertyAccessor,
-        typ: ExprType,
-    ) -> usize {
-        let name: SmolStr = name.into();
-        let native_type_index = self
-            .types_by_id
-            .get(&TypeId::of::<T>())
-            .expect("Attempt to add property to a type that has not been registered");
-
-        let native_type = self.native_types.get_mut(*native_type_index).unwrap();
-        if native_type.instance_decls.contains_key(&name) {
-            panic!("Member property {name} is already defined.");
-        }
-
-        let index = self.native_members.len();
-        self.native_members.push(NativeMember::Property(accessor));
-        native_type.instance_decls.insert(
-            name,
-            Decl {
-                location: TokenLocation::default(),
-                visibility: DeclVisibility::Public,
-                typ,
-                kind: DeclKind::Global {
-                    is_const: true,
-                    index,
-                },
-            },
-        );
-
-        index
+    /// Returns the `HostType` table for a native type.
+    pub fn get_host_type_by_id(&self, id: TypeId) -> Option<&HostType> {
+        self.host_types.get(&id)
     }
 }

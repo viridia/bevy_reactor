@@ -42,10 +42,8 @@ pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS
 /// stack input: args
 /// stack output: result
 pub const OP_CALL: u8 = 70; // Call script function
-pub const OP_CALL_NATIVE_METHOD: u8 = 71; // Call method on native type
-pub const OP_CALL_HOST_METHOD: u8 = 72; // Call host method
-// Currently only used for strings
-pub const OP_CALL_OBJECT_METHOD: u8 = 73; // Call method of object
+pub const OP_CALL_HOST_METHOD: u8 = 71; // Call method on native type
+pub const OP_CALL_HOST_FUNCTION: u8 = 72; // Call host function
 pub const OP_RET: u8 = 74; // transfers value from child stack to parent
 
 // Experimental
@@ -362,16 +360,10 @@ pub fn disassemble(code: &[u8]) {
                 eprintln!("call module[{fn_index}] {num_params}",);
             }
 
-            OP_CALL_NATIVE_METHOD => {
+            OP_CALL_HOST_METHOD => {
                 let fn_index = reader.read_immediate::<u32>();
                 let num_params = reader.read_immediate::<u16>() as usize;
-                eprintln!("call native[{fn_index}] {num_params}",);
-            }
-
-            OP_CALL_OBJECT_METHOD => {
-                let fn_index = reader.read_immediate::<u32>();
-                let num_params = reader.read_immediate::<u16>() as usize;
-                eprintln!("call object[{fn_index}] {num_params}",);
+                eprintln!("call host method[{fn_index}] {num_params}",);
             }
 
             // pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity

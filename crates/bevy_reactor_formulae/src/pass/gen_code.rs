@@ -261,7 +261,7 @@ fn gen_expr<'cu>(
                 // println!("Call function: {}", index);
                 match scope_type {
                     decl::ScopeType::Host => {
-                        out.push_op(instr::OP_CALL_HOST_METHOD);
+                        out.push_op(instr::OP_CALL_HOST_FUNCTION);
                         out.push_immediate::<u32>(index as u32);
                     }
                     decl::ScopeType::Module => {
@@ -285,7 +285,7 @@ fn gen_expr<'cu>(
                 for arg in args {
                     gen_expr(module, function, arg, out)?;
                 }
-                out.push_op(instr::OP_CALL_OBJECT_METHOD);
+                out.push_op(instr::OP_CALL_HOST_METHOD);
                 out.push_immediate::<u16>(*index as u16);
                 let num_args = args.len() + 1;
                 if num_args > u16::MAX as usize {
@@ -489,7 +489,7 @@ enum LValue {
 }
 
 fn expr_to_lvalue(
-    function: &FunctionBody,
+    _function: &FunctionBody,
     expr: &Expr,
     _out: &mut InstructionBuilder,
 ) -> Result<(LValue, ExprType), CompilationError> {

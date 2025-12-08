@@ -2,6 +2,7 @@ use core::fmt::Display;
 use std::sync::Arc;
 
 use bevy::{ecs::entity::Entity, reflect::TypeInfo};
+use smol_str::SmolStr;
 
 use crate::decl::FunctionParam;
 
@@ -159,6 +160,6 @@ pub struct TypeVarId(pub(crate) usize);
 /// Represents a function parameter.
 #[derive(Debug, PartialEq)]
 pub struct Param {
-    pub name: String,
+    pub name: SmolStr,
     pub ty: ExprType,
 }
