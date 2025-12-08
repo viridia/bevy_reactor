@@ -26,7 +26,3 @@ fn string_len(_vm: &VM, args: &[Value]) -> Result<Value, VMError> {
         ))
     }
 }
-
-// fn string_len_native(str: &Arc<String>) -> Result<i32, VMError> {
-//     Ok(str.len() as i32)
-// }

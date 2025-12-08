@@ -684,7 +684,7 @@ fn call(vm: &mut VM) -> Result<(), VMError> {
 
 // TODO: combine this with `call_object_method`.
 fn call_native_method(vm: &mut VM) -> Result<(), VMError> {
-    let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    // let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let method_index = vm.read_immediate::<u16>() as usize;
     let num_params = vm.read_immediate::<u16>() as usize;
     let stack_len = vm.stack.len();
@@ -693,7 +693,7 @@ fn call_native_method(vm: &mut VM) -> Result<(), VMError> {
     }
     let args = &vm.stack[stack_len - num_params..stack_len];
     let val = match vm.host.native_members.get(method_index) {
-        Some(NativeMember::Method(method)) => method(vm, arg, args)?,
+        Some(NativeMember::Method(method)) => method(vm, args)?,
         Some(NativeMember::StaticMethod(_)) | Some(NativeMember::Property(_)) => {
             return Err(VMError::InvalidEntityMethod(method_index))?;
         }

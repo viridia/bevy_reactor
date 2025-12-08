@@ -61,8 +61,7 @@ impl Default for Global {
 }
 
 pub type NativePropertyAccessor = fn(&VM, this: Value) -> Result<Value, VMError>;
-pub type NativeMethod = fn(&VM, this: Value, args: &[Value]) -> Result<Value, VMError>;
-pub type NativeStaticMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
+pub type NativeMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum NativeMember {
@@ -71,7 +70,7 @@ pub enum NativeMember {
     /// A method, such as `actor.has_threat()`
     Method(NativeMethod),
     /// A method, such as `actor.has_threat()`
-    StaticMethod(NativeStaticMethod),
+    StaticMethod(NativeMethod),
 }
 
 impl Default for NativeMember {
