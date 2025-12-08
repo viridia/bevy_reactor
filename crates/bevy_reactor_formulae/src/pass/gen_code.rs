@@ -143,9 +143,9 @@ fn gen_expr<'cu>(
             // }
         }
 
-        ExprKind::EntityProp(ref base, field_index) => {
+        ExprKind::NativeProp(ref base, field_index) => {
             gen_expr(module, function, base, out)?;
-            out.push_op(instr::OP_LOAD_ENTITY_PROP);
+            out.push_op(instr::OP_LOAD_NATIVE_PROP);
             out.push_immediate::<u16>(field_index as u16);
         }
 

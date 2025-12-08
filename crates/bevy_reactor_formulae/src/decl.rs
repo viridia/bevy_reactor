@@ -45,6 +45,10 @@ pub enum DeclKind {
         /// Index of this function in the host or module's functions table.
         index: usize,
     },
+    NativeType {
+        /// Index of this type in the host types table.
+        index: usize,
+    },
     TypeAlias,
 }
 
@@ -65,10 +69,6 @@ pub struct FunctionParam {
 
     /// Index of this param in the params table.
     pub index: usize,
-
-    /// Index of this param in the function's local variables. This takes into account multi-value
-    /// params.
-    pub local_index: usize,
 }
 
 // #[derive(Debug)]

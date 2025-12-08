@@ -42,7 +42,7 @@ pub(crate) enum ExprKind<'e> {
     GlobalRef(usize),
     Field(&'e mut Expr<'e>, usize),
     Index(&'e mut Expr<'e>, usize),
-    EntityProp(&'e mut Expr<'e>, usize),
+    NativeProp(&'e mut Expr<'e>, usize),
     Call(&'e mut Expr<'e>, Vec<&'e mut Expr<'e>>),
     BinaryExpr {
         op: BinaryOp,
@@ -108,7 +108,7 @@ impl<'e> Display for Expr<'e> {
                 base.fmt(f)?;
                 write!(f, ".{index}")
             }
-            ExprKind::EntityProp(base, index) => {
+            ExprKind::NativeProp(base, index) => {
                 base.fmt(f)?;
                 write!(f, ".{index}")
             }

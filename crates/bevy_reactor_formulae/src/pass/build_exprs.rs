@@ -8,6 +8,7 @@ use crate::expr_type::ExprType;
 use crate::host::HostState;
 use crate::pass::build_exprs;
 use crate::string::get_string_methods;
+use bevy::ecs::entity::Entity;
 use bevy::log::tracing_subscriber::field;
 use bevy::reflect::TypeInfo;
 use bevy::{log::info, render::render_graph::Node, scene::ron::de};
@@ -225,14 +226,13 @@ fn create_decls<'ast, 'me>(
                 ASTDecl::Struct {
                     name, visibility, ..
                 } => {
-                    //     // Multiple declarations of the same function are not allowed.
-                    //     if scope.contains(*name) {
-                    //         let name_str = decls.symbols.resolve(*name);
-                    //         return Err(CompilationError::NameRedefinition(
-                    //             ast_decl.location,
-                    //             name_str,
-                    //         ));
-                    //     }
+                    // Multiple declarations of the same function are not allowed.
+                    if module.module_decls.contains_key(name) {
+                        return Err(CompilationError::NameRedefinition(
+                            ast_decl.location,
+                            name.to_string(),
+                        ));
+                    }
 
                     //     let index = decls.structs.len();
                     //     let sd = decl::StructDecl {
@@ -296,7 +296,6 @@ pub(crate) fn resolve_decl_types<'ast>(
                             name: p.name.clone(),
                             typ,
                             index: i,
-                            local_index: 0,
                         });
                     }
 
@@ -687,14 +686,18 @@ fn build_exprs<'a, 'e>(
             #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 ExprType::Entity => {
-                    if let Some(field) = host.entity_decls.get(fname) {
+                    let nt = host.get_native_type::<Entity>();
+                    let Some(entity_type) = nt else {
+                        panic!("'Entity' type has not been registered");
+                    };
+                    if let Some(field) = entity_type.instance_decls.get(fname) {
                         match &field.kind {
                             DeclKind::Global { is_const: _, index } => {
                                 // assign_types(arg_expr, &infer)?;
                                 Ok(out
                                     .alloc(Expr::new(
                                         ast.location,
-                                        ExprKind::EntityProp(base_expr, *index),
+                                        ExprKind::NativeProp(base_expr, *index),
                                     ))
                                     .with_type(field.typ.clone()))
                             }
@@ -718,7 +721,7 @@ fn build_exprs<'a, 'e>(
                                 Ok(out
                                     .alloc(Expr::new(
                                         ast.location,
-                                        ExprKind::EntityProp(base_expr, *index),
+                                        ExprKind::NativeProp(base_expr, *index),
                                     ))
                                     .with_type(field.typ.clone()))
                             }

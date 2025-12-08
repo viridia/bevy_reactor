@@ -156,12 +156,9 @@ impl Display for ExprType {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub struct TypeVarId(pub(crate) usize);
 
-#[derive(Debug, PartialEq)]
-pub struct TypeId(usize);
-
 /// Represents a function parameter.
 #[derive(Debug, PartialEq)]
 pub struct Param {
     pub name: String,
-    pub ty: TypeId,
+    pub ty: ExprType,
 }

@@ -16,9 +16,9 @@ pub const OP_DROP_N: u8 = 11; // (imm u32)
 pub const OP_LOAD_PARAM: u8 = 20;
 pub const OP_LOAD_LOCAL: u8 = 21;
 pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u16)
-pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u16, consumes TOS)
-pub const OP_LOAD_FIELD: u8 = 24; // (imm u16, consumes TOS)
-pub const OP_STORE_LOCAL: u8 = 25;
+pub const OP_LOAD_NATIVE_PROP: u8 = 24; // (imm u16, consumes TOS)
+pub const OP_LOAD_FIELD: u8 = 25; // (imm u16, consumes TOS)
+pub const OP_STORE_LOCAL: u8 = 26;
 
 // Binops: all consume TOS + 1 and push result
 pub const OP_LOGICAL_AND: u8 = 35;
@@ -42,8 +42,9 @@ pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS
 /// stack input: args
 /// stack output: result
 pub const OP_CALL: u8 = 70; // Call script function
-pub const OP_CALL_ENTITY_METHOD: u8 = 71; // Call method on entity
+pub const OP_CALL_NATIVE_METHOD: u8 = 71; // Call method on native type
 pub const OP_CALL_HOST_METHOD: u8 = 72; // Call host method
+// Currently only used for strings
 pub const OP_CALL_OBJECT_METHOD: u8 = 73; // Call method of object
 pub const OP_RET: u8 = 74; // transfers value from child stack to parent
 
@@ -324,9 +325,9 @@ pub fn disassemble(code: &[u8]) {
                 eprintln!("load global {val}");
             }
 
-            OP_LOAD_ENTITY_PROP => {
+            OP_LOAD_NATIVE_PROP => {
                 let val = reader.read_immediate::<u16>();
-                eprintln!("load entity prop {val}");
+                eprintln!("load native prop {val}");
             }
 
             OP_LOAD_FIELD => {
@@ -336,7 +337,6 @@ pub fn disassemble(code: &[u8]) {
 
             // pub const OP_LOAD_LOCAL: u8 = 21;
             // pub const OP_LOAD_GLOBAL: u8 = 22; // (imm u32)
-            // pub const OP_LOAD_ENTITY_PROP: u8 = 23; // (imm u16, consumes TOS)
             OP_STORE_LOCAL => {
                 let val = reader.read_immediate::<u16>();
                 eprintln!("store local {val}");
@@ -362,10 +362,10 @@ pub fn disassemble(code: &[u8]) {
                 eprintln!("call module[{fn_index}] {num_params}",);
             }
 
-            OP_CALL_ENTITY_METHOD => {
+            OP_CALL_NATIVE_METHOD => {
                 let fn_index = reader.read_immediate::<u32>();
                 let num_params = reader.read_immediate::<u16>() as usize;
-                eprintln!("call entity[{fn_index}] {num_params}",);
+                eprintln!("call native[{fn_index}] {num_params}",);
             }
 
             OP_CALL_OBJECT_METHOD => {

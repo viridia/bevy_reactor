@@ -249,16 +249,22 @@ mod tests {
         Ok(Value::Entity(vm.owner))
     }
 
-    fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
-        if let Some(&Health(h)) = vm.component::<Health>(actor) {
+    fn entity_health(vm: &VM, actor: Value) -> Result<Value, VMError> {
+        let Value::Entity(entity) = actor else {
+            panic!("Not an entity");
+        };
+        if let Some(&Health(h)) = vm.component::<Health>(entity) {
             Ok(Value::F32(h))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))
         }
     }
 
-    fn entity_position(vm: &VM, actor: Entity) -> Result<Value, VMError> {
-        if let Some(Position(h)) = vm.component::<Position>(actor) {
+    fn entity_position(vm: &VM, actor: Value) -> Result<Value, VMError> {
+        let Value::Entity(entity) = actor else {
+            panic!("Not an entity");
+        };
+        if let Some(Position(h)) = vm.component::<Position>(entity) {
             Ok(vm.reflected_value(h.as_reflect()))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))
@@ -439,7 +445,8 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_entity_prop("health", entity_health, ExprType::F32);
+        host.add_native_type::<Entity>("Entity");
+        host.add_native_property::<Entity>("health", entity_health, ExprType::F32);
 
         let module = future::block_on(compile_formula(
             "--str--",
@@ -463,12 +470,12 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_entity_prop(
+        host.add_native_type::<Entity>("Entity");
+        host.add_native_property::<Entity>(
             "position",
             entity_position,
             ExprType::Reflected(Vec3::type_info()),
         );
-        // host.add_type_alias("Vec3", ExprType::Reflected(Vec3::type_info()));
 
         let module = future::block_on(compile_formula(
             "--str--",
@@ -506,7 +513,8 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         host.add_global_prop("self", get_self, ExprType::Entity);
-        host.add_entity_prop("health", entity_health, ExprType::F32);
+        host.add_native_type::<Entity>("Entity");
+        host.add_native_property::<Entity>("health", entity_health, ExprType::F32);
 
         let module = future::block_on(compile_formula(
             "--str--",

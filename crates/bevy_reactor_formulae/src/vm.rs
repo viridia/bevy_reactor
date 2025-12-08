@@ -1,5 +1,5 @@
 use std::{
-    any::{Any, TypeId},
+    any::TypeId,
     cell::RefCell,
     ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Sub},
     sync::Arc,
@@ -16,7 +16,7 @@ use crate::{
     Module,
     decl::DeclKind,
     expr_type::ExprType,
-    host::{EntityMember, Global, HostState},
+    host::{Global, HostState, NativeMember},
     instr,
     string::get_string_methods,
 };
@@ -309,7 +309,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_LOAD_PARAM as usize] = load_param;
     table[instr::OP_LOAD_LOCAL as usize] = load_local;
     table[instr::OP_LOAD_GLOBAL as usize] = load_global;
-    table[instr::OP_LOAD_ENTITY_PROP as usize] = load_entity_prop;
+    table[instr::OP_LOAD_NATIVE_PROP as usize] = load_native_prop;
     table[instr::OP_LOAD_FIELD as usize] = load_field;
     table[instr::OP_STORE_LOCAL as usize] = store_local;
 
@@ -321,7 +321,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
     table[instr::OP_BRANCH_IF_FALSE as usize] = branch_if_false;
 
     table[instr::OP_CALL as usize] = call;
-    table[instr::OP_CALL_ENTITY_METHOD as usize] = call_entity_method;
+    table[instr::OP_CALL_NATIVE_METHOD as usize] = call_native_method;
     table[instr::OP_CALL_OBJECT_METHOD as usize] = call_object_method;
 
     table[instr::OP_ADD_I32 as usize] = add_i32;
@@ -487,15 +487,14 @@ fn load_global(vm: &mut VM) -> Result<(), VMError> {
     Ok(())
 }
 
-fn load_entity_prop(vm: &mut VM) -> Result<(), VMError> {
+fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let Value::Entity(entity) = arg else {
-        return Err(VMError::NotAnEntity(arg.value_type()));
-    };
     let prop_index = vm.read_immediate::<u16>() as usize;
-    let val = match vm.host.entity_members.get(prop_index) {
-        Some(EntityMember::Property(accessor)) => accessor(vm, entity)?,
-        Some(EntityMember::Method(_)) => return Err(VMError::InvalidEntityProp(prop_index)),
+    let val = match vm.host.native_members.get(prop_index) {
+        Some(NativeMember::Property(accessor)) => accessor(vm, arg)?,
+        Some(NativeMember::Method(_)) | Some(NativeMember::StaticMethod(_)) => {
+            return Err(VMError::InvalidEntityProp(prop_index));
+        }
         None => return Err(VMError::InvalidEntityProp(prop_index)),
     };
     vm.stack.push(val);
@@ -684,11 +683,8 @@ fn call(vm: &mut VM) -> Result<(), VMError> {
 }
 
 // TODO: combine this with `call_object_method`.
-fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
+fn call_native_method(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-    let Value::Entity(entity) = arg else {
-        return Err(VMError::NotAnEntity(arg.value_type()));
-    };
     let method_index = vm.read_immediate::<u16>() as usize;
     let num_params = vm.read_immediate::<u16>() as usize;
     let stack_len = vm.stack.len();
@@ -696,9 +692,9 @@ fn call_entity_method(vm: &mut VM) -> Result<(), VMError> {
         return Err(VMError::StackUnderflow);
     }
     let args = &vm.stack[stack_len - num_params..stack_len];
-    let val = match vm.host.entity_members.get(method_index) {
-        Some(EntityMember::Method(method)) => method(vm, entity, args)?,
-        Some(EntityMember::Property(_accessor)) => {
+    let val = match vm.host.native_members.get(method_index) {
+        Some(NativeMember::Method(method)) => method(vm, arg, args)?,
+        Some(NativeMember::StaticMethod(_)) | Some(NativeMember::Property(_)) => {
             return Err(VMError::InvalidEntityMethod(method_index))?;
         }
         None => return Err(VMError::InvalidEntityMethod(method_index)),
@@ -976,12 +972,13 @@ mod tests {
         let actor_id = actor.id();
         let mut host = HostState::default();
         let self_id = host.add_global_prop("self", get_self, ExprType::Entity);
-        let health_id = host.add_entity_prop("health", entity_health, ExprType::F32);
+        host.add_native_type::<Entity>("Entity");
+        let health_id = host.add_native_property::<Entity>("health", entity_health, ExprType::F32);
         let mut tracking = TrackingScope::new(Tick::default());
         let mut builder = instr::InstructionBuilder::default();
         builder.push_op(instr::OP_LOAD_GLOBAL);
         builder.push_immediate::<u16>(self_id as u16);
-        builder.push_op(instr::OP_LOAD_ENTITY_PROP);
+        builder.push_op(instr::OP_LOAD_NATIVE_PROP);
         builder.push_immediate::<u16>(health_id as u16);
         builder.push_op(instr::OP_RET);
         let code = builder.inner();
@@ -996,8 +993,11 @@ mod tests {
         Ok(Value::Entity(vm.owner))
     }
 
-    fn entity_health(vm: &VM, actor: Entity) -> Result<Value, VMError> {
-        if let Some(&Health(h)) = vm.component::<Health>(actor) {
+    fn entity_health(vm: &VM, actor: Value) -> Result<Value, VMError> {
+        let Value::Entity(entity) = actor else {
+            panic!("Not an entity");
+        };
+        if let Some(&Health(h)) = vm.component::<Health>(entity) {
             Ok(Value::F32(h))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))

@@ -82,29 +82,33 @@
 
 Next:
 
-- local vars
-- string values
 - complex expressions
 
   - e.g. if { 0 } ...
 
+- constructors
+  - means method namespaces for reflected types
 - load module from asset (extension: .fmod or .crow)
+- heap types
+  - temporary values
+- garbage collection:
+  - world_refs
+  - heap_refs
+  - We need to know when a value is dropped
+    - this is hard because values can be dropped anywhere without a VM reference.
 - function definitions
   - script [done]
   - host
   - entity
 - type cast
 - inferred function adaptors
-- local vars
-- parameters
-  - script functions [done]
-  - native functions
-  - entity methods
 - operators
   - shl / shr
   - log and/not
   - unary
 - type alias
+  - in script
+  - from host
 - control flow
   - if [done]
   - for
@@ -113,10 +117,10 @@ Next:
   - break
   - continue
   - match? (pattern matching is hard, and requires tuples and other things)
-- bblocks
+- basic blocks
 - complex types
-  - string
-  - array
+  - string (more methods)
+  - array (native type?)
   - struct
   - tuple
 - import statements
@@ -154,3 +158,8 @@ This is probably the simplest approach. Main problems are:
 Alternate idea 3:
 
 Write my own Rc which uses an index instead of a pointer.
+
+- type namespaces:
+  - part of host struct
+  - need to be indexed by TypeId
+  - needs both instance methods and static methods
