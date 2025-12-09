@@ -11,6 +11,7 @@ use bevy::ecs::entity::Entity;
 use bevy::log::tracing_subscriber::field;
 use bevy::reflect::TypeInfo;
 use bevy::{log::info, render::render_graph::Node, scene::ron::de};
+use smol_str::SmolStr;
 
 use crate::{
     ast::ASTDecl,
@@ -58,7 +59,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
 
         let host_scope = Scope {
             parent: None,
-            decls: &host.global_decls,
+            decls: &host.decls,
             scope_type: ScopeType::Host,
         };
 
@@ -262,7 +263,7 @@ pub(crate) fn resolve_decl_types<'ast>(
 ) -> Result<(), CompilationError> {
     let host_scope = Scope {
         parent: None,
-        decls: &host.global_decls,
+        decls: &host.decls,
         scope_type: ScopeType::Host,
     };
 
@@ -349,7 +350,7 @@ pub(crate) fn build_function_bodies<'ast, 'me>(
 ) -> Result<(), CompilationError> {
     let host_scope = Scope {
         parent: None,
-        decls: &host.global_decls,
+        decls: &host.decls,
         scope_type: ScopeType::Host,
     };
 
@@ -518,7 +519,56 @@ fn build_exprs<'a, 'e>(
             }
         }
 
-        NodeKind::QName(_name) => panic!("Should already be resolved"),
+        NodeKind::QName(name_parts) => {
+            assert!(name_parts.len() > 1);
+            let (head, tail) = name_parts.split_at(1);
+
+            let NodeKind::Ident(ref head_name) = head[0].kind else {
+                panic!("Expected QName head to be a name");
+            };
+
+            match scope.lookup(head_name) {
+                Some((_scope_type, decl)) => match &decl.kind {
+                    decl::DeclKind::NativeType { id } => {
+                        let native_type = host.get_host_type_by_id(*id).unwrap();
+                        // Look for inner name.
+                        // TODO: Make this recursive.
+                        let NodeKind::Ident(ref fname) = tail[0].kind else {
+                            panic!("Expected QName element to be a name");
+                        };
+                        let Some(member_decl) = native_type.decls.get(fname) else {
+                            return Err(CompilationError::UnknownField(
+                                ast.location,
+                                head_name.clone(),
+                                fname.clone(),
+                            ));
+                        };
+                        match member_decl.kind {
+                            DeclKind::Global { is_const, index } => todo!(),
+                            DeclKind::Local { is_const, index } => todo!(),
+                            DeclKind::Param { index } => todo!(),
+                            DeclKind::Function { index } => Ok(out
+                                .alloc(Expr::new(
+                                    ast.location,
+                                    ExprKind::FunctionRef(ScopeType::Host, index),
+                                ))
+                                .with_type(member_decl.typ.clone())),
+                            DeclKind::NativeType { id } => todo!(),
+                            DeclKind::TypeAlias => todo!(),
+                        }
+                    }
+
+                    _ => Err(CompilationError::NoMembers(
+                        head[0].location,
+                        head_name.clone(),
+                    )),
+                },
+                None => Err(CompilationError::UnknownSymbol(
+                    head[0].location,
+                    head_name.to_string(),
+                )),
+            }
+        }
 
         NodeKind::BinaryExpr { op, lhs, rhs } => {
             let lhs_expr = build_exprs(lhs, host, scope, function, inference, out)?;
@@ -706,8 +756,8 @@ fn build_exprs<'a, 'e>(
                     } else {
                         Err(CompilationError::UnknownField(
                             ast.location,
-                            "Entity".to_string(),
-                            fname.to_string(),
+                            SmolStr::new_static("Entity"),
+                            fname.clone(),
                         ))
                     }
                 }
@@ -738,8 +788,8 @@ fn build_exprs<'a, 'e>(
                     } else {
                         Err(CompilationError::UnknownField(
                             ast.location,
-                            "String".to_string(),
-                            fname.to_string(),
+                            SmolStr::new_static("String"),
+                            fname.clone(),
                         ))
                     }
                 }
@@ -770,8 +820,8 @@ fn build_exprs<'a, 'e>(
                         } else {
                             Err(CompilationError::UnknownField(
                                 ast.location,
-                                "Entity".to_string(),
-                                fname.to_string(),
+                                SmolStr::new_static("Entity"),
+                                fname.clone(),
                             ))
                         }
                     }
@@ -860,6 +910,7 @@ fn build_exprs<'a, 'e>(
             let fty = match func_expr.typ.clone() {
                 ExprType::Function(fty) => fty.clone(),
                 _ => {
+                    // eprintln!("{}", func_expr.typ);
                     return Err(CompilationError::NotCallable(ast.location));
                 }
             };
@@ -1040,10 +1091,7 @@ fn build_stmt<'a, 'e>(
                     (Some(typ), None) => typ,
                     (None, Some(value)) => value.typ.clone(),
                     (None, None) => {
-                        return Err(CompilationError::MissingType(
-                            ast.location,
-                            name.to_string(),
-                        ));
+                        return Err(CompilationError::MissingType(ast.location, name.clone()));
                     }
                 };
 

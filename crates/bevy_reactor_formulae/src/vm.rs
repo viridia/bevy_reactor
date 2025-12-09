@@ -32,23 +32,10 @@ pub enum Value {
     Entity(Entity),
     String(Arc<String>),
     WorldRef(usize),
+    HeapRef(u16),
 }
 
 impl Value {
-    pub fn value_type(&self) -> ExprType {
-        match self {
-            Value::Void => ExprType::Void,
-            Value::Bool(_) => ExprType::Boolean,
-            Value::I32(_) => ExprType::I32,
-            Value::I64(_) => ExprType::I64,
-            Value::F32(_) => ExprType::F32,
-            Value::F64(_) => ExprType::F64,
-            Value::Entity(_) => ExprType::Entity,
-            Value::String(_) => ExprType::String,
-            Value::WorldRef(_) => todo!(),
-        }
-    }
-
     pub fn is_void(&self) -> bool {
         *self == Value::Void
     }
@@ -119,6 +106,9 @@ pub struct VM<'world, 'host, 'p> {
     /// TODO: Would be better to use an arena for this and other temporaries.
     world_refs: RefCell<Vec<&'world dyn PartialReflect>>,
 
+    /// Temporary non-primitive values created during execution.
+    heap_refs: RefCell<Vec<Box<dyn PartialReflect>>>,
+
     /// Value stack: consists of [Value; num_params + num_locals + temporaries]
     stack: Vec<Value>,
 
@@ -147,6 +137,7 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             module: Default::default(),
             call_stack: Vec::new(),
             world_refs: RefCell::new(Vec::new()),
+            heap_refs: RefCell::new(Vec::new()),
             stack: Vec::new(),
             iptr: Default::default(),
             tracking: RefCell::new(tracking),
@@ -267,12 +258,23 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
         comp
     }
 
-    /// Construct a `Value` containing a `PartialReflect`.
-    pub fn reflected_value(&self, reflected: &'world dyn PartialReflect) -> Value {
+    /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
+    pub fn create_world_ref(&self, reflected: &'world dyn PartialReflect) -> Value {
         let mut world_refs = self.world_refs.borrow_mut();
         let index = world_refs.len();
         world_refs.push(reflected);
         Value::WorldRef(index)
+    }
+
+    /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
+    pub fn create_heap_ref<T: PartialReflect>(&self, value: T) -> Value {
+        let mut heap = self.heap_refs.borrow_mut();
+        let index = heap.len();
+        if index > u16::MAX as usize {
+            panic!("VM only supports 64k heap items");
+        }
+        heap.push(Box::new(value).into_partial_reflect());
+        Value::HeapRef(index as u16)
     }
 
     fn push_call_stack(&mut self, new_stack: Vec<Value>) {
@@ -288,6 +290,38 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
         self.module = tos.module;
         self.stack = tos.stack;
         self.iptr = tos.iptr;
+    }
+
+    /// Determine the type of this value, if possible.
+    pub(crate) fn value_type(&self, value: &Value) -> ExprType {
+        match value {
+            Value::Void => ExprType::Void,
+            Value::Bool(_) => ExprType::Boolean,
+            Value::I32(_) => ExprType::I32,
+            Value::I64(_) => ExprType::I64,
+            Value::F32(_) => ExprType::F32,
+            Value::F64(_) => ExprType::F64,
+            Value::Entity(_) => ExprType::Entity,
+            Value::String(_) => ExprType::String,
+            Value::WorldRef(world_index) => {
+                if let Some(reflect) =
+                    self.world_refs.borrow()[*world_index].get_represented_type_info()
+                {
+                    ExprType::Reflected(reflect)
+                } else {
+                    ExprType::None
+                }
+            }
+            Value::HeapRef(heap_index) => {
+                if let Some(reflect) =
+                    self.heap_refs.borrow()[*heap_index as usize].get_represented_type_info()
+                {
+                    ExprType::Reflected(reflect)
+                } else {
+                    ExprType::None
+                }
+            }
+        }
     }
 }
 
@@ -321,6 +355,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
 
     table[instr::OP_CALL as usize] = call;
     table[instr::OP_CALL_HOST_METHOD as usize] = call_host_method;
+    table[instr::OP_CALL_HOST_FUNCTION as usize] = call_host_function;
 
     table[instr::OP_ADD_I32 as usize] = add_i32;
     table[instr::OP_ADD_I64 as usize] = add_i64;
@@ -476,9 +511,10 @@ fn store_local(vm: &mut VM) -> Result<(), VMError> {
 
 fn load_global(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u16>() as usize;
-    let val = match vm.host.vars.get(n) {
+    let val = match vm.host.globals.get(n) {
         Some(Global::Const(val)) => val.clone(),
         Some(Global::Property(accessor)) => accessor(vm)?,
+        Some(Global::Function(_)) => return Err(VMError::InvalidNativeProp(n)),
         None => return Err(VMError::InvalidGlobalIndex(n)),
     };
     vm.stack.push(val);
@@ -500,7 +536,7 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
             .expect("Entity type not registered"),
         Value::WorldRef(wref) => vm
             .host
-            .get_host_type_by_id(wref.type_id())
+            .get_host_type_by_id(vm.world_refs.borrow()[wref].type_id())
             .expect("Unknown host type"),
         _ => {
             panic!("Type does not have properties");
@@ -539,15 +575,43 @@ fn load_field(vm: &mut VM) -> Result<(), VMError> {
                 } else if let Some(val) = field.try_downcast_ref::<f64>() {
                     Value::F64(*val)
                 } else {
-                    vm.reflected_value(field)
+                    vm.create_world_ref(field)
                 };
                 vm.stack.push(val);
                 Ok(())
             }
-            _ => Err(VMError::InvalidType(arg.value_type())),
+            _ => Err(VMError::InvalidType(vm.value_type(&arg))),
+        }
+    } else if let Value::HeapRef(heap_index) = arg {
+        let field_index = vm.read_immediate::<u16>() as usize;
+        let heap = vm.heap_refs.borrow();
+        let reflect = heap[heap_index as usize].as_ref();
+        let reflect_ref = reflect.reflect_ref();
+        match reflect_ref {
+            ReflectRef::Struct(rstruct) => {
+                let field = rstruct.field_at(field_index);
+                let Some(field) = field else {
+                    panic!("Invalid struct field index");
+                };
+                let val = if let Some(val) = field.try_downcast_ref::<i32>() {
+                    Value::I32(*val)
+                } else if let Some(val) = field.try_downcast_ref::<i64>() {
+                    Value::I64(*val)
+                } else if let Some(val) = field.try_downcast_ref::<f32>() {
+                    Value::F32(*val)
+                } else if let Some(val) = field.try_downcast_ref::<f64>() {
+                    Value::F64(*val)
+                } else {
+                    todo!();
+                    // vm.create_world_ref(field)
+                };
+                vm.stack.push(val);
+                Ok(())
+            }
+            _ => Err(VMError::InvalidType(vm.value_type(&arg))),
         }
     } else {
-        Err(VMError::InvalidType(arg.value_type()))
+        Err(VMError::InvalidType(vm.value_type(&arg)))
     }
 }
 
@@ -555,14 +619,16 @@ macro_rules! impl_typed_binop {
     ($name:ident, $variant:ident, $type:ty, $op:ident) => {
         fn $name(vm: &mut VM) -> Result<(), VMError> {
             let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-            let lhs = vm.stack.last_mut().ok_or(VMError::StackUnderflow)?;
-            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs.clone(), rhs.clone()) {
-                Value::$variant(l.$op(r))
+            let lhs = vm.stack.last().ok_or(VMError::StackUnderflow)?;
+            if let (Value::$variant(l), Value::$variant(r)) = (lhs.clone(), rhs.clone()) {
+                *vm.stack.last_mut().ok_or(VMError::StackUnderflow)? = Value::$variant(l.$op(r));
+                Ok(())
             } else {
-                return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
-            };
-            *lhs = val;
-            Ok(())
+                Err(VMError::MismatchedTypes(
+                    vm.value_type(&lhs),
+                    vm.value_type(&rhs),
+                ))
+            }
         }
     };
 }
@@ -571,14 +637,16 @@ macro_rules! impl_relational_binop {
     ($name:ident, $variant:ident, $type:ty, $op:ident) => {
         fn $name(vm: &mut VM) -> Result<(), VMError> {
             let rhs = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
-            let lhs = vm.stack.last_mut().ok_or(VMError::StackUnderflow)?;
-            let val = if let (Value::$variant(l), Value::$variant(r)) = (lhs.clone(), rhs.clone()) {
-                Value::Bool(l.$op(&r))
+            let lhs = vm.stack.last().ok_or(VMError::StackUnderflow)?;
+            if let (Value::$variant(l), Value::$variant(r)) = (lhs.clone(), rhs.clone()) {
+                *vm.stack.last_mut().ok_or(VMError::StackUnderflow)? = Value::Bool(l.$op(&r));
+                Ok(())
             } else {
-                return Err(VMError::MismatchedTypes(lhs.value_type(), rhs.value_type()));
-            };
-            *lhs = val;
-            Ok(())
+                Err(VMError::MismatchedTypes(
+                    vm.value_type(&lhs),
+                    vm.value_type(&rhs),
+                ))
+            }
         }
     };
 }
@@ -653,7 +721,10 @@ fn log_and(vm: &mut VM) -> Result<(), VMError> {
     let val = match (lhs, rhs) {
         (Value::Bool(l), Value::Bool(r)) => Value::Bool(l && r),
         (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
+            return Err(VMError::MismatchedTypes(
+                vm.value_type(&v0),
+                vm.value_type(&v1),
+            ));
         }
     };
     vm.stack.push(val);
@@ -666,7 +737,10 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
     let val = match (lhs, rhs) {
         (Value::Bool(l), Value::Bool(r)) => Value::Bool(l && r),
         (v0, v1) => {
-            return Err(VMError::MismatchedTypes(v0.value_type(), v1.value_type()));
+            return Err(VMError::MismatchedTypes(
+                vm.value_type(&v0),
+                vm.value_type(&v1),
+            ));
         }
     };
     vm.stack.push(val);
@@ -683,7 +757,7 @@ fn log_or(vm: &mut VM) -> Result<(), VMError> {
 // pub const OP_COMPLEMENT: u8 = 52;
 
 fn call(vm: &mut VM) -> Result<(), VMError> {
-    let fn_index = vm.read_immediate::<u32>() as usize;
+    let fn_index = vm.read_immediate::<u16>() as usize;
     let num_params = vm.read_immediate::<u16>() as usize;
     let stack_len = vm.stack.len();
     if num_params > stack_len {
@@ -727,15 +801,37 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
     };
 
     let args = &vm.stack[stack_len - num_params..stack_len];
-    if method_index > host_type.members.len() {
-        return Err(VMError::InvalidMethod(method_index));
-    }
     let val = match host_type.members.get(method_index) {
         Some(HostTypeMember::Method(method)) => method(vm, args)?,
         Some(HostTypeMember::StaticMethod(_)) | Some(HostTypeMember::Property(_)) => {
             return Err(VMError::InvalidNativeMethod(method_index))?;
         }
         None => return Err(VMError::InvalidNativeMethod(method_index)),
+    };
+
+    // Drop args
+    vm.stack.truncate(stack_len - num_params);
+    if !val.is_void() {
+        vm.stack.push(val);
+    }
+    Ok(())
+}
+
+fn call_host_function(vm: &mut VM) -> Result<(), VMError> {
+    let function_index = vm.read_immediate::<u16>() as usize;
+    let num_params = vm.read_immediate::<u16>() as usize;
+    let stack_len = vm.stack.len();
+    if num_params > stack_len {
+        return Err(VMError::StackUnderflow);
+    }
+
+    let args = &vm.stack[stack_len - num_params..stack_len];
+    let val = match vm.host.globals.get(function_index) {
+        Some(Global::Function(f)) => f(vm, args)?,
+        Some(Global::Const(_)) | Some(Global::Property(_)) => {
+            return Err(VMError::InvalidGlobalIndex(function_index))?;
+        }
+        None => return Err(VMError::InvalidGlobalIndex(function_index)),
     };
 
     // Drop args
@@ -764,7 +860,7 @@ fn branch_if_false(vm: &mut VM) -> Result<(), VMError> {
         Value::Bool(true) => Ok(()),
 
         _ => Err(VMError::MismatchedTypes(
-            test.value_type(),
+            vm.value_type(&test),
             ExprType::Boolean,
         )),
     }
@@ -972,7 +1068,7 @@ mod tests {
     #[test]
     fn test_global() {
         let mut world = World::new();
-        let actor = world.spawn(Health(22.0));
+        let actor = world.spawn(());
         let actor_id = actor.id();
         let mut host = HostState::default();
         let self_id = host.add_global_prop("self", get_self, ExprType::Entity);
@@ -992,5 +1088,10 @@ mod tests {
 
     fn get_self(vm: &VM) -> Result<Value, VMError> {
         Ok(Value::Entity(vm.owner))
+    }
+
+    #[test]
+    fn test_value_size() {
+        assert_eq!(std::mem::size_of::<Value>(), 16);
     }
 }

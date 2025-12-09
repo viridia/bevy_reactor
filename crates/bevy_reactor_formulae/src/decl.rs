@@ -1,3 +1,5 @@
+use std::any::TypeId;
+
 use bevy::platform::collections::HashMap;
 use smol_str::SmolStr;
 
@@ -40,7 +42,7 @@ pub enum DeclKind {
     },
     NativeType {
         /// Index of this type in the host types table.
-        index: usize,
+        id: TypeId,
     },
     TypeAlias,
 }

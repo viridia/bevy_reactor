@@ -262,11 +262,11 @@ fn gen_expr<'cu>(
                 match scope_type {
                     decl::ScopeType::Host => {
                         out.push_op(instr::OP_CALL_HOST_FUNCTION);
-                        out.push_immediate::<u32>(index as u32);
+                        out.push_immediate::<u16>(index as u16);
                     }
                     decl::ScopeType::Module => {
                         out.push_op(instr::OP_CALL);
-                        out.push_immediate::<u32>(index as u32);
+                        out.push_immediate::<u16>(index as u16);
                     }
                     decl::ScopeType::Object | decl::ScopeType::String => {
                         panic!("Method call without base expression");

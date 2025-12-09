@@ -15,14 +15,14 @@ use crate::{HostState, VM, Value, expr_type::ExprType, vm::VMError};
 // }
 
 /// string.len()
-fn string_len(_vm: &VM, args: &[Value]) -> Result<Value, VMError> {
+fn string_len(vm: &VM, args: &[Value]) -> Result<Value, VMError> {
     assert_eq!(args.len(), 1);
     if let Value::String(str) = &args[0] {
         Ok(Value::I32(str.len() as i32))
     } else {
         Err(VMError::MismatchedTypes(
             ExprType::String,
-            args[0].value_type(),
+            vm.value_type(&args[0]),
         ))
     }
 }

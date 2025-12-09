@@ -100,7 +100,7 @@ peg::parser! {
             / lit_int()
             / lit_string()
             / lit_bool()
-            / ident()
+            / qname()
             / "(" _ e:expr() _ ")" { e }
             / expected!("expression")
         ) { e }
@@ -370,9 +370,9 @@ peg::parser! {
             arena.alloc(ASTNode::new((0, 0), NodeKind::Empty))
         }
 
-        rule type_name() -> &'a ASTNode<'a> =
+        rule qname() -> &'a ASTNode<'a> =
             start:position!()
-            n:(ident() ** (_ "::" _))
+            n:(ident() ++ (_ "::" _))
             end:position!()
             {
                 if n.len() == 1 {
@@ -382,6 +382,8 @@ peg::parser! {
                     arena.alloc(ASTNode::new((start, end), NodeKind::QName(names)))
                 }
             }
+
+        rule type_name() -> &'a ASTNode<'a> = n:qname() { n }
 
         rule array_type() -> &'a ASTNode<'a> =
             start:position!()

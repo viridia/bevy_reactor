@@ -14,10 +14,7 @@ pub(crate) fn resolve_types<'a>(
         NodeKind::ArrayType(_member) => todo!(),
         NodeKind::Ident(ident) => {
             let Some((_, decl)) = scope.lookup(ident.as_str()) else {
-                return Err(CompilationError::UnknownType(
-                    ast.location,
-                    ident.to_string(),
-                ));
+                return Err(CompilationError::UnknownType(ast.location, ident.clone()));
             };
             match &decl.kind {
                 decl::DeclKind::TypeAlias => Ok(decl.typ.clone()),

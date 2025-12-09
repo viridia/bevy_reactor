@@ -83,13 +83,11 @@
 Next:
 
 - complex expressions
-
   - e.g. if { 0 } ...
-
-- fold string methods in with native methods.
-
 - constructors
+
   - means method namespaces for reflected types
+
 - load module from asset (extension: .fmod or .crow)
 - heap types
   - temporary values

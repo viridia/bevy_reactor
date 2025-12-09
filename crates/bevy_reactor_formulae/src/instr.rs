@@ -355,15 +355,21 @@ pub fn disassemble(code: &[u8]) {
             // pub const OP_BRANCH: u8 = 62; // (imm i32 relative offset)
             // pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS)
             OP_CALL => {
-                let fn_index = reader.read_immediate::<u32>();
+                let fn_index = reader.read_immediate::<u16>();
                 let num_params = reader.read_immediate::<u16>() as usize;
                 eprintln!("call module[{fn_index}] {num_params}",);
             }
 
             OP_CALL_HOST_METHOD => {
-                let fn_index = reader.read_immediate::<u32>();
+                let fn_index = reader.read_immediate::<u16>();
                 let num_params = reader.read_immediate::<u16>() as usize;
                 eprintln!("call host method[{fn_index}] {num_params}",);
+            }
+
+            OP_CALL_HOST_FUNCTION => {
+                let fn_index = reader.read_immediate::<u16>();
+                let num_params = reader.read_immediate::<u16>() as usize;
+                eprintln!("call host function[{fn_index}] {num_params}",);
             }
 
             // pub const OP_CALL_ENTITY_METHOD: u8 = 70; // Call method on entity

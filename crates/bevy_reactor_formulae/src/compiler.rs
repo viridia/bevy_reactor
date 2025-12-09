@@ -6,6 +6,7 @@ use crate::{
 };
 use bumpalo::Bump;
 use peg::{error::ParseError, str::LineCol};
+use smol_str::SmolStr;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -19,7 +20,7 @@ pub enum CompilationError {
     #[error("Semicolon expected")]
     ExpectSemi(TokenLocation),
     #[error("Expected {1}")]
-    Expected(TokenLocation, String),
+    Expected(TokenLocation, SmolStr),
     #[error("Cannot assign type {2} to {1}")]
     MismatchedTypes(TokenLocation, ExprType, ExprType),
     #[error("Cannot convert type from {2} to {1}")]
@@ -31,11 +32,11 @@ pub enum CompilationError {
     #[error("Recursive type: {1}")]
     RecursiveType(TokenLocation, ExprType),
     #[error("Cannot infer type for '{1}'")]
-    MissingType(TokenLocation, String),
+    MissingType(TokenLocation, SmolStr),
     #[error("Unknown type: {1}")]
-    UnknownType(TokenLocation, String),
+    UnknownType(TokenLocation, SmolStr),
     #[error("Unknown field: {1}.{2}")]
-    UnknownField(TokenLocation, String, String),
+    UnknownField(TokenLocation, SmolStr, SmolStr),
     #[error("Invalid element index: {1}.{2}")]
     InvalidIndex(TokenLocation, String, usize),
     #[error("Type {1} does not have fields")]
@@ -43,6 +44,8 @@ pub enum CompilationError {
     #[error("Type {1} does not have indexed elements")]
     NoIndex(TokenLocation, ExprType),
     #[error("Can't find the name '{1}' in this scope")]
+    NoMembers(TokenLocation, SmolStr),
+    #[error("Name {1} does not have fields or properties")]
     UnknownSymbol(TokenLocation, String),
     #[error("Invalid type for binary operator {2} to {3}")]
     InvalidBinaryOpType(TokenLocation, BinaryOp, ExprType, ExprType),
@@ -75,6 +78,7 @@ impl CompilationError {
             | CompilationError::UnknownType(loc, _)
             | CompilationError::NoFields(loc, _)
             | CompilationError::NoIndex(loc, _)
+            | CompilationError::NoMembers(loc, _)
             | CompilationError::UnknownSymbol(loc, _)
             | CompilationError::UnknownField(loc, _, _)
             | CompilationError::InvalidIndex(loc, _, _)
@@ -174,7 +178,7 @@ fn transform_parse_error(err: ParseError<LineCol>) -> CompilationError {
         }
     }
     let tokens = err.expected.to_string();
-    CompilationError::Expected(location, tokens)
+    CompilationError::Expected(location, tokens.into())
 }
 
 /// Given a string of source code, compile a module.
@@ -225,7 +229,13 @@ pub async fn compile_formula(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{VM, Value, expr_type::ExprType, host::HostState, vm::VMError};
+    use crate::{
+        VM, Value,
+        expr_type::{ExprType, Param},
+        host::HostState,
+        instr::disassemble,
+        vm::VMError,
+    };
     use bevy::{
         ecs::{
             component::{Component, Tick},
@@ -237,6 +247,7 @@ mod tests {
     };
     use bevy_reactor::TrackingScope;
     use futures_lite::future;
+    use smol_str::SmolStr;
     use std::any::Any;
 
     #[derive(Component)]
@@ -265,7 +276,7 @@ mod tests {
             panic!("Not an entity");
         };
         if let Some(Position(h)) = vm.component::<Position>(entity) {
-            Ok(vm.reflected_value(h.as_reflect()))
+            Ok(vm.create_world_ref(h.as_reflect()))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))
         }
@@ -652,5 +663,72 @@ mod tests {
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
         assert_eq!(result, Value::I32(20));
+    }
+
+    #[test]
+    fn compile_constructor() {
+        let mut host = HostState::new();
+        host.add_host_type::<Vec3>("Vec3");
+        host.add_static_method::<Vec3>(
+            "new",
+            vec3_new,
+            vec![
+                Param {
+                    name: SmolStr::new_static("x"),
+                    ty: ExprType::F32,
+                },
+                Param {
+                    name: SmolStr::new_static("y"),
+                    ty: ExprType::F32,
+                },
+                Param {
+                    name: SmolStr::new_static("z"),
+                    ty: ExprType::F32,
+                },
+            ],
+            ExprType::Reflected(Vec3::type_info()),
+        );
+        let host = Mutex::new(host);
+        let module = future::block_on(compile_module(
+            "--str--",
+            "
+            fn test() -> f32 { Vec3::new(1.0, 2.0, 3.0).x }
+            ",
+            &host,
+        ))
+        .unwrap();
+        // disassemble(&module.functions[0].code);
+        // disassemble(&module.functions[1].code);
+
+        let world = World::new();
+        let mut tracking = TrackingScope::new(Tick::default());
+        let host = host.lock().unwrap();
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        let result = vm.run(&module, "test").unwrap();
+        assert_eq!(result, Value::F32(1.0));
+    }
+
+    fn vec3_new(vm: &VM, args: &[Value]) -> Result<Value, VMError> {
+        assert_eq!(args.len(), 3);
+        let Value::F32(x) = args[0] else {
+            return Err(VMError::MismatchedTypes(
+                vm.value_type(&args[0]),
+                ExprType::F32,
+            ));
+        };
+        let Value::F32(y) = args[1] else {
+            return Err(VMError::MismatchedTypes(
+                vm.value_type(&args[1]),
+                ExprType::F32,
+            ));
+        };
+        let Value::F32(z) = args[2] else {
+            return Err(VMError::MismatchedTypes(
+                vm.value_type(&args[2]),
+                ExprType::F32,
+            ));
+        };
+        let result = Vec3 { x, y, z };
+        Ok(vm.create_heap_ref(result))
     }
 }
