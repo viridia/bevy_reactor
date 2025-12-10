@@ -141,41 +141,6 @@ struct CallStackEntry {
     iptr: *const u8,
 }
 
-/// A virtual machine for evaluating formulae.
-pub struct VM<'world, 'host, 'p> {
-    /// Bevy World
-    pub world: &'world World,
-
-    /// Entity upon which this script is attached.
-    pub owner: Entity,
-
-    /// Globals and entity members
-    pub host: &'host HostState,
-
-    /// Module we are executing
-    pub module: *const Module,
-
-    /// Execution stack
-    call_stack: Vec<CallStackEntry>,
-
-    /// Reflected values.
-    /// TODO: Need garbage collection
-    /// TODO: Would be better to use an arena for this and other temporaries.
-    world_refs: RefCell<Vec<&'world dyn PartialReflect>>,
-
-    /// Temporary non-primitive values created during execution.
-    heap_refs: RefCell<Vec<Box<dyn PartialReflect>>>,
-
-    /// Value stack: consists of [Value; num_params + num_locals + temporaries]
-    stack: Vec<Value>,
-
-    /// Instruction pointer
-    iptr: *const u8,
-
-    /// Reactive tracking scope
-    pub tracking: RefCell<&'p mut TrackingScope>,
-}
-
 /// A simplified interface for calling native functions.
 pub struct CallContext<'vm, 'world> {
     world_refs: &'vm Vec<&'world dyn PartialReflect>,
@@ -265,6 +230,41 @@ impl<'vm, 'world> CallContext<'vm, 'world> {
         self.heap_refs.push(Box::new(value).into_partial_reflect());
         Value::HeapRef(index as u16)
     }
+}
+
+/// A virtual machine for evaluating formulae.
+pub struct VM<'world, 'host, 'p> {
+    /// Bevy World
+    pub world: &'world World,
+
+    /// Entity upon which this script is attached.
+    pub owner: Entity,
+
+    /// Globals and entity members
+    pub host: &'host HostState,
+
+    /// Module we are executing
+    pub module: *const Module,
+
+    /// Execution stack
+    call_stack: Vec<CallStackEntry>,
+
+    /// Reflected values.
+    /// TODO: Need garbage collection
+    /// TODO: Would be better to use an arena for this and other temporaries.
+    world_refs: RefCell<Vec<&'world dyn PartialReflect>>,
+
+    /// Temporary non-primitive values created during execution.
+    heap_refs: RefCell<Vec<Box<dyn PartialReflect>>>,
+
+    /// Value stack: consists of [Value; num_params + num_locals + temporaries]
+    stack: Vec<Value>,
+
+    /// Instruction pointer
+    iptr: *const u8,
+
+    /// Reactive tracking scope
+    pub tracking: RefCell<&'p mut TrackingScope>,
 }
 
 type InstrHandler = fn(&mut VM) -> Result<(), VMError>;
