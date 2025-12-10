@@ -279,7 +279,7 @@ pub struct VM<'world, 'host, 'p> {
     /// Reflected values.
     /// TODO: Need garbage collection
     /// TODO: Would be better to use an arena for this and other temporaries.
-    world_refs: RefCell<Vec<&'world dyn PartialReflect>>,
+    world_refs: Vec<&'world dyn PartialReflect>,
 
     /// Temporary non-primitive values created during execution.
     heap_refs: Vec<Box<dyn PartialReflect>>,
@@ -311,7 +311,7 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             host,
             module: Default::default(),
             call_stack: Vec::new(),
-            world_refs: RefCell::new(Vec::new()),
+            world_refs: Vec::new(),
             heap_refs: Vec::new(),
             stack: Vec::new(),
             iptr: Default::default(),
@@ -434,9 +434,8 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
 
     /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
     pub fn create_world_ref(&mut self, reflected: &'world dyn PartialReflect) -> Value {
-        let mut world_refs = self.world_refs.borrow_mut();
-        let index = world_refs.len();
-        world_refs.push(reflected);
+        let index = self.world_refs.len();
+        self.world_refs.push(reflected);
         Value::WorldRef(index)
     }
 
@@ -467,9 +466,7 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             Value::Entity(_) => ExprType::Entity,
             Value::String(_) => ExprType::String,
             Value::WorldRef(world_index) => {
-                if let Some(reflect) =
-                    self.world_refs.borrow()[*world_index].get_represented_type_info()
-                {
+                if let Some(reflect) = self.world_refs[*world_index].get_represented_type_info() {
                     ExprType::Reflected(reflect)
                 } else {
                     ExprType::None
@@ -699,7 +696,7 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
             .expect("Entity type not registered"),
         Value::WorldRef(wref) => vm
             .host
-            .get_host_type_by_id(vm.world_refs.borrow()[wref].type_id())
+            .get_host_type_by_id(vm.world_refs[wref].type_id())
             .expect("Unknown host type"),
         _ => {
             panic!("Type does not have properties");
@@ -708,7 +705,7 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
 
     let mut ctx = InvocationContext {
         world: vm.world,
-        world_refs: &mut vm.world_refs.borrow_mut(),
+        world_refs: &mut vm.world_refs,
         heap_refs: &mut vm.heap_refs,
         tracking: vm.tracking,
         args: &[],
@@ -728,7 +725,7 @@ fn load_field(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     if let Value::WorldRef(world_index) = arg {
         let field_index = vm.read_immediate::<u16>() as usize;
-        let reflect = vm.world_refs.borrow()[world_index];
+        let reflect = vm.world_refs[world_index];
         let reflect_ref = reflect.reflect_ref();
         match reflect_ref {
             ReflectRef::Struct(rstruct) => {
@@ -973,7 +970,7 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
     let args = &vm.stack[stack_len - num_params..stack_len];
     let mut ctx = InvocationContext {
         world: vm.world,
-        world_refs: &mut vm.world_refs.borrow_mut(),
+        world_refs: &mut vm.world_refs,
         heap_refs: &mut vm.heap_refs,
         tracking: vm.tracking,
         args,
@@ -1005,7 +1002,7 @@ fn call_host_function(vm: &mut VM) -> Result<(), VMError> {
     };
     let mut ctx = InvocationContext {
         world: vm.world,
-        world_refs: &mut vm.world_refs.borrow_mut(),
+        world_refs: &mut vm.world_refs,
         heap_refs: &mut vm.heap_refs,
         tracking: vm.tracking,
         args,
