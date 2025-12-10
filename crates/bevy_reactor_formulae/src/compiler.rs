@@ -233,8 +233,7 @@ mod tests {
         VM, Value,
         expr_type::{ExprType, Param},
         host::HostState,
-        instr::disassemble,
-        vm::{CallContext, VMError},
+        vm::{InvocationContext, VMError},
     };
     use bevy::{
         ecs::{
@@ -260,23 +259,23 @@ mod tests {
         Ok(Value::Entity(vm.owner))
     }
 
-    fn entity_health(vm: &VM, actor: Value) -> Result<Value, VMError> {
+    fn entity_health(ctx: &mut InvocationContext, actor: Value) -> Result<Value, VMError> {
         let Value::Entity(entity) = actor else {
             panic!("Not an entity");
         };
-        if let Some(&Health(h)) = vm.component::<Health>(entity) {
+        if let Some(&Health(h)) = ctx.component::<Health>(entity) {
             Ok(Value::F32(h))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))
         }
     }
 
-    fn entity_position(vm: &VM, actor: Value) -> Result<Value, VMError> {
+    fn entity_position(ctx: &mut InvocationContext, actor: Value) -> Result<Value, VMError> {
         let Value::Entity(entity) = actor else {
             panic!("Not an entity");
         };
-        if let Some(Position(h)) = vm.component::<Position>(entity) {
-            Ok(vm.create_world_ref(h.as_reflect()))
+        if let Some(Position(h)) = ctx.component::<Position>(entity) {
+            Ok(ctx.create_world_ref(h.as_reflect()))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))
         }
@@ -708,7 +707,7 @@ mod tests {
         assert_eq!(result, Value::F32(1.0));
     }
 
-    fn vec3_new(ctx: &mut CallContext) -> Result<Value, VMError> {
+    fn vec3_new(ctx: &mut InvocationContext) -> Result<Value, VMError> {
         assert_eq!(ctx.num_arguments(), 3);
         let x = ctx.argument::<f32>(0)?;
         let y = ctx.argument::<f32>(1)?;

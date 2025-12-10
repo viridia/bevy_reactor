@@ -142,13 +142,24 @@ struct CallStackEntry {
 }
 
 /// A simplified interface for calling native functions.
-pub struct CallContext<'vm, 'world> {
-    world_refs: &'vm Vec<&'world dyn PartialReflect>,
+pub struct InvocationContext<'vm, 'world, 'p> {
+    /// Bevy World
+    world: &'world World,
+
+    /// Reflected references to the world.
+    world_refs: &'vm mut Vec<&'world dyn PartialReflect>,
+
+    /// Reflected temporary objects
     heap_refs: &'vm mut Vec<Box<dyn PartialReflect>>,
+
+    /// Calling arguments (used for function calls but not property accessors).
     args: &'vm [Value],
+
+    /// Reactive tracking scope
+    tracking: &'p mut TrackingScope,
 }
 
-impl<'vm, 'world> CallContext<'vm, 'world> {
+impl<'vm, 'world, 'p> InvocationContext<'vm, 'world, 'p> {
     /// Return the number of arguments to the function.
     pub fn num_arguments(&self) -> usize {
         self.args.len()
@@ -230,6 +241,22 @@ impl<'vm, 'world> CallContext<'vm, 'world> {
         self.heap_refs.push(Box::new(value).into_partial_reflect());
         Value::HeapRef(index as u16)
     }
+
+    /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
+    pub fn create_world_ref(&mut self, reflected: &'world dyn PartialReflect) -> Value {
+        let index = self.world_refs.len();
+        self.world_refs.push(reflected);
+        Value::WorldRef(index)
+    }
+
+    /// Return a reference to the Component `C` on the given entity. Calling this function
+    /// adds the component as a dependency of the current tracking scope.
+    pub fn component<C: Component>(&mut self, entity: Entity) -> Option<&'world C> {
+        let comp = self.world.entity(entity).get::<C>();
+        self.tracking
+            .track_component::<C>(entity, self.world, comp.is_some());
+        comp
+    }
 }
 
 /// A virtual machine for evaluating formulae.
@@ -264,7 +291,7 @@ pub struct VM<'world, 'host, 'p> {
     iptr: *const u8,
 
     /// Reactive tracking scope
-    pub tracking: RefCell<&'p mut TrackingScope>,
+    pub tracking: &'p mut TrackingScope,
 }
 
 type InstrHandler = fn(&mut VM) -> Result<(), VMError>;
@@ -288,7 +315,7 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             heap_refs: Vec::new(),
             stack: Vec::new(),
             iptr: Default::default(),
-            tracking: RefCell::new(tracking),
+            tracking,
         }
     }
 
@@ -396,18 +423,17 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
         }
     }
 
-    /// Return a reference to the Component `C` on the given entity. Calling this function
-    /// adds the component as a dependency of the current tracking scope.
-    pub fn component<C: Component>(&self, entity: Entity) -> Option<&'world C> {
-        let comp = self.world.entity(entity).get::<C>();
-        self.tracking
-            .borrow_mut()
-            .track_component::<C>(entity, self.world, comp.is_some());
-        comp
-    }
+    // /// Return a reference to the Component `C` on the given entity. Calling this function
+    // /// adds the component as a dependency of the current tracking scope.
+    // pub fn component<C: Component>(&self, entity: Entity) -> Option<&'world C> {
+    //     let comp = self.world.entity(entity).get::<C>();
+    //     self.tracking
+    //         .track_component::<C>(entity, self.world, comp.is_some());
+    //     comp
+    // }
 
     /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
-    pub fn create_world_ref(&self, reflected: &'world dyn PartialReflect) -> Value {
+    pub fn create_world_ref(&mut self, reflected: &'world dyn PartialReflect) -> Value {
         let mut world_refs = self.world_refs.borrow_mut();
         let index = world_refs.len();
         world_refs.push(reflected);
@@ -680,8 +706,15 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
         }
     };
 
+    let mut ctx = InvocationContext {
+        world: vm.world,
+        world_refs: &mut vm.world_refs.borrow_mut(),
+        heap_refs: &mut vm.heap_refs,
+        tracking: vm.tracking,
+        args: &[],
+    };
     let val = match host_type.members.get(prop_index) {
-        Some(HostTypeMember::Property(accessor)) => accessor(vm, arg)?,
+        Some(HostTypeMember::Property(accessor)) => accessor(&mut ctx, arg)?,
         Some(_) => {
             return Err(VMError::InvalidNativeProp(prop_index));
         }
@@ -938,9 +971,11 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
     };
 
     let args = &vm.stack[stack_len - num_params..stack_len];
-    let mut ctx = CallContext {
-        world_refs: &vm.world_refs.borrow(),
+    let mut ctx = InvocationContext {
+        world: vm.world,
+        world_refs: &mut vm.world_refs.borrow_mut(),
         heap_refs: &mut vm.heap_refs,
+        tracking: vm.tracking,
         args,
     };
     let Some(HostTypeMember::Method(method)) = host_type.members.get(method_index) else {
@@ -968,9 +1003,11 @@ fn call_host_function(vm: &mut VM) -> Result<(), VMError> {
     let Some(Global::Function(f)) = vm.host.globals.get(function_index) else {
         return Err(VMError::InvalidGlobalIndex(function_index));
     };
-    let mut ctx = CallContext {
-        world_refs: &vm.world_refs.borrow(),
+    let mut ctx = InvocationContext {
+        world: vm.world,
+        world_refs: &mut vm.world_refs.borrow_mut(),
         heap_refs: &mut vm.heap_refs,
+        tracking: vm.tracking,
         args,
     };
     let val = f(&mut ctx)?;
@@ -1014,7 +1051,7 @@ fn ret(_vm: &mut VM) -> Result<(), VMError> {
 
 #[cfg(test)]
 mod tests {
-    use bevy::{ecs::component::Tick, math::Vec3};
+    use bevy::ecs::component::Tick;
 
     use crate::{expr_type::ExprType, instr};
 

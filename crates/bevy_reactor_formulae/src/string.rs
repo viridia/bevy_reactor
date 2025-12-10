@@ -5,9 +5,9 @@
 use std::sync::Arc;
 
 use crate::{
-    HostState, VM, Value,
+    HostState, Value,
     expr_type::ExprType,
-    vm::{CallContext, VMError},
+    vm::{InvocationContext, VMError},
 };
 
 // static STRING_METHODS: OnceLock<ObjectMembers> = OnceLock::new();
@@ -21,7 +21,7 @@ use crate::{
 // }
 
 /// string.len()
-fn string_len(ctx: &mut CallContext) -> Result<Value, VMError> {
+fn string_len(ctx: &mut InvocationContext) -> Result<Value, VMError> {
     assert_eq!(ctx.num_arguments(), 1);
     let s: Arc<String> = ctx.argument(0)?;
     Ok(Value::I32(s.len() as i32))

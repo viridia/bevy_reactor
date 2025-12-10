@@ -9,12 +9,11 @@ use crate::{
     expr_type::{ExprType, FunctionType, Param},
     location::TokenLocation,
     string::init_string_methods,
-    vm::{CallContext, VMError},
+    vm::{InvocationContext, VMError},
 };
 
-pub type HostTypeProperty = fn(&VM, this: Value) -> Result<Value, VMError>;
-// pub type HostTypeMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
-pub type HostFunction = fn(&mut CallContext) -> Result<Value, VMError>;
+pub type HostTypeProperty = fn(&mut InvocationContext, this: Value) -> Result<Value, VMError>;
+pub type HostFunction = fn(&mut InvocationContext) -> Result<Value, VMError>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum HostTypeMember {
