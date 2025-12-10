@@ -255,7 +255,7 @@ pub struct VM<'world, 'host, 'p> {
     world_refs: RefCell<Vec<&'world dyn PartialReflect>>,
 
     /// Temporary non-primitive values created during execution.
-    heap_refs: RefCell<Vec<Box<dyn PartialReflect>>>,
+    heap_refs: Vec<Box<dyn PartialReflect>>,
 
     /// Value stack: consists of [Value; num_params + num_locals + temporaries]
     stack: Vec<Value>,
@@ -285,7 +285,7 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             module: Default::default(),
             call_stack: Vec::new(),
             world_refs: RefCell::new(Vec::new()),
-            heap_refs: RefCell::new(Vec::new()),
+            heap_refs: Vec::new(),
             stack: Vec::new(),
             iptr: Default::default(),
             tracking: RefCell::new(tracking),
@@ -414,17 +414,6 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
         Value::WorldRef(index)
     }
 
-    /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
-    pub fn create_heap_ref<T: PartialReflect>(&self, value: T) -> Value {
-        let mut heap = self.heap_refs.borrow_mut();
-        let index = heap.len();
-        if index > u16::MAX as usize {
-            panic!("VM only supports 64k heap items");
-        }
-        heap.push(Box::new(value).into_partial_reflect());
-        Value::HeapRef(index as u16)
-    }
-
     fn push_call_stack(&mut self, new_stack: Vec<Value>) {
         self.call_stack.push(CallStackEntry {
             module: self.module,
@@ -462,7 +451,7 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             }
             Value::HeapRef(heap_index) => {
                 if let Some(reflect) =
-                    self.heap_refs.borrow()[*heap_index as usize].get_represented_type_info()
+                    self.heap_refs[*heap_index as usize].get_represented_type_info()
                 {
                     ExprType::Reflected(reflect)
                 } else {
@@ -732,7 +721,7 @@ fn load_field(vm: &mut VM) -> Result<(), VMError> {
         }
     } else if let Value::HeapRef(heap_index) = arg {
         let field_index = vm.read_immediate::<u16>() as usize;
-        let heap = vm.heap_refs.borrow();
+        let heap = &vm.heap_refs;
         let reflect = heap[heap_index as usize].as_ref();
         let reflect_ref = reflect.reflect_ref();
         match reflect_ref {
@@ -951,7 +940,7 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
     let args = &vm.stack[stack_len - num_params..stack_len];
     let mut ctx = CallContext {
         world_refs: &vm.world_refs.borrow(),
-        heap_refs: &mut vm.heap_refs.borrow_mut(),
+        heap_refs: &mut vm.heap_refs,
         args,
     };
     let Some(HostTypeMember::Method(method)) = host_type.members.get(method_index) else {
@@ -981,7 +970,7 @@ fn call_host_function(vm: &mut VM) -> Result<(), VMError> {
     };
     let mut ctx = CallContext {
         world_refs: &vm.world_refs.borrow(),
-        heap_refs: &mut vm.heap_refs.borrow_mut(),
+        heap_refs: &mut vm.heap_refs,
         args,
     };
     let val = f(&mut ctx)?;
