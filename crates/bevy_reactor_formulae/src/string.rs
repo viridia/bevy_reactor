@@ -2,7 +2,13 @@
 
 // use std::sync::OnceLock;
 
-use crate::{HostState, VM, Value, expr_type::ExprType, vm::VMError};
+use std::sync::Arc;
+
+use crate::{
+    HostState, VM, Value,
+    expr_type::ExprType,
+    vm::{CallContext, VMError},
+};
 
 // static STRING_METHODS: OnceLock<ObjectMembers> = OnceLock::new();
 
@@ -15,16 +21,10 @@ use crate::{HostState, VM, Value, expr_type::ExprType, vm::VMError};
 // }
 
 /// string.len()
-fn string_len(vm: &VM, args: &[Value]) -> Result<Value, VMError> {
-    assert_eq!(args.len(), 1);
-    if let Value::String(str) = &args[0] {
-        Ok(Value::I32(str.len() as i32))
-    } else {
-        Err(VMError::MismatchedTypes(
-            ExprType::String,
-            vm.value_type(&args[0]),
-        ))
-    }
+fn string_len(ctx: &mut CallContext) -> Result<Value, VMError> {
+    assert_eq!(ctx.num_arguments(), 1);
+    let s: Arc<String> = ctx.argument(0)?;
+    Ok(Value::I32(s.len() as i32))
 }
 
 pub(crate) fn init_string_methods(host: &mut HostState) {

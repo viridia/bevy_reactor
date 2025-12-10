@@ -9,20 +9,21 @@ use crate::{
     expr_type::{ExprType, FunctionType, Param},
     location::TokenLocation,
     string::init_string_methods,
-    vm::VMError,
+    vm::{CallContext, VMError},
 };
 
 pub type HostTypeProperty = fn(&VM, this: Value) -> Result<Value, VMError>;
-pub type HostTypeMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
+// pub type HostTypeMethod = fn(&VM, args: &[Value]) -> Result<Value, VMError>;
+pub type HostFunction = fn(&mut CallContext) -> Result<Value, VMError>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum HostTypeMember {
     /// A property, such as `actor.health`
     Property(HostTypeProperty),
     /// A method, such as `actor.has_threat()`
-    Method(HostTypeMethod),
+    Method(HostFunction),
     /// A method, such as `actor.has_threat()`
-    StaticMethod(HostTypeMethod),
+    StaticMethod(HostFunction),
 }
 
 /// Symbol table containing the methods and fields of a composite type such as a struct.
@@ -74,7 +75,7 @@ impl HostType {
     pub fn add_method(
         &mut self,
         name: &'static str,
-        method: HostTypeMethod,
+        method: HostFunction,
         params: Vec<Param>,
         return_type: ExprType,
     ) -> &mut Self {
@@ -122,7 +123,7 @@ pub enum Global {
     Property(GlobalPropertyAccessor),
 
     /// A callable function which does not require a `self` argument.
-    Function(HostTypeMethod),
+    Function(HostFunction),
 }
 
 impl Default for Global {
@@ -273,7 +274,7 @@ impl HostState {
     pub fn add_static_method<T: Typed>(
         &mut self,
         name: &'static str,
-        method: HostTypeMethod,
+        method: HostFunction,
         params: Vec<Param>,
         return_type: ExprType,
     ) -> &mut Self {

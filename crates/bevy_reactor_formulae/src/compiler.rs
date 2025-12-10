@@ -234,7 +234,7 @@ mod tests {
         expr_type::{ExprType, Param},
         host::HostState,
         instr::disassemble,
-        vm::VMError,
+        vm::{CallContext, VMError},
     };
     use bevy::{
         ecs::{
@@ -708,27 +708,34 @@ mod tests {
         assert_eq!(result, Value::F32(1.0));
     }
 
-    fn vec3_new(vm: &VM, args: &[Value]) -> Result<Value, VMError> {
-        assert_eq!(args.len(), 3);
-        let Value::F32(x) = args[0] else {
-            return Err(VMError::MismatchedTypes(
-                vm.value_type(&args[0]),
-                ExprType::F32,
-            ));
-        };
-        let Value::F32(y) = args[1] else {
-            return Err(VMError::MismatchedTypes(
-                vm.value_type(&args[1]),
-                ExprType::F32,
-            ));
-        };
-        let Value::F32(z) = args[2] else {
-            return Err(VMError::MismatchedTypes(
-                vm.value_type(&args[2]),
-                ExprType::F32,
-            ));
-        };
-        let result = Vec3 { x, y, z };
-        Ok(vm.create_heap_ref(result))
+    fn vec3_new(ctx: &mut CallContext) -> Result<Value, VMError> {
+        assert_eq!(ctx.num_arguments(), 3);
+        let x = ctx.argument::<f32>(0)?;
+        let y = ctx.argument::<f32>(1)?;
+        let z = ctx.argument::<f32>(2)?;
+        Ok(ctx.create_heap_ref(Vec3 { x, y, z }))
     }
+    // fn vec3_new(vm: &VM, args: &[Value]) -> Result<Value, VMError> {
+    //     assert_eq!(args.len(), 3);
+    //     let Value::F32(x) = args[0] else {
+    //         return Err(VMError::MismatchedTypes(
+    //             vm.value_type(&args[0]),
+    //             ExprType::F32,
+    //         ));
+    //     };
+    //     let Value::F32(y) = args[1] else {
+    //         return Err(VMError::MismatchedTypes(
+    //             vm.value_type(&args[1]),
+    //             ExprType::F32,
+    //         ));
+    //     };
+    //     let Value::F32(z) = args[2] else {
+    //         return Err(VMError::MismatchedTypes(
+    //             vm.value_type(&args[2]),
+    //             ExprType::F32,
+    //         ));
+    //     };
+    //     let result = Vec3 { x, y, z };
+    //     Ok(vm.create_heap_ref(result))
+    // }
 }

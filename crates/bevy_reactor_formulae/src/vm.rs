@@ -41,6 +41,63 @@ impl Value {
     }
 }
 
+pub trait SimpleValueConversion
+where
+    Self: Sized,
+{
+    const EXPR_TYPE: ExprType;
+
+    fn from_value(value: &Value) -> Option<Self>;
+}
+
+impl SimpleValueConversion for i32 {
+    const EXPR_TYPE: ExprType = ExprType::I32;
+
+    fn from_value(value: &Value) -> Option<i32> {
+        if let Value::I32(n) = value {
+            Some(*n)
+        } else {
+            None
+        }
+    }
+}
+
+impl SimpleValueConversion for f32 {
+    const EXPR_TYPE: ExprType = ExprType::F32;
+
+    fn from_value(value: &Value) -> Option<f32> {
+        if let Value::F32(n) = value {
+            Some(*n)
+        } else {
+            None
+        }
+    }
+}
+
+impl SimpleValueConversion for Entity {
+    const EXPR_TYPE: ExprType = ExprType::Entity;
+
+    fn from_value(value: &Value) -> Option<Entity> {
+        if let Value::Entity(entity) = value {
+            Some(*entity)
+        } else {
+            None
+        }
+    }
+}
+
+impl SimpleValueConversion for Arc<String> {
+    const EXPR_TYPE: ExprType = ExprType::Entity;
+
+    fn from_value(value: &Value) -> Option<Arc<String>> {
+        if let Value::String(s) = value {
+            Some(s.clone())
+        } else {
+            None
+        }
+    }
+}
+
 #[non_exhaustive]
 #[derive(Debug, Error, PartialEq)]
 pub enum VMError {
@@ -117,6 +174,97 @@ pub struct VM<'world, 'host, 'p> {
 
     /// Reactive tracking scope
     pub tracking: RefCell<&'p mut TrackingScope>,
+}
+
+/// A simplified interface for calling native functions.
+pub struct CallContext<'vm, 'world> {
+    world_refs: &'vm Vec<&'world dyn PartialReflect>,
+    heap_refs: &'vm mut Vec<Box<dyn PartialReflect>>,
+    args: &'vm [Value],
+}
+
+impl<'vm, 'world> CallContext<'vm, 'world> {
+    /// Return the number of arguments to the function.
+    pub fn num_arguments(&self) -> usize {
+        self.args.len()
+    }
+
+    /// Get the nth calling argument and unwrap it, returning a clone of the inner value.
+    pub fn argument<T: SimpleValueConversion + Clone + 'static>(
+        &self,
+        arg_index: usize,
+    ) -> Result<T, VMError> {
+        let arg_value = &self.args[arg_index];
+        match arg_value {
+            Value::Void => Err(VMError::MismatchedTypes(ExprType::Void, T::EXPR_TYPE)),
+            Value::Bool(_)
+            | Value::I32(_)
+            | Value::I64(_)
+            | Value::F32(_)
+            | Value::F64(_)
+            | Value::Entity(_)
+            | Value::String(_) => T::from_value(arg_value).ok_or_else(|| {
+                VMError::MismatchedTypes(self.value_type(&self.args[1]), T::EXPR_TYPE)
+            }),
+            Value::WorldRef(world_index) => {
+                let world_ref = self.world_refs[*world_index];
+                world_ref.try_downcast_ref::<T>().cloned().ok_or_else(|| {
+                    VMError::MismatchedTypes(
+                        self.value_type(&self.args[1]),
+                        ExprType::Reflected(world_ref.get_represented_type_info().unwrap()),
+                    )
+                })
+            }
+            Value::HeapRef(heap_index) => {
+                let heap_ref = &self.heap_refs[*heap_index as usize];
+                heap_ref.try_downcast_ref::<T>().cloned().ok_or_else(|| {
+                    VMError::MismatchedTypes(
+                        self.value_type(&self.args[1]),
+                        ExprType::Reflected(heap_ref.get_represented_type_info().unwrap()),
+                    )
+                })
+            }
+        }
+    }
+
+    pub(crate) fn value_type(&self, value: &Value) -> ExprType {
+        match value {
+            Value::Void => ExprType::Void,
+            Value::Bool(_) => ExprType::Boolean,
+            Value::I32(_) => ExprType::I32,
+            Value::I64(_) => ExprType::I64,
+            Value::F32(_) => ExprType::F32,
+            Value::F64(_) => ExprType::F64,
+            Value::Entity(_) => ExprType::Entity,
+            Value::String(_) => ExprType::String,
+            Value::WorldRef(world_index) => {
+                if let Some(reflect) = self.world_refs[*world_index].get_represented_type_info() {
+                    ExprType::Reflected(reflect)
+                } else {
+                    ExprType::None
+                }
+            }
+            Value::HeapRef(heap_index) => {
+                if let Some(reflect) =
+                    self.heap_refs[*heap_index as usize].get_represented_type_info()
+                {
+                    ExprType::Reflected(reflect)
+                } else {
+                    ExprType::None
+                }
+            }
+        }
+    }
+
+    /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
+    pub fn create_heap_ref<T: PartialReflect>(&mut self, value: T) -> Value {
+        let index = self.heap_refs.len();
+        if index > u16::MAX as usize {
+            panic!("VM only supports 64k heap items");
+        }
+        self.heap_refs.push(Box::new(value).into_partial_reflect());
+        Value::HeapRef(index as u16)
+    }
 }
 
 type InstrHandler = fn(&mut VM) -> Result<(), VMError>;
@@ -514,7 +662,7 @@ fn load_global(vm: &mut VM) -> Result<(), VMError> {
     let val = match vm.host.globals.get(n) {
         Some(Global::Const(val)) => val.clone(),
         Some(Global::Property(accessor)) => accessor(vm)?,
-        Some(Global::Function(_)) => return Err(VMError::InvalidNativeProp(n)),
+        Some(_) => return Err(VMError::InvalidNativeProp(n)),
         None => return Err(VMError::InvalidGlobalIndex(n)),
     };
     vm.stack.push(val);
@@ -545,7 +693,7 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
 
     let val = match host_type.members.get(prop_index) {
         Some(HostTypeMember::Property(accessor)) => accessor(vm, arg)?,
-        Some(HostTypeMember::Method(_)) | Some(HostTypeMember::StaticMethod(_)) => {
+        Some(_) => {
             return Err(VMError::InvalidNativeProp(prop_index));
         }
         None => return Err(VMError::InvalidNativeProp(prop_index)),
@@ -801,13 +949,15 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
     };
 
     let args = &vm.stack[stack_len - num_params..stack_len];
-    let val = match host_type.members.get(method_index) {
-        Some(HostTypeMember::Method(method)) => method(vm, args)?,
-        Some(HostTypeMember::StaticMethod(_)) | Some(HostTypeMember::Property(_)) => {
-            return Err(VMError::InvalidNativeMethod(method_index))?;
-        }
-        None => return Err(VMError::InvalidNativeMethod(method_index)),
+    let mut ctx = CallContext {
+        world_refs: &vm.world_refs.borrow(),
+        heap_refs: &mut vm.heap_refs.borrow_mut(),
+        args,
     };
+    let Some(HostTypeMember::Method(method)) = host_type.members.get(method_index) else {
+        return Err(VMError::InvalidNativeMethod(method_index));
+    };
+    let val = method(&mut ctx)?;
 
     // Drop args
     vm.stack.truncate(stack_len - num_params);
@@ -826,13 +976,15 @@ fn call_host_function(vm: &mut VM) -> Result<(), VMError> {
     }
 
     let args = &vm.stack[stack_len - num_params..stack_len];
-    let val = match vm.host.globals.get(function_index) {
-        Some(Global::Function(f)) => f(vm, args)?,
-        Some(Global::Const(_)) | Some(Global::Property(_)) => {
-            return Err(VMError::InvalidGlobalIndex(function_index))?;
-        }
-        None => return Err(VMError::InvalidGlobalIndex(function_index)),
+    let Some(Global::Function(f)) = vm.host.globals.get(function_index) else {
+        return Err(VMError::InvalidGlobalIndex(function_index));
     };
+    let mut ctx = CallContext {
+        world_refs: &vm.world_refs.borrow(),
+        heap_refs: &mut vm.heap_refs.borrow_mut(),
+        args,
+    };
+    let val = f(&mut ctx)?;
 
     // Drop args
     vm.stack.truncate(stack_len - num_params);
@@ -873,7 +1025,7 @@ fn ret(_vm: &mut VM) -> Result<(), VMError> {
 
 #[cfg(test)]
 mod tests {
-    use bevy::ecs::component::{Component, Tick};
+    use bevy::{ecs::component::Tick, math::Vec3};
 
     use crate::{expr_type::ExprType, instr};
 
