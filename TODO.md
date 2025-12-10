@@ -82,11 +82,15 @@
 
 Next:
 
+- assets
+  - need a practical use case
 - complex expressions
-  - e.g. if { 0 } ...
-- constructors
+  - e.g. if { 0 } { 1 } { 2 }
+- error cases:
+  - calling a static function non-statically
+  - calling a non-static function statically
 
-  - means method namespaces for reflected types
+## Formula tasks
 
 - load module from asset (extension: .fmod or .crow)
 - heap types

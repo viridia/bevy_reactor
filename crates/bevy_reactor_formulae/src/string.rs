@@ -1,7 +1,5 @@
 //! String type and methods.
 
-// use std::sync::OnceLock;
-
 use std::sync::Arc;
 
 use crate::{
@@ -9,16 +7,6 @@ use crate::{
     expr_type::ExprType,
     vm::{InvocationContext, VMError},
 };
-
-// static STRING_METHODS: OnceLock<ObjectMembers> = OnceLock::new();
-
-// pub(crate) fn get_string_methods() -> &'static ObjectMembers {
-//     STRING_METHODS.get_or_init(|| {
-//         let mut table = ObjectMembers::default();
-//         table.add_method("len", string_len, Vec::new(), ExprType::I32);
-//         table
-//     })
-// }
 
 /// string.len()
 fn string_len(ctx: &mut InvocationContext) -> Result<Value, VMError> {
