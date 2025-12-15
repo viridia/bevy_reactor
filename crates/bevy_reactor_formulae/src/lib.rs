@@ -13,7 +13,9 @@ mod pass;
 mod string;
 pub mod vm;
 
+pub use asset::{ScriptModuleAsset, ScriptModuleLoader};
 pub use compiler::{CompilationError, compile_formula, compile_module};
+pub use expr_type::{ExprType, Param};
 pub use host::HostState;
 pub use vm::{VM, Value};
 

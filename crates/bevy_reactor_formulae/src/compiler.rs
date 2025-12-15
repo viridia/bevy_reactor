@@ -667,8 +667,7 @@ mod tests {
     #[test]
     fn compile_constructor() {
         let mut host = HostState::new();
-        host.add_host_type::<Vec3>("Vec3");
-        host.add_static_method::<Vec3>(
+        host.add_host_type::<Vec3>("Vec3").add_static_method(
             "new",
             vec3_new,
             vec![
@@ -714,27 +713,4 @@ mod tests {
         let z = ctx.argument::<f32>(2)?;
         Ok(ctx.create_heap_ref(Vec3 { x, y, z }))
     }
-    // fn vec3_new(vm: &VM, args: &[Value]) -> Result<Value, VMError> {
-    //     assert_eq!(args.len(), 3);
-    //     let Value::F32(x) = args[0] else {
-    //         return Err(VMError::MismatchedTypes(
-    //             vm.value_type(&args[0]),
-    //             ExprType::F32,
-    //         ));
-    //     };
-    //     let Value::F32(y) = args[1] else {
-    //         return Err(VMError::MismatchedTypes(
-    //             vm.value_type(&args[1]),
-    //             ExprType::F32,
-    //         ));
-    //     };
-    //     let Value::F32(z) = args[2] else {
-    //         return Err(VMError::MismatchedTypes(
-    //             vm.value_type(&args[2]),
-    //             ExprType::F32,
-    //         ));
-    //     };
-    //     let result = Vec3 { x, y, z };
-    //     Ok(vm.create_heap_ref(result))
-    // }
 }

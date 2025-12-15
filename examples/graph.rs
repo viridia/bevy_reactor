@@ -10,7 +10,6 @@ use bevy::{
     },
     prelude::*,
     scene2::{CommandsSpawnScene, bsn, on},
-    window::CursorIcon,
 };
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_nodegraph::{
@@ -24,10 +23,10 @@ use bevy_reactor_nodegraph::{
 struct GraphEditState {
     /// Connection being edited
     connection: Option<Entity>,
-    /// Terminal which is showing "not allowed" cursor.
-    disabled_terminal: Option<Entity>,
-    /// Previous cursor icon
-    saved_cursor: CursorIcon,
+    // / Terminal which is showing "not allowed" cursor.
+    // disabled_terminal: Option<Entity>,
+    // / Previous cursor icon
+    // saved_cursor: CursorIcon,
     /// Zoom level for graph
     zoom_level: u32,
 }
@@ -225,8 +224,8 @@ fn on_connect(
         color: Color::srgb(0.5, 1.0, 0.5), // TODO: Change color based on valid
     };
 
-    let mut forbidden_terminal: Option<Entity> = None;
-    // let mut show_forbidden = false;
+    // let mut forbidden_connection: Option<Entity> = None;
+    let mut show_forbidden = false;
 
     match connect.action {
         DragAction::StartNew => {
@@ -243,7 +242,8 @@ fn on_connect(
             let conn_id = r_graph_state.connection.unwrap();
             commands.entity(conn_id).insert(connection);
             if !is_valid {
-                forbidden_terminal = None;
+                show_forbidden = true;
+                // forbidden_connection = Some(conn_id);
             }
             // show_forbidden = !is_valid;
         }
@@ -263,6 +263,11 @@ fn on_connect(
             commands.entity(conn_id).despawn();
             r_graph_state.connection = None;
         }
+    }
+
+    if show_forbidden {
+        // r_graph_state.disabled_terminal =
+        // TODO: Change connection color
     }
 }
 

@@ -1,0 +1,7 @@
+fn main() -> Color {
+    if self.position.distance(player.position) >= 3.0 {
+      Color::srgb(0.0, 0.3, 0.9)
+    } else {
+      Color::srgb(0.9, 1.0, 0.0)
+    }
+}

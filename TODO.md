@@ -85,25 +85,16 @@ Next:
 - assets
   - need a practical use case
 - complex expressions
-  - e.g. if { 0 } { 1 } { 2 }
+  - e.g. if { 0 } { 1 } else { 2 }
 - error cases:
   - calling a static function non-statically
   - calling a non-static function statically
+  - calling a non-function
+  - attempting to use a function or type name as an lvalue
 
 ## Formula tasks
 
 - load module from asset (extension: .fmod or .crow)
-- heap types
-  - temporary values
-- garbage collection:
-  - world_refs
-  - heap_refs
-  - We need to know when a value is dropped
-    - this is hard because values can be dropped anywhere without a VM reference.
-- function definitions
-  - script [done]
-  - host
-  - entity
 - type cast
 - inferred function adaptors
 - operators
@@ -127,43 +118,9 @@ Next:
   - array (native type?)
   - struct
   - tuple
+  - note: Vec is going to be hard to add methods to because of generics.
 - import statements
   - parse
   - resolve
   - backend
 - record max stack size in function
-
-## Heap values:
-
-- strings
-- structs
-- arrays
-- tuples
-- Bevy math types, such as Vec2, Vec4, Quat, Mat, etc.?
-
-Idea: a "heap" table in the vm that stores heap values of type `dyn PartialReflect`. The value
-contains the index to this heap.
-
-Problems:
-
-- we don't know when to destroy heap items, since values can be cloned, so there's no clear
-  ownership.
-  - unless we do garbage collection
-
-Alternate idea:
-
-Value::Heap(Arc<dyn PartialReflect>)
-
-This is probably the simplest approach. Main problems are:
-
-- If we want to mutate stuff we will have to wrap every value in a mutex (ick).
-- We haven't worked out by-value vs. by-reference semantics for operations
-
-Alternate idea 3:
-
-Write my own Rc which uses an index instead of a pointer.
-
-- type namespaces:
-  - part of host struct
-  - need to be indexed by TypeId
-  - needs both instance methods and static methods

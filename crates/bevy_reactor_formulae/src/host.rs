@@ -12,39 +12,33 @@ use crate::{
     vm::{InvocationContext, VMError},
 };
 
-pub type HostTypeProperty = fn(&mut InvocationContext, this: Value) -> Result<Value, VMError>;
+pub type HostInstanceProperty = fn(&mut InvocationContext, this: Value) -> Result<Value, VMError>;
 pub type HostFunction = fn(&mut InvocationContext) -> Result<Value, VMError>;
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum HostTypeMember {
-    /// A property, such as `actor.health`
-    Property(HostTypeProperty),
-    /// A method, such as `actor.has_threat()`
-    Method(HostFunction),
-    /// A method, such as `actor.has_threat()`
-    StaticMethod(HostFunction),
-}
 
 /// Symbol table containing the methods and fields of a composite type such as a struct.
 #[derive(Default, Debug)]
 pub struct HostType {
     /// Lookup scope for object properties and methods.
     pub(crate) decls: DeclTable,
-
-    /// Properties of entities
-    pub(crate) members: Vec<HostTypeMember>,
 }
 
 impl HostType {
     pub fn get(&self, name: &str) -> Option<&Decl> {
         self.decls.get(name)
     }
+}
 
+pub struct HostTypeBuilder<'host> {
+    decls: &'host mut DeclTable,
+    members: &'host mut Vec<Global>,
+}
+
+impl<'host> HostTypeBuilder<'host> {
     /// Add a property to this type.
     pub fn add_property(
         &mut self,
         name: impl Into<SmolStr>,
-        accessor: HostTypeProperty,
+        accessor: HostInstanceProperty,
         typ: ExprType,
     ) -> &mut Self {
         let name: SmolStr = name.into();
@@ -53,7 +47,7 @@ impl HostType {
         }
 
         let index = self.members.len();
-        self.members.push(HostTypeMember::Property(accessor));
+        self.members.push(Global::InstanceProperty(accessor));
         self.decls.insert(
             name,
             Decl {
@@ -84,7 +78,47 @@ impl HostType {
         }
 
         let index = self.members.len();
-        self.members.push(HostTypeMember::Method(method));
+        self.members.push(Global::InstanceMethod(method));
+        self.decls.insert(
+            name,
+            Decl {
+                location: TokenLocation::default(),
+                visibility: DeclVisibility::Public,
+                typ: ExprType::Function(Arc::new(FunctionType {
+                    params: params
+                        .iter()
+                        .enumerate()
+                        .map(|(index, p)| FunctionParam {
+                            location: TokenLocation::default(),
+                            name: p.name.clone(),
+                            typ: p.ty.clone(),
+                            index,
+                        })
+                        .collect(),
+                    ret: return_type,
+                })),
+                kind: DeclKind::Function { index },
+            },
+        );
+
+        self
+    }
+
+    /// Add a native method to this type.
+    pub fn add_static_method(
+        &mut self,
+        name: &'static str,
+        method: HostFunction,
+        params: Vec<Param>,
+        return_type: ExprType,
+    ) -> &mut Self {
+        let name: SmolStr = name.into();
+        if self.decls.contains_key(&name) {
+            panic!("Object member {name} is already defined.");
+        }
+
+        let index = self.members.len();
+        self.members.push(Global::Function(method));
         self.decls.insert(
             name,
             Decl {
@@ -119,10 +153,16 @@ pub enum Global {
     Const(Value),
 
     /// A dynamic property, such as `time`.
-    Property(GlobalPropertyAccessor),
+    GlobalProperty(GlobalPropertyAccessor),
 
     /// A callable function which does not require a `self` argument.
     Function(HostFunction),
+
+    /// A property of a type
+    InstanceProperty(HostInstanceProperty),
+
+    /// A method of a type
+    InstanceMethod(HostFunction),
 }
 
 impl Default for Global {
@@ -139,18 +179,18 @@ pub struct HostState {
     pub(crate) decls: DeclTable,
 
     /// Table of global variables, properties, and functions.
-    pub(crate) globals: Vec<Global>,
+    pub(crate) members: Vec<Global>,
 
     /// List of known native types
-    pub(crate) host_types: HashMap<TypeId, HostType>,
+    pub(crate) types: HashMap<TypeId, HostType>,
 }
 
 impl HostState {
     pub fn new() -> Self {
         let mut this = Self {
             decls: DeclTable::default(),
-            host_types: HashMap::new(),
-            globals: Vec::new(),
+            types: HashMap::new(),
+            members: Vec::new(),
         };
 
         // Builtin primitive type definitions.
@@ -201,8 +241,8 @@ impl HostState {
                 panic!("Unsupported constant type");
             }
         };
-        let index = self.globals.len();
-        self.globals.push(Global::Const(value));
+        let index = self.members.len();
+        self.members.push(Global::Const(value));
         self.decls.insert(
             name,
             Decl {
@@ -230,8 +270,8 @@ impl HostState {
             panic!("Host symbol {name} is already defined.");
         }
 
-        let index = self.globals.len();
-        self.globals.push(Global::Property(accessor));
+        let index = self.members.len();
+        self.members.push(Global::GlobalProperty(accessor));
         self.decls.insert(
             name,
             Decl {
@@ -248,14 +288,14 @@ impl HostState {
         index
     }
 
-    pub fn add_host_type<T: Typed>(&mut self, name: &'static str) -> &mut HostType {
+    pub fn add_host_type<T: Typed>(&mut self, name: &'static str) -> HostTypeBuilder {
         let name: SmolStr = name.into();
         if self.decls.contains_key(&name) {
             panic!("Host symbol {name} is already defined.");
         }
 
         let id = TypeId::of::<T>();
-        self.host_types.entry(id).insert(HostType::default());
+        self.types.entry(id).insert(HostType::default());
         self.decls.insert(
             name,
             Decl {
@@ -266,68 +306,30 @@ impl HostState {
             },
         );
 
-        self.host_types.get_mut(&id).unwrap()
-    }
-
-    /// Add a static method to a native type.
-    pub fn add_static_method<T: Typed>(
-        &mut self,
-        name: &'static str,
-        method: HostFunction,
-        params: Vec<Param>,
-        return_type: ExprType,
-    ) -> &mut Self {
-        let name: SmolStr = name.into();
-        let index = self.globals.len();
-        let Some(host_type) = self.get_host_type_mut::<T>() else {
-            panic!(
-                "Host type {} must be registered first",
-                T::type_info().type_path()
-            );
-        };
-
-        if host_type.decls.contains_key(&name) {
-            panic!("Object member {name} is already defined.");
+        let host_type = self.types.get_mut(&id).unwrap();
+        HostTypeBuilder {
+            decls: &mut host_type.decls,
+            members: &mut self.members,
         }
-
-        host_type.decls.insert(
-            name,
-            Decl {
-                location: TokenLocation::default(),
-                visibility: DeclVisibility::Public,
-                typ: ExprType::Function(Arc::new(FunctionType {
-                    params: params
-                        .iter()
-                        .enumerate()
-                        .map(|(index, p)| FunctionParam {
-                            location: TokenLocation::default(),
-                            name: p.name.clone(),
-                            typ: p.ty.clone(),
-                            index,
-                        })
-                        .collect(),
-                    ret: return_type,
-                })),
-                kind: DeclKind::Function { index },
-            },
-        );
-        self.globals.push(Global::Function(method));
-
-        self
     }
 
     /// Returns the `HostType` table for a native type.
     pub fn get_host_type<T: Typed>(&self) -> Option<&HostType> {
-        self.host_types.get(&TypeId::of::<T>())
+        self.types.get(&TypeId::of::<T>())
     }
 
     /// Returns the mutable `HostType` table for a native type.
-    pub fn get_host_type_mut<T: Typed>(&mut self) -> Option<&mut HostType> {
-        self.host_types.get_mut(&TypeId::of::<T>())
+    pub fn get_host_type_mut<T: Typed>(&mut self) -> Option<HostTypeBuilder> {
+        self.types
+            .get_mut(&TypeId::of::<T>())
+            .map(|host_type| HostTypeBuilder {
+                decls: &mut host_type.decls,
+                members: &mut self.members,
+            })
     }
 
     /// Returns the `HostType` table for a native type.
     pub fn get_host_type_by_id(&self, id: TypeId) -> Option<&HostType> {
-        self.host_types.get(&id)
+        self.types.get(&id)
     }
 }

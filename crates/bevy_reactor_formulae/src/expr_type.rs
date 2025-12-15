@@ -55,7 +55,7 @@ impl PartialEq for ExprType {
         match (self, other) {
             (Self::Infer(l0), Self::Infer(r0)) => l0 == r0,
             (Self::Function(l0), Self::Function(r0)) => l0 == r0,
-            (Self::Reflected(_l0), Self::Reflected(_r0)) => todo!(),
+            (Self::Reflected(l0), Self::Reflected(r0)) => l0.type_id() == r0.type_id(),
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }

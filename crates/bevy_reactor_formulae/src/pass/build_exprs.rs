@@ -546,7 +546,9 @@ fn build_exprs<'a, 'e>(
                         match member_decl.kind {
                             DeclKind::Global { is_const, index } => todo!(),
                             DeclKind::Local { is_const, index } => todo!(),
-                            DeclKind::Param { index } => todo!(),
+                            DeclKind::Param { .. } => {
+                                unreachable!("Parameter name can't be qualified")
+                            }
                             DeclKind::Function { index } => Ok(out
                                 .alloc(Expr::new(
                                     ast.location,
@@ -732,7 +734,6 @@ fn build_exprs<'a, 'e>(
 
         NodeKind::FieldName(base, fname) => {
             let base_expr = build_exprs(base, host, scope, function, inference, out)?;
-            #[allow(clippy::match_single_binding)] // For now
             match base_expr.typ.clone() {
                 ExprType::Entity => {
                     let nt = host.get_host_type::<Entity>();
@@ -811,7 +812,23 @@ fn build_exprs<'a, 'e>(
                 // }
                 ExprType::Reflected(type_info) => match type_info {
                     TypeInfo::Struct(struct_info) => {
-                        if let Some(field) = struct_info.field(fname)
+                        if let Some(host_type) = host.get_host_type_by_id(type_info.type_id())
+                            && let Some(field_decl) = host_type.get(fname)
+                        {
+                            match field_decl.kind {
+                                DeclKind::Global { is_const, index } => todo!(),
+                                DeclKind::Local { is_const, index } => todo!(),
+                                DeclKind::Param { index } => todo!(),
+                                DeclKind::Function { index } => Ok(out
+                                    .alloc(Expr::new(
+                                        ast.location,
+                                        ExprKind::MethodRef(ScopeType::Object, base_expr, index),
+                                    ))
+                                    .with_type(field_decl.typ.clone())),
+                                DeclKind::NativeType { id } => todo!(),
+                                DeclKind::TypeAlias => todo!(),
+                            }
+                        } else if let Some(field) = struct_info.field(fname)
                             && let Some(index) = struct_info.index_of(fname)
                         {
                             Ok(out
@@ -820,7 +837,7 @@ fn build_exprs<'a, 'e>(
                         } else {
                             Err(CompilationError::UnknownField(
                                 ast.location,
-                                SmolStr::new_static("Entity"),
+                                SmolStr::new_static(type_info.type_path()),
                                 fname.clone(),
                             ))
                         }

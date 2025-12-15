@@ -18,6 +18,7 @@ pub(crate) fn resolve_types<'a>(
             };
             match &decl.kind {
                 decl::DeclKind::TypeAlias => Ok(decl.typ.clone()),
+                decl::DeclKind::NativeType { .. } => Ok(decl.typ.clone()),
                 // decl::Decl::Struct(sindex) => {
                 //     Ok(ExprType::Struct(decls.structs[*sindex].typ.clone()))
                 // }

@@ -6,7 +6,8 @@ use std::{
 
 use bevy::{
     ecs::{component::Component, entity::Entity, world::World},
-    reflect::{PartialReflect, ReflectRef},
+    log::warn,
+    reflect::{PartialReflect, ReflectRef, TypePath},
 };
 use bevy_reactor::TrackingScope;
 use thiserror::Error;
@@ -15,7 +16,7 @@ use crate::{
     Module,
     decl::DeclKind,
     expr_type::ExprType,
-    host::{Global, HostState, HostTypeMember},
+    host::{Global, HostState},
     instr,
 };
 
@@ -30,70 +31,15 @@ pub enum Value {
     F64(f64),
     Entity(Entity),
     String(Arc<String>),
+    /// An index into the table of world references, contains `&'world dyn PartialReflect`.
     WorldRef(usize),
+    /// An index into the VM's temporary heap, contains `Box<dyn PartialReflect>`.
     HeapRef(u16),
 }
 
 impl Value {
     pub fn is_void(&self) -> bool {
         *self == Value::Void
-    }
-}
-
-pub trait SimpleValueConversion
-where
-    Self: Sized,
-{
-    const EXPR_TYPE: ExprType;
-
-    fn from_value(value: &Value) -> Option<Self>;
-}
-
-impl SimpleValueConversion for i32 {
-    const EXPR_TYPE: ExprType = ExprType::I32;
-
-    fn from_value(value: &Value) -> Option<i32> {
-        if let Value::I32(n) = value {
-            Some(*n)
-        } else {
-            None
-        }
-    }
-}
-
-impl SimpleValueConversion for f32 {
-    const EXPR_TYPE: ExprType = ExprType::F32;
-
-    fn from_value(value: &Value) -> Option<f32> {
-        if let Value::F32(n) = value {
-            Some(*n)
-        } else {
-            None
-        }
-    }
-}
-
-impl SimpleValueConversion for Entity {
-    const EXPR_TYPE: ExprType = ExprType::Entity;
-
-    fn from_value(value: &Value) -> Option<Entity> {
-        if let Value::Entity(entity) = value {
-            Some(*entity)
-        } else {
-            None
-        }
-    }
-}
-
-impl SimpleValueConversion for Arc<String> {
-    const EXPR_TYPE: ExprType = ExprType::Entity;
-
-    fn from_value(value: &Value) -> Option<Arc<String>> {
-        if let Value::String(s) = value {
-            Some(s.clone())
-        } else {
-            None
-        }
     }
 }
 
@@ -106,10 +52,10 @@ pub enum VMError {
     StackUnderflow,
     #[error("Mismatched types: {0} {1}")]
     MismatchedTypes(ExprType, ExprType),
+    #[error("Mismatched types: {0} {1}")]
+    MismatchedTypes2(&'static str, &'static str),
     #[error("Invalid assignment")]
     InvalidAssignment,
-    #[error("Value is not an entity: {0}")]
-    NotAnEntity(ExprType),
     #[error("Invalid type for operation: {0}")]
     InvalidType(ExprType),
     #[error("Invalid global index: {0}")]
@@ -165,67 +111,74 @@ impl<'vm, 'world, 'p> InvocationContext<'vm, 'world, 'p> {
     }
 
     /// Get the nth calling argument and unwrap it, returning a clone of the inner value.
-    pub fn argument<T: SimpleValueConversion + Clone + 'static>(
-        &self,
-        arg_index: usize,
-    ) -> Result<T, VMError> {
+    pub fn argument<T: TypePath + Clone + 'static>(&self, arg_index: usize) -> Result<T, VMError> {
         let arg_value = &self.args[arg_index];
         match arg_value {
-            Value::Void => Err(VMError::MismatchedTypes(ExprType::Void, T::EXPR_TYPE)),
-            Value::Bool(_)
-            | Value::I32(_)
-            | Value::I64(_)
-            | Value::F32(_)
-            | Value::F64(_)
-            | Value::Entity(_)
-            | Value::String(_) => T::from_value(arg_value).ok_or_else(|| {
-                VMError::MismatchedTypes(self.value_type(&self.args[1]), T::EXPR_TYPE)
-            }),
+            Value::Void => Err(VMError::MismatchedTypes2("void", T::short_type_path())),
+            Value::Bool(b) if TypeId::of::<T>() == TypeId::of::<bool>() => unsafe {
+                Ok(std::mem::transmute_copy(b))
+            },
+            Value::I32(n) if TypeId::of::<T>() == TypeId::of::<i32>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::I64(n) if TypeId::of::<T>() == TypeId::of::<i64>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::F32(n) if TypeId::of::<T>() == TypeId::of::<f32>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::F64(n) if TypeId::of::<T>() == TypeId::of::<f64>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::Entity(e) if TypeId::of::<T>() == TypeId::of::<Entity>() => unsafe {
+                Ok(std::mem::transmute_copy(e))
+            },
+            Value::String(s) if TypeId::of::<T>() == TypeId::of::<Arc<String>>() => unsafe {
+                Ok(std::mem::transmute_copy(&s.clone()))
+            },
             Value::WorldRef(world_index) => {
                 let world_ref = self.world_refs[*world_index];
                 world_ref.try_downcast_ref::<T>().cloned().ok_or_else(|| {
-                    VMError::MismatchedTypes(
-                        self.value_type(&self.args[1]),
-                        ExprType::Reflected(world_ref.get_represented_type_info().unwrap()),
-                    )
+                    VMError::MismatchedTypes2(self.value_type_path(arg_value), T::short_type_path())
                 })
             }
             Value::HeapRef(heap_index) => {
                 let heap_ref = &self.heap_refs[*heap_index as usize];
                 heap_ref.try_downcast_ref::<T>().cloned().ok_or_else(|| {
-                    VMError::MismatchedTypes(
-                        self.value_type(&self.args[1]),
-                        ExprType::Reflected(heap_ref.get_represented_type_info().unwrap()),
-                    )
+                    VMError::MismatchedTypes2(self.value_type_path(arg_value), T::short_type_path())
                 })
             }
+            _ => Err(VMError::MismatchedTypes2(
+                self.value_type_path(arg_value),
+                T::short_type_path(),
+            )),
         }
     }
 
-    pub(crate) fn value_type(&self, value: &Value) -> ExprType {
+    pub(crate) fn value_type_path(&self, value: &Value) -> &'static str {
         match value {
-            Value::Void => ExprType::Void,
-            Value::Bool(_) => ExprType::Boolean,
-            Value::I32(_) => ExprType::I32,
-            Value::I64(_) => ExprType::I64,
-            Value::F32(_) => ExprType::F32,
-            Value::F64(_) => ExprType::F64,
-            Value::Entity(_) => ExprType::Entity,
-            Value::String(_) => ExprType::String,
+            Value::Void => "void",
+            Value::Bool(_) => "bool",
+            Value::I32(_) => "i32",
+            Value::I64(_) => "i64",
+            Value::F32(_) => "f32",
+            Value::F64(_) => "f64",
+            Value::Entity(_) => "Entity",
+            Value::String(_) => "String",
             Value::WorldRef(world_index) => {
                 if let Some(reflect) = self.world_refs[*world_index].get_represented_type_info() {
-                    ExprType::Reflected(reflect)
+                    reflect.type_path()
                 } else {
-                    ExprType::None
+                    "none"
                 }
             }
             Value::HeapRef(heap_index) => {
                 if let Some(reflect) =
                     self.heap_refs[*heap_index as usize].get_represented_type_info()
                 {
-                    ExprType::Reflected(reflect)
+                    reflect.type_path()
                 } else {
-                    ExprType::None
+                    "none"
                 }
             }
         }
@@ -322,6 +275,79 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
     pub fn set_owner(&mut self, owner: Entity) -> &mut Self {
         self.owner = owner;
         self
+    }
+
+    /// Get the nth calling argument and unwrap it, returning a clone of the inner value.
+    pub fn extract_value<T: TypePath + Clone + 'static>(&self, value: Value) -> Result<T, VMError> {
+        match &value {
+            Value::Void => Err(VMError::MismatchedTypes2("void", T::short_type_path())),
+            Value::Bool(b) if TypeId::of::<T>() == TypeId::of::<bool>() => unsafe {
+                Ok(std::mem::transmute_copy(b))
+            },
+            Value::I32(n) if TypeId::of::<T>() == TypeId::of::<i32>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::I64(n) if TypeId::of::<T>() == TypeId::of::<i64>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::F32(n) if TypeId::of::<T>() == TypeId::of::<f32>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::F64(n) if TypeId::of::<T>() == TypeId::of::<f64>() => unsafe {
+                Ok(std::mem::transmute_copy(n))
+            },
+            Value::Entity(e) if TypeId::of::<T>() == TypeId::of::<Entity>() => unsafe {
+                Ok(std::mem::transmute_copy(e))
+            },
+            Value::String(s) if TypeId::of::<T>() == TypeId::of::<Arc<String>>() => unsafe {
+                Ok(std::mem::transmute_copy(&s.clone()))
+            },
+            Value::WorldRef(world_index) => {
+                let world_ref = self.world_refs[*world_index];
+                world_ref.try_downcast_ref::<T>().cloned().ok_or_else(|| {
+                    VMError::MismatchedTypes2(self.value_type_path(&value), T::short_type_path())
+                })
+            }
+            Value::HeapRef(heap_index) => {
+                let heap_ref = &self.heap_refs[*heap_index as usize];
+                heap_ref.try_downcast_ref::<T>().cloned().ok_or_else(|| {
+                    VMError::MismatchedTypes2(self.value_type_path(&value), T::short_type_path())
+                })
+            }
+            _ => Err(VMError::MismatchedTypes2(
+                self.value_type_path(&value),
+                T::short_type_path(),
+            )),
+        }
+    }
+
+    pub(crate) fn value_type_path(&self, value: &Value) -> &'static str {
+        match value {
+            Value::Void => "void",
+            Value::Bool(_) => "bool",
+            Value::I32(_) => "i32",
+            Value::I64(_) => "i64",
+            Value::F32(_) => "f32",
+            Value::F64(_) => "f64",
+            Value::Entity(_) => "Entity",
+            Value::String(_) => "String",
+            Value::WorldRef(world_index) => {
+                if let Some(reflect) = self.world_refs[*world_index].get_represented_type_info() {
+                    reflect.type_path()
+                } else {
+                    "none"
+                }
+            }
+            Value::HeapRef(heap_index) => {
+                if let Some(reflect) =
+                    self.heap_refs[*heap_index as usize].get_represented_type_info()
+                {
+                    reflect.type_path()
+                } else {
+                    "none"
+                }
+            }
+        }
     }
 
     /// Align the instruction pointer in preparation for loading an immediate value.
@@ -670,9 +696,9 @@ fn store_local(vm: &mut VM) -> Result<(), VMError> {
 
 fn load_global(vm: &mut VM) -> Result<(), VMError> {
     let n = vm.read_immediate::<u16>() as usize;
-    let val = match vm.host.globals.get(n) {
+    let val = match vm.host.members.get(n) {
         Some(Global::Const(val)) => val.clone(),
-        Some(Global::Property(accessor)) => accessor(vm)?,
+        Some(Global::GlobalProperty(accessor)) => accessor(vm)?,
         Some(_) => return Err(VMError::InvalidNativeProp(n)),
         None => return Err(VMError::InvalidGlobalIndex(n)),
     };
@@ -684,24 +710,6 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
     let arg = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
     let prop_index = vm.read_immediate::<u16>() as usize;
 
-    let host_type = match arg {
-        Value::String(_) => vm
-            .host
-            .get_host_type::<String>()
-            .expect("String type not registered"),
-        Value::Entity(_) => vm
-            .host
-            .get_host_type::<Entity>()
-            .expect("Entity type not registered"),
-        Value::WorldRef(wref) => vm
-            .host
-            .get_host_type_by_id(vm.world_refs[wref].type_id())
-            .expect("Unknown host type"),
-        _ => {
-            panic!("Type does not have properties");
-        }
-    };
-
     let mut ctx = InvocationContext {
         world: vm.world,
         world_refs: &mut vm.world_refs,
@@ -709,8 +717,8 @@ fn load_native_prop(vm: &mut VM) -> Result<(), VMError> {
         tracking: vm.tracking,
         args: &[],
     };
-    let val = match host_type.members.get(prop_index) {
-        Some(HostTypeMember::Property(accessor)) => accessor(&mut ctx, arg)?,
+    let val = match vm.host.members.get(prop_index) {
+        Some(Global::InstanceProperty(accessor)) => accessor(&mut ctx, arg)?,
         Some(_) => {
             return Err(VMError::InvalidNativeProp(prop_index));
         }
@@ -746,7 +754,13 @@ fn load_field(vm: &mut VM) -> Result<(), VMError> {
                 vm.stack.push(val);
                 Ok(())
             }
-            _ => Err(VMError::InvalidType(vm.value_type(&arg))),
+            _ => {
+                warn!(
+                    "Can't access world field {field_index} of {}",
+                    reflect.reflect_short_type_path()
+                );
+                Err(VMError::InvalidType(vm.value_type(&arg)))
+            }
         }
     } else if let Value::HeapRef(heap_index) = arg {
         let field_index = vm.read_immediate::<u16>() as usize;
@@ -774,7 +788,13 @@ fn load_field(vm: &mut VM) -> Result<(), VMError> {
                 vm.stack.push(val);
                 Ok(())
             }
-            _ => Err(VMError::InvalidType(vm.value_type(&arg))),
+            _ => {
+                warn!(
+                    "Can't access heap field {field_index} of {}",
+                    reflect.reflect_short_type_path()
+                );
+                Err(VMError::InvalidType(vm.value_type(&arg)))
+            }
         }
     } else {
         Err(VMError::InvalidType(vm.value_type(&arg)))
@@ -947,25 +967,6 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
         return Err(VMError::StackUnderflow);
     }
 
-    let this = vm.stack[stack_len - num_params].clone();
-    let host_type = match this {
-        Value::String(_) => vm
-            .host
-            .get_host_type::<String>()
-            .expect("String type not registered"),
-        Value::Entity(_) => vm
-            .host
-            .get_host_type::<Entity>()
-            .expect("Entity type not registered"),
-        Value::WorldRef(wref) => vm
-            .host
-            .get_host_type_by_id(wref.type_id())
-            .expect("Unknown host type"),
-        _ => {
-            panic!("Type does not have methods");
-        }
-    };
-
     let args = &vm.stack[stack_len - num_params..stack_len];
     let mut ctx = InvocationContext {
         world: vm.world,
@@ -974,7 +975,7 @@ fn call_host_method(vm: &mut VM) -> Result<(), VMError> {
         tracking: vm.tracking,
         args,
     };
-    let Some(HostTypeMember::Method(method)) = host_type.members.get(method_index) else {
+    let Some(Global::InstanceMethod(method)) = vm.host.members.get(method_index) else {
         return Err(VMError::InvalidNativeMethod(method_index));
     };
     let val = method(&mut ctx)?;
@@ -996,7 +997,7 @@ fn call_host_function(vm: &mut VM) -> Result<(), VMError> {
     }
 
     let args = &vm.stack[stack_len - num_params..stack_len];
-    let Some(Global::Function(f)) = vm.host.globals.get(function_index) else {
+    let Some(Global::Function(f)) = vm.host.members.get(function_index) else {
         return Err(VMError::InvalidGlobalIndex(function_index));
     };
     let mut ctx = InvocationContext {

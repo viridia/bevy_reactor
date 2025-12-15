@@ -12,11 +12,11 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 #[derive(TypePath, Asset)]
-pub struct ModuleAsset {
-    module: Module,
+pub struct ScriptModuleAsset {
+    pub module: Module,
 }
 
-impl ModuleAsset {
+impl ScriptModuleAsset {
     pub fn call<Params, Results>(
         &self,
         vm: &mut VM,
@@ -42,12 +42,12 @@ pub enum ModuleLoaderError {
     Compilation(#[from] compiler::CompilationError),
 }
 
-pub struct ModuleLoader {
-    host: Arc<Mutex<HostState>>,
+pub struct ScriptModuleLoader {
+    pub host: Arc<Mutex<HostState>>,
 }
 
-impl AssetLoader for ModuleLoader {
-    type Asset = ModuleAsset;
+impl AssetLoader for ScriptModuleLoader {
+    type Asset = ScriptModuleAsset;
     type Error = ModuleLoaderError;
     type Settings = ();
 
@@ -64,7 +64,7 @@ impl AssetLoader for ModuleLoader {
         let host_ref = self.host.clone();
 
         match compile_module(&path, src, &host_ref).await {
-            Ok(module) => Ok(ModuleAsset { module }),
+            Ok(module) => Ok(ScriptModuleAsset { module }),
             Err(err) => {
                 report_error(&path, src, &err);
                 Err(ModuleLoaderError::Compilation(err))
