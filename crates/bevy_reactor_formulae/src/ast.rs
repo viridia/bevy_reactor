@@ -127,6 +127,7 @@ pub(crate) struct ASTFunctionParam<'a> {
 
 /// AST for a structure field declaration
 #[derive(Debug)]
+#[allow(dead_code)] // TODO: for now
 pub(crate) struct ASTStructField<'a> {
     pub(crate) location: TokenLocation,
     pub(crate) name: SmolStr,

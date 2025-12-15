@@ -484,18 +484,14 @@ fn build_exprs<'a, 'e>(
                 Some((scope_type, decl)) => {
                     match &decl.kind {
                         decl::DeclKind::Function { index } => match scope_type {
-                            ScopeType::Host | ScopeType::Module => Ok(out
-                                .alloc(Expr::new(
-                                    ast.location,
-                                    ExprKind::FunctionRef(scope_type, *index),
-                                ))
+                            ScopeType::Host => Ok(out
+                                .alloc(Expr::new(ast.location, ExprKind::HostFunctionRef(*index)))
                                 .with_type(decl.typ.clone())),
-                            ScopeType::Import => todo!(),
+                            ScopeType::Module => Ok(out
+                                .alloc(Expr::new(ast.location, ExprKind::ScriptFunctionRef(*index)))
+                                .with_type(decl.typ.clone())),
                             ScopeType::Param => todo!(),
                             ScopeType::Local => todo!(),
-                            ScopeType::Object | ScopeType::String => {
-                                unreachable!("Member defn should not be accssible as global")
-                            }
                         },
 
                         decl::DeclKind::Local { is_const: _, index } => Ok(out
@@ -544,18 +540,15 @@ fn build_exprs<'a, 'e>(
                             ));
                         };
                         match member_decl.kind {
-                            DeclKind::Global { is_const, index } => todo!(),
-                            DeclKind::Local { is_const, index } => todo!(),
+                            DeclKind::Global { .. } => todo!(),
+                            DeclKind::Local { .. } => todo!(),
                             DeclKind::Param { .. } => {
                                 unreachable!("Parameter name can't be qualified")
                             }
                             DeclKind::Function { index } => Ok(out
-                                .alloc(Expr::new(
-                                    ast.location,
-                                    ExprKind::FunctionRef(ScopeType::Host, index),
-                                ))
+                                .alloc(Expr::new(ast.location, ExprKind::HostFunctionRef(index)))
                                 .with_type(member_decl.typ.clone())),
-                            DeclKind::NativeType { id } => todo!(),
+                            DeclKind::NativeType { .. } => todo!(),
                             DeclKind::TypeAlias => todo!(),
                         }
                     }
@@ -781,7 +774,7 @@ fn build_exprs<'a, 'e>(
                             DeclKind::Function { index } => Ok(out
                                 .alloc(Expr::new(
                                     ast.location,
-                                    ExprKind::MethodRef(ScopeType::String, base_expr, *index),
+                                    ExprKind::HostMethodRef(base_expr, *index),
                                 ))
                                 .with_type(field.typ.clone())),
                             _ => panic!("Invalid entity member"),
@@ -816,16 +809,16 @@ fn build_exprs<'a, 'e>(
                             && let Some(field_decl) = host_type.get(fname)
                         {
                             match field_decl.kind {
-                                DeclKind::Global { is_const, index } => todo!(),
-                                DeclKind::Local { is_const, index } => todo!(),
-                                DeclKind::Param { index } => todo!(),
+                                DeclKind::Global { .. } => todo!(),
+                                DeclKind::Local { .. } => todo!(),
+                                DeclKind::Param { .. } => todo!(),
                                 DeclKind::Function { index } => Ok(out
                                     .alloc(Expr::new(
                                         ast.location,
-                                        ExprKind::MethodRef(ScopeType::Object, base_expr, index),
+                                        ExprKind::HostMethodRef(base_expr, index),
                                     ))
                                     .with_type(field_decl.typ.clone())),
-                                DeclKind::NativeType { id } => todo!(),
+                                DeclKind::NativeType { .. } => todo!(),
                                 DeclKind::TypeAlias => todo!(),
                             }
                         } else if let Some(field) = struct_info.field(fname)

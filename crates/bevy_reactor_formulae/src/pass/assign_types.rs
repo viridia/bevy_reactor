@@ -24,8 +24,8 @@ pub(crate) fn assign_types<'e>(
         }
         ExprKind::ConstBool(_) => {}
         ExprKind::ConstString(_) => {}
-        ExprKind::FunctionRef(_, _) => {}
-        ExprKind::MethodRef(_, base, _) => {
+        ExprKind::HostFunctionRef(_) | ExprKind::ScriptFunctionRef(_) => {}
+        ExprKind::HostMethodRef(base, _) | ExprKind::ScriptMethodRef(base, _) => {
             assign_types(base, inference)?;
         }
         ExprKind::LocalRef(_) | ExprKind::GlobalRef(_) | ExprKind::ParamRef(_) => {}

@@ -254,33 +254,29 @@ fn gen_expr<'cu>(
         //     }
         // }
         ExprKind::Call(ref func, ref args) => {
-            if let ExprKind::FunctionRef(scope_type, index) = func.kind {
+            if let ExprKind::HostFunctionRef(index) = func.kind {
                 for arg in args {
                     gen_expr(module, function, arg, out)?;
                 }
-                // println!("Call function: {}", index);
-                match scope_type {
-                    decl::ScopeType::Host => {
-                        out.push_op(instr::OP_CALL_HOST_FUNCTION);
-                        out.push_immediate::<u16>(index as u16);
-                    }
-                    decl::ScopeType::Module => {
-                        out.push_op(instr::OP_CALL);
-                        out.push_immediate::<u16>(index as u16);
-                    }
-                    decl::ScopeType::Object | decl::ScopeType::String => {
-                        panic!("Method call without base expression");
-                    }
-                    decl::ScopeType::Import => todo!(),
-                    decl::ScopeType::Param => todo!(),
-                    decl::ScopeType::Local => todo!(),
-                }
+                out.push_op(instr::OP_CALL_HOST_FUNCTION);
+                out.push_immediate::<u16>(index as u16);
                 let num_args = args.len();
                 if num_args > u16::MAX as usize {
                     panic!("Too many function arguments: {num_args}");
                 }
                 out.push_immediate::<u16>(num_args as u16);
-            } else if let ExprKind::MethodRef(_scope_type, base, index) = &func.kind {
+            } else if let ExprKind::ScriptFunctionRef(index) = func.kind {
+                for arg in args {
+                    gen_expr(module, function, arg, out)?;
+                }
+                out.push_op(instr::OP_CALL);
+                out.push_immediate::<u16>(index as u16);
+                let num_args = args.len();
+                if num_args > u16::MAX as usize {
+                    panic!("Too many function arguments: {num_args}");
+                }
+                out.push_immediate::<u16>(num_args as u16);
+            } else if let ExprKind::HostMethodRef(base, index) = &func.kind {
                 gen_expr(module, function, base, out)?;
                 for arg in args {
                     gen_expr(module, function, arg, out)?;
@@ -292,6 +288,8 @@ fn gen_expr<'cu>(
                     panic!("Too many function arguments: {num_args}");
                 }
                 out.push_immediate::<u16>(num_args as u16);
+            } else if let ExprKind::ScriptMethodRef(_base, _index) = &func.kind {
+                todo!();
             } else {
                 panic!("Invalid function reference: {func:?}");
             }

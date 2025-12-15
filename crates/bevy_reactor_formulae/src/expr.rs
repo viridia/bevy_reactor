@@ -1,24 +1,11 @@
 use smol_str::SmolStr;
 
 use crate::{
-    decl::ScopeType,
     expr_type::ExprType,
     location::TokenLocation,
     oper::{BinaryOp, UnaryOp},
 };
 use core::fmt::Display;
-
-// #[derive(Debug)]
-// pub(crate) enum Callable {
-//     /// A global function provided by the host environment.
-//     Host(usize),
-//     /// A function defined in the current module.
-//     Global(usize),
-//     /// A function imported from another module,
-//     Imported { module: usize, function: usize },
-//     // TODO: Entity method
-//     // TODO: Other method
-// }
 
 /// Content of an Expression node.
 #[derive(Debug)]
@@ -29,8 +16,11 @@ pub(crate) enum ExprKind<'e> {
     ConstFloat(f64),
     ConstBool(bool),
     ConstString(SmolStr),
-    FunctionRef(ScopeType, usize),
-    MethodRef(ScopeType, &'e mut Expr<'e>, usize),
+    ScriptFunctionRef(usize),
+    HostFunctionRef(usize),
+    #[allow(dead_code)] // TODO: for now
+    ScriptMethodRef(&'e mut Expr<'e>, usize),
+    HostMethodRef(&'e mut Expr<'e>, usize),
     /// A local `let` statement
     // LocalDecl(usize, Option<&'e mut Expr<'e>>),
     /// A reference to a function parameter.
@@ -93,8 +83,9 @@ impl<'e> Display for Expr<'e> {
             }
             ExprKind::ConstBool(value) => value.fmt(f),
             ExprKind::ConstString(symbol) => write!(f, "String({symbol})"),
-            ExprKind::FunctionRef(_ty, id) => write!(f, "Function({id})"),
-            ExprKind::MethodRef(_ty, base, id) => {
+            ExprKind::ScriptFunctionRef(id) => write!(f, "ScriptFunction({id})"),
+            ExprKind::HostFunctionRef(id) => write!(f, "HostFunction({id})"),
+            ExprKind::ScriptMethodRef(base, id) | ExprKind::HostMethodRef(base, id) => {
                 base.fmt(f)?;
                 write!(f, ".method({id})")
             }

@@ -91,10 +91,7 @@ pub type DeclTable = HashMap<SmolStr, Decl>;
 pub enum ScopeType {
     Host,
     Module,
-    Import,
     Param,
-    Object,
-    String,
     Local,
 }
 
