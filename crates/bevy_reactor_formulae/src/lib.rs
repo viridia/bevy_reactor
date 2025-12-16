@@ -17,7 +17,7 @@ pub use asset::{ScriptModuleAsset, ScriptModuleLoader};
 pub use compiler::{CompilationError, compile_formula, compile_module};
 pub use expr_type::{ExprType, Param};
 pub use host::HostState;
-pub use vm::{VM, Value};
+pub use vm::VM;
 
 use crate::{compiler::CompiledFunction, decl::DeclTable};
 

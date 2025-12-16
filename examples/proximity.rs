@@ -9,8 +9,8 @@ use std::{
 use bevy::{color::palettes::css, ecs::component::Tick, prelude::*, reflect::Typed as _};
 use bevy_reactor::{ReactorPlugin, TrackingScope};
 use bevy_reactor_formulae::{
-    ExprType, HostState, Param, ScriptModuleAsset, ScriptModuleLoader, VM, Value,
-    vm::{InvocationContext, VMError},
+    ExprType, HostState, Param, ScriptModuleAsset, ScriptModuleLoader, VM,
+    vm::{InvocationContext, StackValue, VMError},
 };
 use smol_str::SmolStr;
 
@@ -247,7 +247,7 @@ impl Default for Random32 {
     }
 }
 
-fn color_srgb(ctx: &mut InvocationContext) -> Result<Value, VMError> {
+fn color_srgb(ctx: &mut InvocationContext) -> Result<StackValue, VMError> {
     assert_eq!(ctx.num_arguments(), 3);
     let r = ctx.argument::<f32>(0)?;
     let g = ctx.argument::<f32>(1)?;
@@ -255,7 +255,7 @@ fn color_srgb(ctx: &mut InvocationContext) -> Result<Value, VMError> {
     Ok(ctx.create_heap_ref(Color::srgb(r, g, b)))
 }
 
-fn color_srgba(ctx: &mut InvocationContext) -> Result<Value, VMError> {
+fn color_srgba(ctx: &mut InvocationContext) -> Result<StackValue, VMError> {
     assert_eq!(ctx.num_arguments(), 4);
     let r = ctx.argument::<f32>(0)?;
     let g = ctx.argument::<f32>(1)?;
@@ -264,22 +264,22 @@ fn color_srgba(ctx: &mut InvocationContext) -> Result<Value, VMError> {
     Ok(ctx.create_heap_ref(Color::srgba(r, g, b, a)))
 }
 
-fn get_self(vm: &VM) -> Result<Value, VMError> {
-    Ok(Value::Entity(vm.owner))
+fn get_self(vm: &VM) -> Result<StackValue, VMError> {
+    Ok(StackValue::Entity(vm.owner))
 }
 
-fn get_player(vm: &VM) -> Result<Value, VMError> {
+fn get_player(vm: &VM) -> Result<StackValue, VMError> {
     let player = vm
         .world
         .try_query_filtered::<Entity, With<Player>>()
         .unwrap()
         .single(vm.world)
         .expect("Player not found");
-    Ok(Value::Entity(player))
+    Ok(StackValue::Entity(player))
 }
 
-fn entity_position(ctx: &mut InvocationContext, actor: Value) -> Result<Value, VMError> {
-    let Value::Entity(entity) = actor else {
+fn entity_position(ctx: &mut InvocationContext, actor: StackValue) -> Result<StackValue, VMError> {
+    let StackValue::Entity(entity) = actor else {
         panic!("Not an entity");
     };
     if let Some(transform) = ctx.component::<GlobalTransform>(entity) {
@@ -290,9 +290,9 @@ fn entity_position(ctx: &mut InvocationContext, actor: Value) -> Result<Value, V
 }
 
 /// string.len()
-fn vec3_distance(ctx: &mut InvocationContext) -> Result<Value, VMError> {
+fn vec3_distance(ctx: &mut InvocationContext) -> Result<StackValue, VMError> {
     assert_eq!(ctx.num_arguments(), 2);
     let v0: Vec3 = ctx.argument(0)?;
     let v1: Vec3 = ctx.argument(1)?;
-    Ok(Value::F32(v0.distance(v1)))
+    Ok(StackValue::F32(v0.distance(v1)))
 }

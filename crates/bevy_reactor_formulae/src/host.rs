@@ -4,16 +4,17 @@ use bevy::{ecs::entity::Entity, platform::collections::HashMap, reflect::Typed};
 use smol_str::SmolStr;
 
 use crate::{
-    VM, Value,
+    VM,
     decl::{Decl, DeclKind, DeclTable, DeclVisibility, FunctionParam},
     expr_type::{ExprType, FunctionType, Param},
     location::TokenLocation,
     string::init_string_methods,
-    vm::{InvocationContext, VMError},
+    vm::{InvocationContext, StackValue, VMError},
 };
 
-pub type HostInstanceProperty = fn(&mut InvocationContext, this: Value) -> Result<Value, VMError>;
-pub type HostFunction = fn(&mut InvocationContext) -> Result<Value, VMError>;
+pub type HostInstanceProperty =
+    fn(&mut InvocationContext, this: StackValue) -> Result<StackValue, VMError>;
+pub type HostFunction = fn(&mut InvocationContext) -> Result<StackValue, VMError>;
 
 /// Symbol table containing the methods and fields of a composite type such as a struct.
 #[derive(Default, Debug)]
@@ -145,12 +146,12 @@ impl<'host> HostTypeBuilder<'host> {
     }
 }
 
-type GlobalPropertyAccessor = fn(&VM) -> Result<Value, VMError>;
+type GlobalPropertyAccessor = fn(&VM) -> Result<StackValue, VMError>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Global {
     /// A constant value.
-    Const(Value),
+    Const(StackValue),
 
     /// A dynamic property, such as `time`.
     GlobalProperty(GlobalPropertyAccessor),
@@ -167,7 +168,7 @@ pub enum Global {
 
 impl Default for Global {
     fn default() -> Self {
-        Global::Const(Value::Void)
+        Global::Const(StackValue::Void)
     }
 }
 
@@ -223,20 +224,20 @@ impl HostState {
         );
     }
 
-    pub fn add_global_const(&mut self, name: impl Into<SmolStr>, value: Value) -> usize {
+    pub fn add_global_const(&mut self, name: impl Into<SmolStr>, value: StackValue) -> usize {
         let name: SmolStr = name.into();
         if self.decls.contains_key(&name) {
             panic!("Host symbol {name} is already defined.");
         }
 
         let var_type = match value {
-            Value::Bool(_) => ExprType::Boolean,
-            Value::I32(_) => ExprType::I32,
-            Value::I64(_) => ExprType::I64,
-            Value::F32(_) => ExprType::F32,
-            Value::F64(_) => ExprType::F64,
-            Value::Entity(_) => ExprType::Entity,
-            Value::String(_) => ExprType::String,
+            StackValue::Bool(_) => ExprType::Boolean,
+            StackValue::I32(_) => ExprType::I32,
+            StackValue::I64(_) => ExprType::I64,
+            StackValue::F32(_) => ExprType::F32,
+            StackValue::F64(_) => ExprType::F64,
+            StackValue::Entity(_) => ExprType::Entity,
+            StackValue::String(_) => ExprType::String,
             _ => {
                 panic!("Unsupported constant type");
             }

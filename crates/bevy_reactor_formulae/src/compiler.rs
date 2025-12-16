@@ -230,10 +230,10 @@ pub async fn compile_formula(
 mod tests {
     use super::*;
     use crate::{
-        VM, Value,
+        VM,
         expr_type::{ExprType, Param},
         host::HostState,
-        vm::{InvocationContext, VMError},
+        vm::{InvocationContext, StackValue, VMError},
     };
     use bevy::{
         ecs::{
@@ -255,23 +255,29 @@ mod tests {
     #[derive(Component)]
     struct Position(Vec3);
 
-    fn get_self(vm: &VM) -> Result<Value, VMError> {
-        Ok(Value::Entity(vm.owner))
+    fn get_self(vm: &VM) -> Result<StackValue, VMError> {
+        Ok(StackValue::Entity(vm.owner))
     }
 
-    fn entity_health(ctx: &mut InvocationContext, actor: Value) -> Result<Value, VMError> {
-        let Value::Entity(entity) = actor else {
+    fn entity_health(
+        ctx: &mut InvocationContext,
+        actor: StackValue,
+    ) -> Result<StackValue, VMError> {
+        let StackValue::Entity(entity) = actor else {
             panic!("Not an entity");
         };
         if let Some(&Health(h)) = ctx.component::<Health>(entity) {
-            Ok(Value::F32(h))
+            Ok(StackValue::F32(h))
         } else {
             Err(VMError::MissingComponent(Health.type_id()))
         }
     }
 
-    fn entity_position(ctx: &mut InvocationContext, actor: Value) -> Result<Value, VMError> {
-        let Value::Entity(entity) = actor else {
+    fn entity_position(
+        ctx: &mut InvocationContext,
+        actor: StackValue,
+    ) -> Result<StackValue, VMError> {
+        let StackValue::Entity(entity) = actor else {
             panic!("Not an entity");
         };
         if let Some(Position(h)) = ctx.component::<Position>(entity) {
@@ -291,7 +297,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::I32(20));
+        assert_eq!(result, StackValue::I32(20));
     }
 
     #[test]
@@ -304,7 +310,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::I32(30));
+        assert_eq!(result, StackValue::I32(30));
     }
 
     #[test]
@@ -322,7 +328,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::F32(30.0));
+        assert_eq!(result, StackValue::F32(30.0));
     }
 
     #[test]
@@ -355,7 +361,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::Bool(false));
+        assert_eq!(result, StackValue::Bool(false));
     }
 
     #[test]
@@ -373,7 +379,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::Bool(true));
+        assert_eq!(result, StackValue::Bool(true));
     }
 
     #[test]
@@ -391,7 +397,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::Bool(false));
+        assert_eq!(result, StackValue::Bool(false));
     }
 
     #[test]
@@ -409,7 +415,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::Bool(false));
+        assert_eq!(result, StackValue::Bool(false));
     }
 
     #[test]
@@ -427,7 +433,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::Bool(true));
+        assert_eq!(result, StackValue::Bool(true));
     }
 
     #[test]
@@ -445,7 +451,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::Bool(true));
+        assert_eq!(result, StackValue::Bool(true));
     }
 
     #[test]
@@ -470,7 +476,7 @@ mod tests {
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.owner = actor_id;
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::F32(22.0));
+        assert_eq!(result, StackValue::F32(22.0));
     }
 
     #[test]
@@ -499,7 +505,7 @@ mod tests {
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.owner = actor_id;
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::F32(1.0));
+        assert_eq!(result, StackValue::F32(1.0));
     }
 
     #[test]
@@ -512,7 +518,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::I32(20));
+        assert_eq!(result, StackValue::I32(20));
     }
 
     #[test]
@@ -538,7 +544,7 @@ mod tests {
         vm.owner = actor_id;
         // eprintln!("Code: {:?}", module.functions[0].code);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::F32(2.0));
+        assert_eq!(result, StackValue::F32(2.0));
     }
 
     #[test]
@@ -557,7 +563,7 @@ mod tests {
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, Value::I32(4));
+        assert_eq!(result, StackValue::I32(4));
     }
 
     #[test]
@@ -571,7 +577,7 @@ mod tests {
         let host = host.lock().unwrap();
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
-        assert_eq!(result, Value::I32(20));
+        assert_eq!(result, StackValue::I32(20));
     }
 
     #[test]
@@ -592,7 +598,7 @@ mod tests {
         let host = host.lock().unwrap();
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
-        assert_eq!(result, Value::I32(20));
+        assert_eq!(result, StackValue::I32(20));
     }
 
     #[test]
@@ -613,7 +619,7 @@ mod tests {
         let host = host.lock().unwrap();
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
-        assert_eq!(result, Value::I32(25));
+        assert_eq!(result, StackValue::I32(25));
     }
 
     #[test]
@@ -636,7 +642,7 @@ mod tests {
         let host = host.lock().unwrap();
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
-        assert_eq!(result, Value::I32(5));
+        assert_eq!(result, StackValue::I32(5));
     }
 
     #[test]
@@ -661,7 +667,7 @@ mod tests {
         let host = host.lock().unwrap();
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
-        assert_eq!(result, Value::I32(20));
+        assert_eq!(result, StackValue::I32(20));
     }
 
     #[test]
@@ -703,10 +709,10 @@ mod tests {
         let host = host.lock().unwrap();
         let mut vm = VM::new(&world, &host, &mut tracking);
         let result = vm.run(&module, "test").unwrap();
-        assert_eq!(result, Value::F32(1.0));
+        assert_eq!(result, StackValue::F32(1.0));
     }
 
-    fn vec3_new(ctx: &mut InvocationContext) -> Result<Value, VMError> {
+    fn vec3_new(ctx: &mut InvocationContext) -> Result<StackValue, VMError> {
         assert_eq!(ctx.num_arguments(), 3);
         let x = ctx.argument::<f32>(0)?;
         let y = ctx.argument::<f32>(1)?;

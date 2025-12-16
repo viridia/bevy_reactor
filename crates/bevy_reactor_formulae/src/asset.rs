@@ -1,7 +1,6 @@
 use crate::{
-    HostState, Module, VM, Value, compile_module,
+    HostState, Module, compile_module,
     compiler::{self, report_error},
-    vm::VMError,
 };
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
@@ -14,17 +13,6 @@ use thiserror::Error;
 #[derive(TypePath, Asset)]
 pub struct ScriptModuleAsset {
     pub module: Module,
-}
-
-impl ScriptModuleAsset {
-    pub fn call<Params, Results>(
-        &self,
-        vm: &mut VM,
-        func_name: &str,
-        _args: &[Value],
-    ) -> Result<Value, VMError> {
-        vm.run(&self.module, func_name)
-    }
 }
 
 #[non_exhaustive]

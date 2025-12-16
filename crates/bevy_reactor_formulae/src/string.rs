@@ -3,16 +3,16 @@
 use std::sync::Arc;
 
 use crate::{
-    HostState, Value,
+    HostState,
     expr_type::ExprType,
-    vm::{InvocationContext, VMError},
+    vm::{InvocationContext, StackValue, VMError},
 };
 
 /// string.len()
-fn string_len(ctx: &mut InvocationContext) -> Result<Value, VMError> {
+fn string_len(ctx: &mut InvocationContext) -> Result<StackValue, VMError> {
     assert_eq!(ctx.num_arguments(), 1);
     let s: Arc<String> = ctx.argument(0)?;
-    Ok(Value::I32(s.len() as i32))
+    Ok(StackValue::I32(s.len() as i32))
 }
 
 pub(crate) fn init_string_methods(host: &mut HostState) {
