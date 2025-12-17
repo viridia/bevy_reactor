@@ -41,6 +41,37 @@ impl StackValue {
     pub fn is_void(&self) -> bool {
         *self == StackValue::Void
     }
+
+    pub fn type_path<'vm>(
+        &self,
+        world_refs: &'vm [&dyn PartialReflect],
+        heap_refs: &'vm [Box<dyn PartialReflect>],
+    ) -> &'static str {
+        match self {
+            StackValue::Void => "void",
+            StackValue::Bool(_) => "bool",
+            StackValue::I32(_) => "i32",
+            StackValue::I64(_) => "i64",
+            StackValue::F32(_) => "f32",
+            StackValue::F64(_) => "f64",
+            StackValue::Entity(_) => "Entity",
+            StackValue::String(_) => "String",
+            StackValue::WorldRef(world_index) => {
+                if let Some(reflect) = world_refs[*world_index].get_represented_type_info() {
+                    reflect.type_path()
+                } else {
+                    "none"
+                }
+            }
+            StackValue::HeapRef(heap_index) => {
+                if let Some(reflect) = heap_refs[*heap_index as usize].get_represented_type_info() {
+                    reflect.type_path()
+                } else {
+                    "none"
+                }
+            }
+        }
+    }
 }
 
 #[non_exhaustive]
@@ -155,33 +186,9 @@ impl<'vm, 'world, 'p> InvocationContext<'vm, 'world, 'p> {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn value_type_path(&self, value: &StackValue) -> &'static str {
-        match value {
-            StackValue::Void => "void",
-            StackValue::Bool(_) => "bool",
-            StackValue::I32(_) => "i32",
-            StackValue::I64(_) => "i64",
-            StackValue::F32(_) => "f32",
-            StackValue::F64(_) => "f64",
-            StackValue::Entity(_) => "Entity",
-            StackValue::String(_) => "String",
-            StackValue::WorldRef(world_index) => {
-                if let Some(reflect) = self.world_refs[*world_index].get_represented_type_info() {
-                    reflect.type_path()
-                } else {
-                    "none"
-                }
-            }
-            StackValue::HeapRef(heap_index) => {
-                if let Some(reflect) =
-                    self.heap_refs[*heap_index as usize].get_represented_type_info()
-                {
-                    reflect.type_path()
-                } else {
-                    "none"
-                }
-            }
-        }
+        value.type_path(self.world_refs, self.heap_refs)
     }
 
     /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
@@ -229,8 +236,6 @@ pub struct VM<'world, 'host, 'p> {
     call_stack: Vec<CallStackEntry>,
 
     /// Reflected values.
-    /// TODO: Need garbage collection
-    /// TODO: Would be better to use an arena for this and other temporaries.
     world_refs: Vec<&'world dyn PartialReflect>,
 
     /// Temporary non-primitive values created during execution.
@@ -324,33 +329,9 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn value_type_path(&self, value: &StackValue) -> &'static str {
-        match value {
-            StackValue::Void => "void",
-            StackValue::Bool(_) => "bool",
-            StackValue::I32(_) => "i32",
-            StackValue::I64(_) => "i64",
-            StackValue::F32(_) => "f32",
-            StackValue::F64(_) => "f64",
-            StackValue::Entity(_) => "Entity",
-            StackValue::String(_) => "String",
-            StackValue::WorldRef(world_index) => {
-                if let Some(reflect) = self.world_refs[*world_index].get_represented_type_info() {
-                    reflect.type_path()
-                } else {
-                    "none"
-                }
-            }
-            StackValue::HeapRef(heap_index) => {
-                if let Some(reflect) =
-                    self.heap_refs[*heap_index as usize].get_represented_type_info()
-                {
-                    reflect.type_path()
-                } else {
-                    "none"
-                }
-            }
-        }
+        value.type_path(&self.world_refs, &self.heap_refs)
     }
 
     /// Align the instruction pointer in preparation for loading an immediate value.
@@ -454,15 +435,6 @@ impl<'world, 'host, 'p> VM<'world, 'host, 'p> {
             Err(VMError::MissingFunction(function_name.to_string()))
         }
     }
-
-    // /// Return a reference to the Component `C` on the given entity. Calling this function
-    // /// adds the component as a dependency of the current tracking scope.
-    // pub fn component<C: Component>(&self, entity: Entity) -> Option<&'world C> {
-    //     let comp = self.world.entity(entity).get::<C>();
-    //     self.tracking
-    //         .track_component::<C>(entity, self.world, comp.is_some());
-    //     comp
-    // }
 
     /// Construct a `Value` containing a `PartialReflect` taken from the Bevy world.
     pub fn create_world_ref(&mut self, reflected: &'world dyn PartialReflect) -> StackValue {
