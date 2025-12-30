@@ -82,19 +82,48 @@
 
 Next:
 
-- assets
-  - need a practical use case
 - complex expressions
   - e.g. if { 0 } { 1 } else { 2 }
-- error cases:
+- error cases in build_exprs and gencode:
   - calling a static function non-statically
   - calling a non-static function statically
   - calling a non-function
   - attempting to use a function or type name as an lvalue
 
+# New locals design:
+
+- We'll need to separate params from locals, at least initially
+- locals is a flat buffer of u8
+- instructions:
+
+  - OP_LOAD_LOCAL_BOOL (u16 stack offset)
+  - OP_LOAD_LOCAL_I32 (u16)
+  - OP_LOAD_LOCAL_I64 (u16)
+  - OP_LOAD_LOCAL_F32 (u16)
+  - OP_LOAD_LOCAL_F64 (u16)
+  - OP_LOAD_LOCAL_STRING (u16)
+  - OP_LOAD_LOCAL_ENTITY (u16)
+  - OP_LOAD_LOCAL_REFLECT (u16) -> points to box<dyn PartialReflect>
+  - similar instructions for OP_STORE...
+  - box dropping:
+    - the function object requires a table of offsets of boxes to be dropped.
+    - this needs to be part of the call frame.
+    - it consists of a &'static [u16]
+    - what about dropping of string locals?
+      - Maybe what we need is an explicit OP_DROP_XXX opcode.
+        - OP_DROP_STRING
+        - OP_DROP_REFLECT
+      - This means doing some kind of lifetime analysis.
+        - This will require basic blocks, which is something we wanted to do anyway.
+        - I'm not sure how to have basic blocks inside expressions.
+        - things like `call(if x { 0 } else { 1 })`.
+        - this would be easier if we had SSA values of some kind, but I don't know how to do that.
+  - We also need to store the local size in the function
+  - This means, then, that we can can represent params via a pointer to the locals of the
+    previous call frame, so long as we align and offset each parameter consistently.
+
 ## Formula tasks
 
-- load module from asset (extension: .fmod or .crow)
 - type cast
 - inferred function adaptors
 - operators

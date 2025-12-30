@@ -653,7 +653,7 @@ fn drop_n(vm: &mut VM) -> Result<(), VMError> {
 }
 
 fn load_param(vm: &mut VM) -> Result<(), VMError> {
-    let n = vm.read_immediate::<u32>() as usize;
+    let n = vm.read_immediate::<u16>() as usize;
     let val = vm.stack[n].clone();
     vm.stack.push(val);
     Ok(())

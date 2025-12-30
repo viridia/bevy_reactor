@@ -1,6 +1,7 @@
 use smol_str::SmolStr;
 
 use crate::{
+    bblock::BasicBlock,
     expr_type::ExprType,
     location::TokenLocation,
     oper::{BinaryOp, UnaryOp},
@@ -22,7 +23,6 @@ pub(crate) enum ExprKind<'e> {
     ScriptMethodRef(&'e mut Expr<'e>, usize),
     HostMethodRef(&'e mut Expr<'e>, usize),
     /// A local `let` statement
-    // LocalDecl(usize, Option<&'e mut Expr<'e>>),
     /// A reference to a function parameter.
     ParamRef(usize),
     /// A reference to a local variable.
@@ -104,14 +104,6 @@ impl<'e> Display for Expr<'e> {
                 write!(f, ".{index}")
             }
             ExprKind::ParamRef(id) => write!(f, "ParamRef({id})"),
-            // ExprKind::LocalDecl(id, init) => {
-            //     write!(f, "Local({id}")?;
-            //     if let Some(init) = init {
-            //         write!(f, " = ")?;
-            //         init.fmt(f)?;
-            //     }
-            //     write!(f, ")")
-            // }
             ExprKind::BinaryExpr { op, lhs, rhs } => {
                 // TODO: Parens if necessary.
                 lhs.fmt(f)?;
@@ -189,4 +181,13 @@ impl<'e> Expr<'e> {
         self.typ = typ;
         self
     }
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct FunctionBody<'ex> {
+    pub(crate) body: Option<&'ex Expr<'ex>>,
+    pub(crate) num_params: usize,
+    pub(crate) locals: Vec<ExprType>,
+    pub(crate) bblocks: Vec<BasicBlock>,
+    // locals: Vec<Decl2>,
 }

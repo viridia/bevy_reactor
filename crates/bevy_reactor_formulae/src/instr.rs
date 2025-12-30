@@ -38,7 +38,7 @@ pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS
 // Method calls
 
 /// Call a registered method on an entity
-/// immediate: [u32, u32]: number of arguments, method index
+/// immediate: [u16, u16]: number of arguments, method index
 /// stack input: args
 /// stack output: result
 pub const OP_CALL: u8 = 70; // Call script function
@@ -309,7 +309,7 @@ pub fn disassemble(code: &[u8]) {
             }
 
             OP_LOAD_PARAM => {
-                let val = reader.read_immediate::<u32>();
+                let val = reader.read_immediate::<u16>();
                 eprintln!("load param {val}");
             }
 

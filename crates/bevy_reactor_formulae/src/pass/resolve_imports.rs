@@ -4,12 +4,12 @@ use std::sync::Arc;
 use bevy::{render::render_graph::Node, scene::ron::de};
 
 use crate::{
+    CompilationUnit,
     ast::{ASTNode, NodeKind},
     compiler::CompilationError,
-    decl::{self, Decl, ImportDecl, LocalDecl, ParamDecl, Scope},
+    decl::{self, Decl, ImportDecl, ParamDecl, Scope},
     expr::{Expr, ExprKind},
     types::{FunctionType, StructType, Type},
-    CompilationUnit,
 };
 
 use super::{

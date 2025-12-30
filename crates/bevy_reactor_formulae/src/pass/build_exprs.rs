@@ -15,9 +15,9 @@ use smol_str::SmolStr;
 
 use crate::{
     ast::ASTDecl,
-    compiler::{self, CompilationError, CompiledFunction, FunctionBody, ModuleExprs},
+    compiler::{self, CompilationError, CompiledFunction, ModuleExprs},
     decl::{self, DeclVisibility, FunctionParam},
-    expr::{Expr, ExprKind},
+    expr::{Expr, ExprKind, FunctionBody},
     expr_type::FunctionType,
     oper::{BinaryOp, UnaryOp},
 };
@@ -106,6 +106,7 @@ pub(crate) fn build_formula_exprs<'ast, 'me>(
         let mut function = FunctionBody {
             body: None,
             locals: Vec::new(),
+            bblocks: Vec::new(),
             num_params: 0,
         };
 
@@ -190,6 +191,7 @@ fn create_decls<'ast, 'me>(
                     module_exprs.functions.push(FunctionBody {
                         body: None,
                         locals: Vec::new(),
+                        bblocks: Vec::new(),
                         num_params: 0,
                     });
                     module.module_decls.insert(name.clone(), fd);

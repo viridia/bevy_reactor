@@ -1,5 +1,6 @@
 pub mod asset;
 pub(crate) mod ast;
+mod bblock;
 pub mod compiler;
 pub(crate) mod decl;
 pub(crate) mod expr;

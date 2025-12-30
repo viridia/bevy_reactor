@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use crate::{
-    Module, expr::Expr, expr_type::ExprType, host::HostState, location::TokenLocation,
+    Module, expr::FunctionBody, expr_type::ExprType, host::HostState, location::TokenLocation,
     oper::BinaryOp, parser::formula_parser, pass,
 };
 use bumpalo::Bump;
@@ -96,14 +96,8 @@ impl CompilationError {
 pub struct CompiledFunction {
     pub(crate) code: Vec<u8>,
     pub(crate) num_locals: usize,
-}
-
-#[derive(Default, Debug)]
-pub(crate) struct FunctionBody<'ex> {
-    pub(crate) body: Option<&'ex Expr<'ex>>,
-    pub(crate) num_params: usize,
-    pub(crate) locals: Vec<ExprType>,
-    // locals: Vec<Decl2>,
+    // local_size: usize
+    // drop_offsets: Vec<usize>
 }
 
 #[derive(Default, Debug)]
@@ -198,8 +192,9 @@ pub async fn compile_module(
     // self.resolve_imports().await?;
     let expr_arena = Bump::new();
     let host_lock = host.lock().unwrap();
-    let module_exprs = pass::build_module_exprs(&host_lock, &mut module, ast, &expr_arena)?;
-    pass::gen_module(&mut module, &module_exprs)?;
+    let mut module_exprs = pass::build_module_exprs(&host_lock, &mut module, ast, &expr_arena)?;
+    pass::build_bblocks(&mut module, &mut module_exprs)?;
+    pass::gen_code(&mut module, &module_exprs)?;
     Ok(module)
 }
 
@@ -222,7 +217,7 @@ pub async fn compile_formula(
     // self.resolve_imports().await?;
     let expr_arena = Bump::new();
     let module_exprs = pass::build_formula_exprs(host, &mut module, ast, result_type, &expr_arena)?;
-    pass::gen_module(&mut module, &module_exprs)?;
+    pass::gen_code(&mut module, &module_exprs)?;
     Ok(module)
 }
 
