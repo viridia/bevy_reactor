@@ -86,6 +86,7 @@ Next:
 - optimize basic block:
   - jump to a block with only a terminator replaces that terminator.
   - block with no predecessor can be eliminated.
+  - jump to a block that only pushes a bool can be reduced to a bool
 - complex expressions
   - e.g. if { 0 } { 1 } else { 2 }
 - error cases in build_exprs and gencode:

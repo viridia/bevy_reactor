@@ -54,7 +54,7 @@ pub(crate) fn assign_types<'e>(
                     }
                 }
 
-                BinaryOp::LogAnd | BinaryOp::LogOr => todo!(),
+                BinaryOp::LogAnd | BinaryOp::LogOr => {}
 
                 BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => {
                     let ty = inference.substitute(&expr.typ);
@@ -163,11 +163,11 @@ pub(crate) fn assign_types<'e>(
         }
 
         ExprKind::If {
-            condition: test,
+            condition,
             then_branch,
             else_branch,
         } => {
-            assign_types(test, inference)?;
+            assign_types(condition, inference)?;
             assign_types(then_branch, inference)?;
             if let Some(e) = else_branch {
                 assign_types(e, inference)?;

@@ -75,79 +75,7 @@ pub(crate) fn gen_code<'content>(
                     builder.set_block_term(BlockTerminator::Return);
                 }
 
-                struct BranchPatch {
-                    from_offset: usize,
-                    to_block: usize,
-                }
-
-                let mut patches: Vec<BranchPatch> = Vec::with_capacity(builder.blocks.len() * 2);
-                let mut ibuilder = InstructionBuilder::default();
-                for (block_id, block) in builder.blocks.iter_mut().enumerate() {
-                    block.start_offset = ibuilder.position();
-                    for op in block.ops.iter() {
-                        visit_stack_op(op, &mut ibuilder)?;
-                    }
-
-                    match block.term {
-                        BlockTerminator::Invalid => panic!("Basic block with no terminator"),
-                        BlockTerminator::Return => {
-                            ibuilder.push_op(instr::OP_RET);
-                        }
-                        BlockTerminator::Jump { target } => {
-                            if target != block_id + 1 {
-                                ibuilder.push_op(instr::OP_BRANCH);
-                                let patch_offset = ibuilder.reserve_immediate::<i32>();
-                                patches.push(BranchPatch {
-                                    from_offset: patch_offset,
-                                    to_block: target,
-                                });
-                            }
-                        }
-                        BlockTerminator::Branch {
-                            then_target,
-                            else_target,
-                        } => {
-                            if then_target == block_id + 1 {
-                                // Fall through to then-block if true
-                                ibuilder.push_op(instr::OP_BRANCH_IF_FALSE);
-                                let patch_offset = ibuilder.reserve_immediate::<i32>();
-                                patches.push(BranchPatch {
-                                    from_offset: patch_offset,
-                                    to_block: else_target,
-                                });
-                            } else if else_target == block_id + 1 {
-                                // Fall through to else block if false.
-                                ibuilder.push_op(instr::OP_BRANCH_IF_TRUE);
-                                let patch_offset = ibuilder.reserve_immediate::<i32>();
-                                patches.push(BranchPatch {
-                                    from_offset: patch_offset,
-                                    to_block: then_target,
-                                });
-                            } else {
-                                ibuilder.push_op(instr::OP_BRANCH_IF_TRUE);
-                                let patch_offset = ibuilder.reserve_immediate::<i32>();
-                                patches.push(BranchPatch {
-                                    from_offset: patch_offset,
-                                    to_block: then_target,
-                                });
-
-                                // Only branch to else block if we wouldn't fall through.
-                                ibuilder.push_op(instr::OP_BRANCH);
-                                let patch_offset = ibuilder.reserve_immediate::<i32>();
-                                patches.push(BranchPatch {
-                                    from_offset: patch_offset,
-                                    to_block: else_target,
-                                });
-                            }
-                        }
-                    }
-                }
-
-                for patch in patches.iter() {
-                    let target_block = &builder.blocks[patch.to_block];
-                    ibuilder.patch_branch_target(patch.from_offset, target_block.start_offset);
-                }
-
+                let ibuilder = build_instructions(builder)?;
                 module.functions[*index].code = ibuilder.inner();
                 module.functions[*index].num_locals = function.locals.len();
             }
@@ -213,11 +141,6 @@ fn visit_expr<'cu>(
             visit_expr(module, function, base, out)?;
             out.add_op(StackOp::LoadNativeProp(field_index as u16));
         }
-
-        // ExprKind::Index(ref base, _field_index) => {
-        //     gen_expr(unit, generator, base, out)?;
-        //     todo!();
-        // }
         ExprKind::GlobalRef(index) => {
             out.add_op(StackOp::LoadGlobal(index as u16));
         }
@@ -225,65 +148,90 @@ fn visit_expr<'cu>(
             op,
             ref lhs,
             ref rhs,
-        } => {
-            visit_expr(module, function, lhs, out)?;
-            visit_expr(module, function, rhs, out)?;
-            match op {
-                BinaryOp::Add
-                | BinaryOp::Sub
-                | BinaryOp::Mul
-                | BinaryOp::Div
-                | BinaryOp::Mod
-                | BinaryOp::LogAnd
-                | BinaryOp::LogOr
-                | BinaryOp::BitAnd
-                | BinaryOp::BitOr
-                | BinaryOp::BitXor => {
-                    out.add_op(StackOp::BinaryOp(
-                        op,
-                        match expr.typ {
-                            ExprType::I32 => StackOpType::I32,
-                            ExprType::I64 => StackOpType::I64,
-                            ExprType::F32 => StackOpType::F32,
-                            ExprType::F64 => StackOpType::F64,
-                            _ => panic!("Invalid type for binary addition: {:?}", expr.typ),
-                        },
-                    ));
-                }
-                BinaryOp::Shl => todo!(),
-                BinaryOp::Shr => todo!(),
-                BinaryOp::Eq
-                | BinaryOp::Ne
-                | BinaryOp::Lt
-                | BinaryOp::Le
-                | BinaryOp::Gt
-                | BinaryOp::Ge => {
-                    out.add_op(StackOp::BinaryOp(
-                        op,
-                        match lhs.typ {
-                            ExprType::I32 => StackOpType::I32,
-                            ExprType::I64 => StackOpType::I64,
-                            ExprType::F32 => StackOpType::F32,
-                            ExprType::F64 => StackOpType::F64,
-                            _ => panic!("Invalid type for binary addition: {:?}", lhs.typ),
-                        },
-                    ));
-                }
+        } => match op {
+            BinaryOp::Add
+            | BinaryOp::Sub
+            | BinaryOp::Mul
+            | BinaryOp::Div
+            | BinaryOp::Mod
+            | BinaryOp::BitAnd
+            | BinaryOp::BitOr
+            | BinaryOp::BitXor => {
+                visit_expr(module, function, lhs, out)?;
+                visit_expr(module, function, rhs, out)?;
+                out.add_op(StackOp::BinaryOp(
+                    op,
+                    match expr.typ {
+                        ExprType::I32 => StackOpType::I32,
+                        ExprType::I64 => StackOpType::I64,
+                        ExprType::F32 => StackOpType::F32,
+                        ExprType::F64 => StackOpType::F64,
+                        _ => panic!("Invalid type for binary addition: {:?}", expr.typ),
+                    },
+                ));
             }
-        }
+            BinaryOp::LogAnd | BinaryOp::LogOr => {
+                visit_expr(module, function, lhs, out)?;
+                let true_block = out.new_block();
+                let false_block = out.new_block();
+                let next_block = out.new_block();
+                out.set_block_term(BlockTerminator::Branch {
+                    then_target: true_block,
+                    else_target: false_block,
+                });
+
+                if op == BinaryOp::LogAnd {
+                    out.current = true_block;
+                    visit_expr(module, function, rhs, out)?;
+                    out.set_block_term(BlockTerminator::Jump { target: next_block });
+
+                    out.current = false_block;
+                    out.add_op(StackOp::ConstBool(false));
+                    out.set_block_term(BlockTerminator::Jump { target: next_block });
+                } else {
+                    out.current = false_block;
+                    visit_expr(module, function, rhs, out)?;
+                    out.set_block_term(BlockTerminator::Jump { target: next_block });
+
+                    out.current = true_block;
+                    out.add_op(StackOp::ConstBool(true));
+                    out.set_block_term(BlockTerminator::Jump { target: next_block });
+                }
+
+                out.current = next_block;
+            }
+            BinaryOp::Shl => todo!(),
+            BinaryOp::Shr => todo!(),
+            BinaryOp::Eq
+            | BinaryOp::Ne
+            | BinaryOp::Lt
+            | BinaryOp::Le
+            | BinaryOp::Gt
+            | BinaryOp::Ge => {
+                visit_expr(module, function, lhs, out)?;
+                visit_expr(module, function, rhs, out)?;
+                out.add_op(StackOp::BinaryOp(
+                    op,
+                    match lhs.typ {
+                        ExprType::I32 => StackOpType::I32,
+                        ExprType::I64 => StackOpType::I64,
+                        ExprType::F32 => StackOpType::F32,
+                        ExprType::F64 => StackOpType::F64,
+                        _ => panic!("Invalid type for binary addition: {:?}", lhs.typ),
+                    },
+                ));
+            }
+        },
         ExprKind::Assign { ref lhs, ref rhs } => {
-            // gen_expr(unit, generator, rhs, out)?;
             visit_assign(module, function, lhs, rhs, None, out)?;
         }
-
-        // ExprKind::AssignOp {
-        //     op,
-        //     ref lhs,
-        //     ref rhs,
-        // } => {
-        //     // gen_expr(unit, generator, rhs, out)?;
-        //     gen_assign(unit, generator, lhs, rhs, Some(op), out)?;
-        // }
+        ExprKind::AssignOp {
+            op,
+            ref lhs,
+            ref rhs,
+        } => {
+            visit_assign(module, function, lhs, rhs, Some(op), out)?;
+        }
         ExprKind::UnaryExpr { op, ref arg } => {
             visit_expr(module, function, arg, out)?;
             match op {
@@ -292,63 +240,6 @@ fn visit_expr<'cu>(
                 UnaryOp::BitNot => todo!(),
             }
         }
-
-        // ExprKind::Cast(ref arg) => {
-        //     gen_expr(unit, generator, arg, out)?;
-        //     // Convert from arg.typ to expr.typ.
-        //     match (&expr.typ, &arg.typ) {
-        //         (ExprType::Boolean, ExprType::I32) => {
-        //             out.instruction(&Instruction::I32Eqz);
-        //         }
-        //         (ExprType::Boolean, ExprType::I64) => {
-        //             out.instruction(&Instruction::I64Eqz);
-        //             out.instruction(&Instruction::I32WrapI64);
-        //         }
-        //         (ExprType::I32, ExprType::Boolean) => {
-        //             // Same type, do nothing.
-        //         }
-        //         (ExprType::I32, ExprType::I64) => {
-        //             out.instruction(&Instruction::I32WrapI64);
-        //         }
-        //         (ExprType::I32, ExprType::F32) => {
-        //             out.instruction(&Instruction::I32TruncF32S);
-        //         }
-        //         (ExprType::I32, ExprType::F64) => {
-        //             out.instruction(&Instruction::I32TruncF64S);
-        //         }
-        //         (ExprType::I64, ExprType::Boolean) => {
-        //             out.instruction(&Instruction::I64ExtendI32U);
-        //         }
-        //         (ExprType::I64, ExprType::I32) => {
-        //             out.instruction(&Instruction::I64Extend32S);
-        //         }
-        //         (ExprType::I64, ExprType::F32) => {
-        //             out.instruction(&Instruction::I64TruncF32S);
-        //         }
-        //         (ExprType::I64, ExprType::F64) => {
-        //             out.instruction(&Instruction::I64TruncF64S);
-        //         }
-        //         (ExprType::F32, ExprType::I32) => {
-        //             out.instruction(&Instruction::F32ConvertI32S);
-        //         }
-        //         (ExprType::F32, ExprType::I64) => {
-        //             out.instruction(&Instruction::F32ConvertI64S);
-        //         }
-        //         (ExprType::F32, ExprType::F64) => {
-        //             out.instruction(&Instruction::F32DemoteF64);
-        //         }
-        //         (ExprType::F64, ExprType::I32) => {
-        //             out.instruction(&Instruction::F64ConvertI32S);
-        //         }
-        //         (ExprType::F64, ExprType::I64) => {
-        //             out.instruction(&Instruction::F64ConvertI64S);
-        //         }
-        //         (ExprType::F64, ExprType::F32) => {
-        //             out.instruction(&Instruction::F64PromoteF32);
-        //         }
-        //         _ => panic!("Invalid cast: {:?}", expr),
-        //     }
-        // }
         ExprKind::Call(ref func, ref args) => {
             if let ExprKind::HostFunctionRef(index) = func.kind {
                 for arg in args {
@@ -393,7 +284,6 @@ fn visit_expr<'cu>(
                 panic!("Invalid function reference: {func:?}");
             }
         }
-
         ExprKind::Block(ref vec, ref expr) => {
             for stmt in vec {
                 visit_expr(module, function, stmt, out)?;
@@ -409,7 +299,6 @@ fn visit_expr<'cu>(
                 visit_expr(module, function, expr, out)?;
             }
         }
-
         ExprKind::If {
             ref condition,
             ref then_branch,
@@ -448,7 +337,15 @@ fn visit_expr<'cu>(
             }
         }
 
-        _ => todo!("Unimplemented {:?}", expr.kind),
+        ExprKind::ScriptFunctionRef(_) | ExprKind::HostFunctionRef(_) => {
+            unreachable!("Should not appear here")
+        }
+
+        ExprKind::ScriptMethodRef(ref _expr, _) | ExprKind::HostMethodRef(ref _expr, _) => {
+            unreachable!("Should not appear here")
+        }
+        ExprKind::Index(ref _expr, _) => todo!(),
+        ExprKind::Cast(ref _expr) => todo!(),
     }
 
     Ok(())
@@ -653,6 +550,80 @@ fn expr_to_lvalue(
         ExprKind::Index(ref _expr, _) => todo!(),
         _ => panic!("Invalid lvalue: {expr:?}"),
     }
+}
+
+fn build_instructions(mut builder: BlockBuilder) -> Result<InstructionBuilder, CompilationError> {
+    struct BranchPatch {
+        from_offset: usize,
+        to_block: usize,
+    }
+    let mut patches: Vec<BranchPatch> = Vec::with_capacity(builder.blocks.len() * 2);
+    let mut ibuilder = InstructionBuilder::default();
+    for (block_id, block) in builder.blocks.iter_mut().enumerate() {
+        block.start_offset = ibuilder.position();
+        for op in block.ops.iter() {
+            visit_stack_op(op, &mut ibuilder)?;
+        }
+
+        match block.term {
+            BlockTerminator::Invalid => panic!("Basic block with no terminator"),
+            BlockTerminator::Return => {
+                ibuilder.push_op(instr::OP_RET);
+            }
+            BlockTerminator::Jump { target } => {
+                if target != block_id + 1 {
+                    ibuilder.push_op(instr::OP_BRANCH);
+                    let patch_offset = ibuilder.reserve_immediate::<i32>();
+                    patches.push(BranchPatch {
+                        from_offset: patch_offset,
+                        to_block: target,
+                    });
+                }
+            }
+            BlockTerminator::Branch {
+                then_target,
+                else_target,
+            } => {
+                if then_target == block_id + 1 {
+                    // Fall through to then-block if true
+                    ibuilder.push_op(instr::OP_BRANCH_IF_FALSE);
+                    let patch_offset = ibuilder.reserve_immediate::<i32>();
+                    patches.push(BranchPatch {
+                        from_offset: patch_offset,
+                        to_block: else_target,
+                    });
+                } else if else_target == block_id + 1 {
+                    // Fall through to else block if false.
+                    ibuilder.push_op(instr::OP_BRANCH_IF_TRUE);
+                    let patch_offset = ibuilder.reserve_immediate::<i32>();
+                    patches.push(BranchPatch {
+                        from_offset: patch_offset,
+                        to_block: then_target,
+                    });
+                } else {
+                    ibuilder.push_op(instr::OP_BRANCH_IF_TRUE);
+                    let patch_offset = ibuilder.reserve_immediate::<i32>();
+                    patches.push(BranchPatch {
+                        from_offset: patch_offset,
+                        to_block: then_target,
+                    });
+
+                    // Only branch to else block if we wouldn't fall through.
+                    ibuilder.push_op(instr::OP_BRANCH);
+                    let patch_offset = ibuilder.reserve_immediate::<i32>();
+                    patches.push(BranchPatch {
+                        from_offset: patch_offset,
+                        to_block: else_target,
+                    });
+                }
+            }
+        }
+    }
+    for patch in patches.iter() {
+        let target_block = &builder.blocks[patch.to_block];
+        ibuilder.patch_branch_target(patch.from_offset, target_block.start_offset);
+    }
+    Ok(ibuilder)
 }
 
 fn visit_stack_op<'cu>(op: &StackOp, out: &mut InstructionBuilder) -> Result<(), CompilationError> {

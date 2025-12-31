@@ -535,14 +535,39 @@ mod tests {
             ExprType::F32,
         ))
         .unwrap();
+        // disassemble(&module.functions[0].code);
+
+        let mut tracking = TrackingScope::new(Tick::default());
+        let mut vm = VM::new(&world, &host, &mut tracking);
+        vm.owner = actor_id;
+        let result = vm.run(&module, Module::DEFAULT).unwrap();
+        assert_eq!(result, StackValue::F32(2.0));
+    }
+
+    #[test]
+    fn compile_logical_op() {
+        let mut world = World::new();
+        let actor = world.spawn(Health(22.0));
+        let actor_id = actor.id();
+        let mut host = HostState::default();
+        host.add_global_prop("self", get_self, ExprType::Entity);
+        host.add_host_type::<Entity>("Entity")
+            .add_property("health", entity_health, ExprType::F32);
+
+        let module = future::block_on(compile_formula(
+            "--str--",
+            "self.health > 0.0 && self.health < 1.0",
+            &host,
+            ExprType::Boolean,
+        ))
+        .unwrap();
         disassemble(&module.functions[0].code);
 
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
         vm.owner = actor_id;
-        // eprintln!("Code: {:?}", module.functions[0].code);
         let result = vm.run(&module, Module::DEFAULT).unwrap();
-        assert_eq!(result, StackValue::F32(2.0));
+        assert_eq!(result, StackValue::Bool(false));
     }
 
     #[test]
