@@ -194,7 +194,7 @@ pub async fn compile_module(
     let host_lock = host.lock().unwrap();
     let mut module_exprs = pass::build_module_exprs(&host_lock, &mut module, ast, &expr_arena)?;
     pass::build_bblocks(&mut module, &mut module_exprs)?;
-    pass::gen_code(&mut module, &module_exprs)?;
+    // pass::gen_code(&mut module, &module_exprs)?;
     Ok(module)
 }
 
@@ -216,8 +216,10 @@ pub async fn compile_formula(
     // pass::define_imports(&mut self.decls, ast)?;
     // self.resolve_imports().await?;
     let expr_arena = Bump::new();
-    let module_exprs = pass::build_formula_exprs(host, &mut module, ast, result_type, &expr_arena)?;
-    pass::gen_code(&mut module, &module_exprs)?;
+    let mut module_exprs =
+        pass::build_formula_exprs(host, &mut module, ast, result_type, &expr_arena)?;
+    pass::build_bblocks(&mut module, &mut module_exprs)?;
+    // pass::gen_code(&mut module, &module_exprs)?;
     Ok(module)
 }
 
@@ -228,6 +230,7 @@ mod tests {
         VM,
         expr_type::{ExprType, Param},
         host::HostState,
+        instr::disassemble,
         vm::{InvocationContext, StackValue, VMError},
     };
     use bevy::{
@@ -300,6 +303,7 @@ mod tests {
         let host = HostState::default();
         let module =
             future::block_on(compile_formula("--str--", "20 + 10", &host, ExprType::I32)).unwrap();
+        // disassemble(&module.functions[0].code);
 
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());
@@ -533,6 +537,7 @@ mod tests {
             ExprType::F32,
         ))
         .unwrap();
+        disassemble(&module.functions[0].code);
 
         let mut tracking = TrackingScope::new(Tick::default());
         let mut vm = VM::new(&world, &host, &mut tracking);
@@ -655,7 +660,6 @@ mod tests {
             &host,
         ))
         .unwrap();
-        // disassemble(&module.functions[0].code);
 
         let world = World::new();
         let mut tracking = TrackingScope::new(Tick::default());

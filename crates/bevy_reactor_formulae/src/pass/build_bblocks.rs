@@ -5,11 +5,12 @@ use bevy::{math::ops::exp, scene::ron::de};
 use crate::{
     Module,
     ast::{ASTNode, NodeKind},
-    bblock::{BasicBlock, BlockTerminator, StackOp},
+    bblock::{BasicBlock, BlockTerminator, StackOp, StackOpType},
     compiler::{CompilationError, CompiledFunction, ModuleExprs},
     decl::{self, FunctionParam, Scope},
     expr::{Expr, ExprKind, FunctionBody},
     expr_type::ExprType,
+    instr::{self, InstructionBuilder},
     oper::{BinaryOp, UnaryOp},
 };
 
@@ -26,10 +27,7 @@ impl BlockBuilder {
 
     fn new_block(&mut self) -> usize {
         let id = self.blocks.len();
-        self.blocks.push(BasicBlock {
-            id,
-            ..Default::default()
-        });
+        self.blocks.push(BasicBlock::default());
         id
     }
 
@@ -74,10 +72,84 @@ pub(crate) fn build_bblocks<'content>(
                     if body.typ.is_void() {
                         builder.add_op(StackOp::ConstVoid);
                     }
-                    builder.add_op(StackOp::Return);
+                    builder.set_block_term(BlockTerminator::Return);
                 }
-                // module.functions[*index].code = builder.inner();
-                // module.functions[*index].num_locals = function.locals.len();
+
+                struct BranchPatch {
+                    from_offset: usize,
+                    to_block: usize,
+                }
+
+                let mut patches: Vec<BranchPatch> = Vec::with_capacity(builder.blocks.len() * 2);
+                let mut ibuilder = InstructionBuilder::default();
+                for (block_id, block) in builder.blocks.iter_mut().enumerate() {
+                    block.start_offset = ibuilder.position();
+                    for op in block.ops.iter() {
+                        visit_stack_op(op, &mut ibuilder)?;
+                    }
+
+                    match block.term {
+                        BlockTerminator::Invalid => panic!("Basic block with no terminator"),
+                        BlockTerminator::Return => {
+                            ibuilder.push_op(instr::OP_RET);
+                        }
+                        BlockTerminator::Jump { target } => {
+                            if target != block_id + 1 {
+                                ibuilder.push_op(instr::OP_BRANCH);
+                                let patch_offset = ibuilder.reserve_immediate::<i32>();
+                                patches.push(BranchPatch {
+                                    from_offset: patch_offset,
+                                    to_block: target,
+                                });
+                            }
+                        }
+                        BlockTerminator::Branch {
+                            then_target,
+                            else_target,
+                        } => {
+                            if then_target == block_id + 1 {
+                                // Fall through to then-block if true
+                                ibuilder.push_op(instr::OP_BRANCH_IF_FALSE);
+                                let patch_offset = ibuilder.reserve_immediate::<i32>();
+                                patches.push(BranchPatch {
+                                    from_offset: patch_offset,
+                                    to_block: else_target,
+                                });
+                            } else if else_target == block_id + 1 {
+                                // Fall through to else block if false.
+                                ibuilder.push_op(instr::OP_BRANCH_IF_TRUE);
+                                let patch_offset = ibuilder.reserve_immediate::<i32>();
+                                patches.push(BranchPatch {
+                                    from_offset: patch_offset,
+                                    to_block: then_target,
+                                });
+                            } else {
+                                ibuilder.push_op(instr::OP_BRANCH_IF_TRUE);
+                                let patch_offset = ibuilder.reserve_immediate::<i32>();
+                                patches.push(BranchPatch {
+                                    from_offset: patch_offset,
+                                    to_block: then_target,
+                                });
+
+                                // Only branch to else block if we wouldn't fall through.
+                                ibuilder.push_op(instr::OP_BRANCH);
+                                let patch_offset = ibuilder.reserve_immediate::<i32>();
+                                patches.push(BranchPatch {
+                                    from_offset: patch_offset,
+                                    to_block: else_target,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                for patch in patches.iter() {
+                    let target_block = &builder.blocks[patch.to_block];
+                    ibuilder.patch_branch_target(patch.from_offset, target_block.start_offset);
+                }
+
+                module.functions[*index].code = ibuilder.inner();
+                module.functions[*index].num_locals = function.locals.len();
             }
             _ => {}
         }
@@ -128,7 +200,6 @@ fn visit_expr<'cu>(
         ExprKind::LocalRef(index) => {
             out.add_op(StackOp::LoadLocal(index as u16));
         }
-
         ExprKind::Field(ref base, field_index) => {
             visit_expr(module, function, base, out)?;
             match base.typ {
@@ -138,7 +209,6 @@ fn visit_expr<'cu>(
                 _ => panic!("Invalid type for field access"),
             }
         }
-
         ExprKind::NativeProp(ref base, field_index) => {
             visit_expr(module, function, base, out)?;
             out.add_op(StackOp::LoadNativeProp(field_index as u16));
@@ -151,7 +221,6 @@ fn visit_expr<'cu>(
         ExprKind::GlobalRef(index) => {
             out.add_op(StackOp::LoadGlobal(index as u16));
         }
-
         ExprKind::BinaryExpr {
             op,
             ref lhs,
@@ -159,9 +228,49 @@ fn visit_expr<'cu>(
         } => {
             visit_expr(module, function, lhs, out)?;
             visit_expr(module, function, rhs, out)?;
-            out.add_op(StackOp::BinaryOp(op));
+            match op {
+                BinaryOp::Add
+                | BinaryOp::Sub
+                | BinaryOp::Mul
+                | BinaryOp::Div
+                | BinaryOp::Mod
+                | BinaryOp::LogAnd
+                | BinaryOp::LogOr
+                | BinaryOp::BitAnd
+                | BinaryOp::BitOr
+                | BinaryOp::BitXor => {
+                    out.add_op(StackOp::BinaryOp(
+                        op,
+                        match expr.typ {
+                            ExprType::I32 => StackOpType::I32,
+                            ExprType::I64 => StackOpType::I64,
+                            ExprType::F32 => StackOpType::F32,
+                            ExprType::F64 => StackOpType::F64,
+                            _ => panic!("Invalid type for binary addition: {:?}", expr.typ),
+                        },
+                    ));
+                }
+                BinaryOp::Shl => todo!(),
+                BinaryOp::Shr => todo!(),
+                BinaryOp::Eq
+                | BinaryOp::Ne
+                | BinaryOp::Lt
+                | BinaryOp::Le
+                | BinaryOp::Gt
+                | BinaryOp::Ge => {
+                    out.add_op(StackOp::BinaryOp(
+                        op,
+                        match lhs.typ {
+                            ExprType::I32 => StackOpType::I32,
+                            ExprType::I64 => StackOpType::I64,
+                            ExprType::F32 => StackOpType::F32,
+                            ExprType::F64 => StackOpType::F64,
+                            _ => panic!("Invalid type for binary addition: {:?}", lhs.typ),
+                        },
+                    ));
+                }
+            }
         }
-
         ExprKind::Assign { ref lhs, ref rhs } => {
             // gen_expr(unit, generator, rhs, out)?;
             visit_assign(module, function, lhs, rhs, None, out)?;
@@ -261,7 +370,7 @@ fn visit_expr<'cu>(
                 if num_args > u16::MAX as usize {
                     panic!("Too many function arguments: {num_args}");
                 }
-                out.add_op(StackOp::CallModuleFunction {
+                out.add_op(StackOp::CallScriptFunction {
                     method: index as u16,
                     num_args: num_args as u16,
                 });
@@ -473,7 +582,16 @@ fn visit_assign<'cu>(
                     }
                     visit_expr(module, function, rhs, out)?;
                     if let Some(bop) = op {
-                        out.add_op(StackOp::BinaryOp(bop));
+                        out.add_op(StackOp::BinaryOp(
+                            bop,
+                            match lhs.typ {
+                                ExprType::I32 => StackOpType::I32,
+                                ExprType::I64 => StackOpType::I64,
+                                ExprType::F32 => StackOpType::F32,
+                                ExprType::F64 => StackOpType::F64,
+                                _ => panic!("Invalid type for binary addition: {:?}", lhs.typ),
+                            },
+                        ));
                         // visit_binop(&lvalue_type, bop, &lhs.typ, &rhs.typ, out);
                         // gen_binop(&expr.typ, op, &lhs.typ, &rhs.typ, out);
                     }
@@ -537,6 +655,275 @@ fn expr_to_lvalue(
     }
 }
 
+fn visit_stack_op<'cu>(op: &StackOp, out: &mut InstructionBuilder) -> Result<(), CompilationError> {
+    match op {
+        StackOp::ConstVoid => {
+            out.push_op(instr::OP_CONST_VOID);
+        }
+
+        StackOp::ConstBool(value) => {
+            match value {
+                true => out.push_op(instr::OP_CONST_TRUE),
+                false => out.push_op(instr::OP_CONST_FALSE),
+            };
+        }
+
+        StackOp::ConstI32(value) => {
+            out.push_op(instr::OP_CONST_I32);
+            out.push_immediate(*value);
+        }
+
+        StackOp::ConstI64(value) => {
+            out.push_op(instr::OP_CONST_I64);
+            out.push_immediate(*value);
+        }
+
+        StackOp::ConstF32(value) => {
+            out.push_op(instr::OP_CONST_F32);
+            out.push_immediate(*value);
+        }
+
+        StackOp::ConstF64(value) => {
+            out.push_op(instr::OP_CONST_F64);
+            out.push_immediate(*value);
+        }
+
+        StackOp::ConstStr(str) => {
+            let str_len = str.len();
+            if str_len > u16::MAX as usize {
+                panic!("String constants longer than 64k are not supported");
+            }
+
+            out.push_op(instr::OP_CONST_STR);
+            out.push_immediate(str_len as u16);
+            out.push_immediate_string(str);
+        }
+
+        StackOp::Drop(n) => {
+            todo!();
+        }
+
+        StackOp::LoadParam(index) => {
+            out.push_op(instr::OP_LOAD_PARAM);
+            out.push_immediate::<u16>(*index);
+        }
+        StackOp::LoadLocal(index) => {
+            out.push_op(instr::OP_LOAD_LOCAL);
+            out.push_immediate::<u16>(*index);
+        }
+
+        StackOp::StoreLocal(index) => {
+            out.push_op(instr::OP_STORE_LOCAL);
+            out.push_immediate::<u16>(*index);
+        }
+
+        StackOp::LoadField(index) => {
+            out.push_op(instr::OP_LOAD_FIELD);
+            out.push_immediate::<u16>(*index);
+        }
+
+        StackOp::LoadNativeProp(field_index) => {
+            out.push_op(instr::OP_LOAD_NATIVE_PROP);
+            out.push_immediate::<u16>(*field_index);
+        }
+
+        StackOp::LoadGlobal(index) => {
+            out.push_op(instr::OP_LOAD_GLOBAL);
+            out.push_immediate::<u16>(*index);
+        }
+
+        StackOp::BinaryOp(op, ty) => {
+            visit_binop(*ty, *op, out);
+        }
+
+        StackOp::UnaryOp(op, _ty) => match op {
+            UnaryOp::Not => todo!(),
+            UnaryOp::Neg => todo!(),
+            UnaryOp::BitNot => todo!(),
+        },
+
+        StackOp::CallScriptFunction { method, num_args } => {
+            out.push_op(instr::OP_CALL);
+            out.push_immediate::<u16>(*method);
+            out.push_immediate::<u16>(*num_args);
+        }
+
+        StackOp::CallHostFunction { method, num_args } => {
+            out.push_op(instr::OP_CALL_HOST_FUNCTION);
+            out.push_immediate::<u16>(*method);
+            out.push_immediate::<u16>(*num_args);
+        }
+
+        StackOp::CallHostMethod { method, num_args } => {
+            out.push_op(instr::OP_CALL_HOST_METHOD);
+            out.push_immediate::<u16>(*method);
+            out.push_immediate::<u16>(*num_args);
+        }
+    }
+
+    Ok(())
+}
+
+fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
+    match op {
+        BinaryOp::Add => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_ADD_I32),
+                StackOpType::I64 => out.push_op(instr::OP_ADD_I64),
+                StackOpType::F32 => out.push_op(instr::OP_ADD_F32),
+                StackOpType::F64 => out.push_op(instr::OP_ADD_F64),
+                _ => panic!("Invalid type for binary addition: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Sub => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_SUB_I32),
+                StackOpType::I64 => out.push_op(instr::OP_SUB_I64),
+                StackOpType::F32 => out.push_op(instr::OP_SUB_F32),
+                StackOpType::F64 => out.push_op(instr::OP_SUB_F64),
+                _ => panic!("Invalid type for binary subtraction: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Mul => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_MUL_I32),
+                StackOpType::I64 => out.push_op(instr::OP_MUL_I64),
+                StackOpType::F32 => out.push_op(instr::OP_MUL_F32),
+                StackOpType::F64 => out.push_op(instr::OP_MUL_F64),
+                _ => panic!("Invalid type for binary multiplication: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Div => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_DIV_I32),
+                StackOpType::I64 => out.push_op(instr::OP_DIV_I64),
+                StackOpType::F32 => out.push_op(instr::OP_DIV_F32),
+                StackOpType::F64 => out.push_op(instr::OP_DIV_F64),
+                _ => panic!("Invalid type for binary division: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Mod => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_REM_I32),
+                StackOpType::I64 => out.push_op(instr::OP_REM_I64),
+                _ => panic!("Invalid type for binary modulo: {typ:?}"),
+            };
+        }
+
+        BinaryOp::LogAnd => {
+            todo!();
+        }
+
+        BinaryOp::LogOr => {
+            todo!();
+        }
+
+        BinaryOp::BitAnd => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_BIT_AND_I32),
+                StackOpType::I64 => out.push_op(instr::OP_BIT_AND_I64),
+                _ => panic!("Invalid type for bitwise AND: {typ:?}"),
+            };
+        }
+
+        BinaryOp::BitOr => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_BIT_OR_I32),
+                StackOpType::I64 => out.push_op(instr::OP_BIT_OR_I64),
+                _ => panic!("Invalid type for bitwise OR: {typ:?}"),
+            };
+        }
+
+        BinaryOp::BitXor => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_BIT_XOR_I32),
+                StackOpType::I64 => out.push_op(instr::OP_BIT_XOR_I64),
+                _ => panic!("Invalid type for bitwise XOR: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Shl => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_SHL),
+                StackOpType::I64 => out.push_op(instr::OP_SHL),
+                _ => panic!("Invalid type for bitwise shift left: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Shr => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_SHR),
+                StackOpType::I64 => out.push_op(instr::OP_SHR),
+                _ => panic!("Invalid type for bitwise shift right: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Eq => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_EQ_I32),
+                StackOpType::I64 => out.push_op(instr::OP_EQ_I64),
+                StackOpType::F32 => out.push_op(instr::OP_EQ_F32),
+                StackOpType::F64 => out.push_op(instr::OP_EQ_F64),
+                _ => panic!("Invalid type for equality comparison: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Ne => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_NE_I32),
+                StackOpType::I64 => out.push_op(instr::OP_NE_I64),
+                StackOpType::F32 => out.push_op(instr::OP_NE_F32),
+                StackOpType::F64 => out.push_op(instr::OP_NE_F64),
+                _ => panic!("Invalid type for inequality comparison: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Lt => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_LT_I32),
+                StackOpType::I64 => out.push_op(instr::OP_LT_I64),
+                StackOpType::F32 => out.push_op(instr::OP_LT_F32),
+                StackOpType::F64 => out.push_op(instr::OP_LT_F64),
+                _ => panic!("Invalid type for less-than comparison: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Le => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_LE_I32),
+                StackOpType::I64 => out.push_op(instr::OP_LE_I64),
+                StackOpType::F32 => out.push_op(instr::OP_LE_F32),
+                StackOpType::F64 => out.push_op(instr::OP_LE_F64),
+                _ => panic!("Invalid type for less-than-or-equal comparison: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Gt => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_GT_I32),
+                StackOpType::I64 => out.push_op(instr::OP_GT_I64),
+                StackOpType::F32 => out.push_op(instr::OP_GT_F32),
+                StackOpType::F64 => out.push_op(instr::OP_GT_F64),
+                _ => panic!("Invalid type for greater-than comparison: {typ:?}"),
+            };
+        }
+
+        BinaryOp::Ge => {
+            match typ {
+                StackOpType::I32 => out.push_op(instr::OP_GE_I32),
+                StackOpType::I64 => out.push_op(instr::OP_GE_I64),
+                StackOpType::F32 => out.push_op(instr::OP_GE_F32),
+                StackOpType::F64 => out.push_op(instr::OP_GE_F64),
+                _ => panic!("Invalid type for greater-than-or-equal comparison: {typ:?}"),
+            };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::host::HostState;
@@ -581,7 +968,7 @@ mod tests {
             vec![
                 StackOp::ConstI32(2),
                 StackOp::ConstI32(2),
-                StackOp::BinaryOp(BinaryOp::Add),
+                StackOp::BinaryOp(BinaryOp::Add, StackOpType::I32),
             ]
         );
     }

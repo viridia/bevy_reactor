@@ -515,6 +515,7 @@ const fn build_jump_table() -> [InstrHandler; 256] {
 
     table[instr::OP_RET as usize] = ret;
     table[instr::OP_BRANCH as usize] = branch;
+    table[instr::OP_BRANCH_IF_TRUE as usize] = branch_if_true;
     table[instr::OP_BRANCH_IF_FALSE as usize] = branch_if_false;
 
     table[instr::OP_CALL as usize] = call;
@@ -1008,6 +1009,24 @@ fn branch_if_false(vm: &mut VM) -> Result<(), VMError> {
     let offset = vm.read_immediate::<i32>();
     match test {
         StackValue::Bool(false) => {
+            vm.iptr = unsafe { vm.iptr.offset(offset as isize) };
+            Ok(())
+        }
+
+        StackValue::Bool(true) => Ok(()),
+
+        _ => Err(VMError::MismatchedTypes(
+            vm.value_type(&test),
+            ExprType::Boolean,
+        )),
+    }
+}
+
+fn branch_if_true(vm: &mut VM) -> Result<(), VMError> {
+    let test = vm.stack.pop().ok_or(VMError::StackUnderflow)?;
+    let offset = vm.read_immediate::<i32>();
+    match test {
+        StackValue::Bool(true) => {
             vm.iptr = unsafe { vm.iptr.offset(offset as isize) };
             Ok(())
         }

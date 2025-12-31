@@ -22,8 +22,6 @@ pub(crate) enum BlockTerminator {
 /// Basic block for control flow.
 #[derive(Debug, Default)]
 pub(crate) struct BasicBlock {
-    /// Index of this block
-    pub(crate) id: usize,
     /// Entry point of this block within the generated code buffer.
     pub(crate) start_offset: usize,
     /// List of instructions within the body of this block.
@@ -33,6 +31,15 @@ pub(crate) struct BasicBlock {
     /// Blocks leading to this block
     pub(crate) predecessors: Vec<usize>,
     // pub(crate) successors: Vec<usize>,
+}
+
+/// Represents the type of an expression.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StackOpType {
+    I32,
+    I64,
+    F32,
+    F64,
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -52,8 +59,8 @@ pub(crate) enum StackOp {
     LoadNativeProp(u16),
     LoadField(u16),
     StoreLocal(u16),
-    UnaryOp(UnaryOp),
-    BinaryOp(BinaryOp),
+    UnaryOp(UnaryOp, StackOpType),
+    BinaryOp(BinaryOp, StackOpType),
     CallHostMethod {
         method: u16,
         num_args: u16,
@@ -62,9 +69,8 @@ pub(crate) enum StackOp {
         method: u16,
         num_args: u16,
     },
-    CallModuleFunction {
+    CallScriptFunction {
         method: u16,
         num_args: u16,
     },
-    Return,
 }

@@ -1,7 +1,6 @@
 use smol_str::SmolStr;
 
 use crate::{
-    bblock::BasicBlock,
     expr_type::ExprType,
     location::TokenLocation,
     oper::{BinaryOp, UnaryOp},
@@ -188,6 +187,5 @@ pub(crate) struct FunctionBody<'ex> {
     pub(crate) body: Option<&'ex Expr<'ex>>,
     pub(crate) num_params: usize,
     pub(crate) locals: Vec<ExprType>,
-    pub(crate) bblocks: Vec<BasicBlock>,
     // locals: Vec<Decl2>,
 }

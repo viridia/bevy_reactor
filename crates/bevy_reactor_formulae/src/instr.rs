@@ -33,7 +33,8 @@ pub const OP_COMPLEMENT: u8 = 52;
 
 // Control flow
 pub const OP_BRANCH: u8 = 62; // (imm i32 relative offset)
-pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS)
+pub const OP_BRANCH_IF_TRUE: u8 = 63; // (imm i32 relative offset, consumes TOS)
+pub const OP_BRANCH_IF_FALSE: u8 = 64; // (imm i32 relative offset, consumes TOS)
 
 // Method calls
 
@@ -94,7 +95,7 @@ pub const OP_BIT_XOR_I64: u8 = 127;
 pub const OP_EQ_I32: u8 = 150;
 pub const OP_EQ_I64: u8 = 151;
 pub const OP_EQ_F32: u8 = 152;
-pub const OP_EQ_F64: u8 = 152;
+pub const OP_EQ_F64: u8 = 153;
 
 pub const OP_NE_I32: u8 = 154;
 pub const OP_NE_I64: u8 = 155;
@@ -341,8 +342,6 @@ pub fn disassemble(code: &[u8]) {
             }
 
             // // Binops: all consume TOS + 1 and push result
-            // pub const OP_LOGICAL_AND: u8 = 35;
-            // pub const OP_LOGICAL_OR: u8 = 36;
             // pub const OP_SHL: u8 = 40;
             // pub const OP_SHR: u8 = 41;
 
@@ -351,9 +350,34 @@ pub fn disassemble(code: &[u8]) {
             // pub const OP_NEGATE: u8 = 51;
             // pub const OP_COMPLEMENT: u8 = 52;
 
-            // // Control flow
-            // pub const OP_BRANCH: u8 = 62; // (imm i32 relative offset)
-            // pub const OP_BRANCH_IF_FALSE: u8 = 63; // (imm i32 relative offset, consumes TOS)
+            // Control flow
+            OP_BRANCH => {
+                let branch_offset = reader.read_immediate::<i32>();
+                let source_offset = reader.address() as i32;
+                eprintln!(
+                    "branch {} [{branch_offset:+}]",
+                    source_offset + branch_offset
+                );
+            }
+
+            OP_BRANCH_IF_TRUE => {
+                let branch_offset = reader.read_immediate::<i32>();
+                let source_offset = reader.address() as i32;
+                eprintln!(
+                    "branch_if_true {} [{branch_offset:+}]",
+                    source_offset + branch_offset
+                );
+            }
+
+            OP_BRANCH_IF_FALSE => {
+                let branch_offset = reader.read_immediate::<i32>();
+                let source_offset = reader.address() as i32;
+                eprintln!(
+                    "branch_if_false {} [{branch_offset:+}]",
+                    source_offset + branch_offset
+                );
+            }
+
             OP_CALL => {
                 let fn_index = reader.read_immediate::<u16>();
                 let num_params = reader.read_immediate::<u16>() as usize;
@@ -431,35 +455,108 @@ pub fn disassemble(code: &[u8]) {
             // // pub const OP_SHL: u8 = 40;
             // // pub const OP_SHR: u8 = 41;
 
-            // pub const OP_EQ_I32: u8 = 150;
-            // pub const OP_EQ_I64: u8 = 151;
-            // pub const OP_EQ_F32: u8 = 152;
-            // pub const OP_EQ_F64: u8 = 152;
+            // EQ
+            OP_EQ_I32 => {
+                eprintln!("eq.i32");
+            }
 
-            // pub const OP_NE_I32: u8 = 154;
-            // pub const OP_NE_I64: u8 = 155;
-            // pub const OP_NE_F32: u8 = 156;
-            // pub const OP_NE_F64: u8 = 157;
+            OP_EQ_I64 => {
+                eprintln!("eq.i64");
+            }
 
-            // pub const OP_LT_I32: u8 = 158;
-            // pub const OP_LT_I64: u8 = 159;
-            // pub const OP_LT_F32: u8 = 160;
-            // pub const OP_LT_F64: u8 = 161;
+            OP_EQ_F32 => {
+                eprintln!("eq.f32");
+            }
 
-            // pub const OP_LE_I32: u8 = 162;
-            // pub const OP_LE_I64: u8 = 163;
-            // pub const OP_LE_F32: u8 = 164;
-            // pub const OP_LE_F64: u8 = 165;
+            OP_EQ_F64 => {
+                eprintln!("eq.f64");
+            }
 
-            // pub const OP_GT_I32: u8 = 166;
-            // pub const OP_GT_I64: u8 = 167;
-            // pub const OP_GT_F32: u8 = 168;
-            // pub const OP_GT_F64: u8 = 169;
+            // NE
+            OP_NE_I32 => {
+                eprintln!("ne.i32");
+            }
 
-            // pub const OP_GE_I32: u8 = 170;
-            // pub const OP_GE_I64: u8 = 171;
-            // pub const OP_GE_F32: u8 = 172;
-            // pub const OP_GE_F64: u8 = 173;
+            OP_NE_I64 => {
+                eprintln!("ne.i64");
+            }
+
+            OP_NE_F32 => {
+                eprintln!("ne.f32");
+            }
+
+            OP_NE_F64 => {
+                eprintln!("ne.f64");
+            }
+
+            // LT
+            OP_LT_I32 => {
+                eprintln!("lt.i32");
+            }
+
+            OP_LT_I64 => {
+                eprintln!("lt.i64");
+            }
+
+            OP_LT_F32 => {
+                eprintln!("lt.f32");
+            }
+
+            OP_LT_F64 => {
+                eprintln!("lt.f64");
+            }
+
+            // LE
+            OP_LE_I32 => {
+                eprintln!("le.i32");
+            }
+
+            OP_LE_I64 => {
+                eprintln!("le.i64");
+            }
+
+            OP_LE_F32 => {
+                eprintln!("le.f32");
+            }
+
+            OP_LE_F64 => {
+                eprintln!("le.f64");
+            }
+
+            // GT
+            OP_GT_I32 => {
+                eprintln!("gt.i32");
+            }
+
+            OP_GT_I64 => {
+                eprintln!("gt.i64");
+            }
+
+            OP_GT_F32 => {
+                eprintln!("gt.f32");
+            }
+
+            OP_GT_F64 => {
+                eprintln!("gt.f64");
+            }
+
+            // GE
+            OP_GE_I32 => {
+                eprintln!("ge.i32");
+            }
+
+            OP_GE_I64 => {
+                eprintln!("ge.i64");
+            }
+
+            OP_GE_F32 => {
+                eprintln!("ge.f32");
+            }
+
+            OP_GE_F64 => {
+                eprintln!("ge.f64");
+            }
+
             OP_RET => {
                 eprintln!("ret");
             }
