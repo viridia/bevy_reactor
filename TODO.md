@@ -82,6 +82,10 @@
 
 Next:
 
+- logical shortcut operators and basic blocks.
+- optimize basic block:
+  - jump to a block with only a terminator replaces that terminator.
+  - block with no predecessor can be eliminated.
 - complex expressions
   - e.g. if { 0 } { 1 } else { 2 }
 - error cases in build_exprs and gencode:

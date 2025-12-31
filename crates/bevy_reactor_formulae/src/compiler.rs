@@ -193,8 +193,7 @@ pub async fn compile_module(
     let expr_arena = Bump::new();
     let host_lock = host.lock().unwrap();
     let mut module_exprs = pass::build_module_exprs(&host_lock, &mut module, ast, &expr_arena)?;
-    pass::build_bblocks(&mut module, &mut module_exprs)?;
-    // pass::gen_code(&mut module, &module_exprs)?;
+    pass::gen_code(&mut module, &mut module_exprs)?;
     Ok(module)
 }
 
@@ -218,8 +217,7 @@ pub async fn compile_formula(
     let expr_arena = Bump::new();
     let mut module_exprs =
         pass::build_formula_exprs(host, &mut module, ast, result_type, &expr_arena)?;
-    pass::build_bblocks(&mut module, &mut module_exprs)?;
-    // pass::gen_code(&mut module, &module_exprs)?;
+    pass::gen_code(&mut module, &mut module_exprs)?;
     Ok(module)
 }
 
