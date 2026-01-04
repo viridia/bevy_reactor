@@ -82,11 +82,10 @@
 
 Next:
 
-- logical shortcut operators and basic blocks.
-- optimize basic block:
-  - jump to a block with only a terminator replaces that terminator.
-  - block with no predecessor can be eliminated.
-  - jump to a block that only pushes a bool can be reduced to a bool
+- lifetime analysis for locals (hard!)
+  - can this be on a per-block level rather than per-instruction? I think so.
+  - that is, for each block we want to know which locals are read and which are written
+    - we can then determine which locals are no longer needed by looking at preds
 - complex expressions
   - e.g. if { 0 } { 1 } else { 2 }
 - error cases in build_exprs and gencode:
@@ -119,13 +118,17 @@ Next:
         - OP_DROP_STRING
         - OP_DROP_REFLECT
       - This means doing some kind of lifetime analysis.
-        - This will require basic blocks, which is something we wanted to do anyway.
-        - I'm not sure how to have basic blocks inside expressions.
-        - things like `call(if x { 0 } else { 1 })`.
         - this would be easier if we had SSA values of some kind, but I don't know how to do that.
   - We also need to store the local size in the function
   - This means, then, that we can can represent params via a pointer to the locals of the
     previous call frame, so long as we align and offset each parameter consistently.
+
+- optimize basic blocks:
+  - jump to a block with only a terminator replaces that terminator.
+  - jump to a block with only one predecessor can merge blocks.
+  - block with no predecessor can be eliminated.
+  - jump to a block that only pushes a bool can be reduced to a bool
+  - note all of the above require examples that generate these patterns.
 
 ## Formula tasks
 
