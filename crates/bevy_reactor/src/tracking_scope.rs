@@ -1,10 +1,7 @@
 use std::sync::atomic::AtomicBool;
 
 use bevy::{
-    ecs::{
-        component::{ComponentId, Tick},
-        world::DeferredWorld,
-    },
+    ecs::{change_detection::Tick, component::ComponentId, world::DeferredWorld},
     platform::collections::HashSet,
     prelude::*,
 };

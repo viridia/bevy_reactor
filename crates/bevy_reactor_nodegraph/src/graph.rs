@@ -167,10 +167,10 @@ pub fn node_graph_node(position: Vec2) -> impl Scene {
             top: px(position.y),
             min_width: px(70),
             min_height: px(20),
+            border_radius: BorderRadius::all(px(3)),
         }
         GraphNode
         Hovered::default()
-        BorderRadius::all(px(3))
         BorderColor::all(palette::GRAY_3)
         BoxShadow::new(
             Color::BLACK,
@@ -207,10 +207,10 @@ pub fn node_graph_node_title() -> impl Scene {
             justify_content: JustifyContent::Start,
             align_items: AlignItems::Center,
             padding: UiRect::axes(px(8.0), px(2.0)),
+            border_radius: BorderRadius::new(px(3), px(3), px(0), px(0)),
         }
         EntityCursor::System(bevy::window::SystemCursorIcon::Move)
         GraphNodeTitle
-        BorderRadius::new(px(3), px(3), px(0), px(0))
         BorderColor::all(Color::WHITE)
         BackgroundColor(palette::ACCENT)
         BorderColor::all(palette::GRAY_3)
@@ -234,8 +234,8 @@ pub fn node_graph_node_body() -> impl Scene {
             align_items: AlignItems::Start,
             padding: UiRect::axes(px(8.0), px(4.0)),
             row_gap: px(4),
+            border_radius: BorderRadius::new(px(0), px(0), px(3), px(3)),
         }
-        BorderRadius::new(px(0), px(0), px(3), px(3))
         BackgroundColor(palette::GRAY_2)
         GraphNodeBody
         EntityCursor::System(bevy::window::SystemCursorIcon::Default)
@@ -268,9 +268,10 @@ pub fn input_terminal(color: Color) -> impl Scene {
                 height: px(12),
                 border: UiRect::all(px(3)), // Invisible border increases picking area
                 left: px(-14),
+                border_radius: BorderRadius::MAX,
+
             }
             template_value(Terminal::Input)
-            BorderRadius::MAX
             BackgroundColor(color)
             on(on_terminal_drag_start)
             on(on_terminal_drag)
@@ -305,9 +306,9 @@ pub fn output_terminal(color: Color) -> impl Scene {
                 height: px(12),
                 right: px(-14),
                 border: UiRect::all(px(3)), // Invisible border increases picking area
+                border_radius: BorderRadius::MAX,
             }
             template_value(Terminal::Output)
-            BorderRadius::MAX
             BackgroundColor(color)
             on(on_terminal_drag_start)
             on(on_terminal_drag)
@@ -326,9 +327,9 @@ pub fn selection_rect() -> impl Scene {
             position_type: PositionType::Absolute,
             border: UiRect::all(px(1)),
             min_height: px(16),
+            border_radius: BorderRadius::all(px(3)),
         }
         SelectionRect
-        BorderRadius::all(px(3))
         BorderColor::all(palette::ACCENT.with_alpha(0.2))
         BackgroundColor({palette::ACCENT.with_alpha(0.03)})
         template_value(Visibility::Hidden)

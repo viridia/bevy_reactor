@@ -40,7 +40,7 @@ use crate::property_inspector::icon;
 // use bevy_picking::{hover::Hovered, PickingSystems};
 // use bevy_reflect::{prelude::ReflectDefault, Reflect};
 // use bevy_ui::{
-//     BackgroundColor, BorderColor, BorderRadius, Checked, InteractionDisabled, Node, UiRect, Val,
+//     BackgroundColor, BorderColor, Checked, InteractionDisabled, Node, UiRect, Val,
 // };
 
 // use crate::{

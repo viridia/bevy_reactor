@@ -30,6 +30,7 @@ pub enum ModuleLoaderError {
     Compilation(#[from] compiler::CompilationError),
 }
 
+#[derive(TypePath)]
 pub struct ScriptModuleLoader {
     pub host: Arc<Mutex<HostState>>,
 }
@@ -47,7 +48,7 @@ impl AssetLoader for ScriptModuleLoader {
     ) -> Result<Self::Asset, Self::Error> {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
-        let path = load_context.path().to_str().unwrap().to_string();
+        let path = load_context.path().to_string();
         let src = str::from_utf8(&bytes)?;
         let host_ref = self.host.clone();
 

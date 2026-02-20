@@ -12,14 +12,12 @@ use bevy::{
         system::{Commands, Query, ResMut},
         world::Ref,
     },
+    material::AlphaMode,
     mesh::{Mesh3d, MeshVertexBufferLayoutRef},
     pbr::{Material, MaterialPipeline, MaterialPipelineKey, MeshMaterial3d},
     reflect::{Reflect, TypePath, prelude::ReflectDefault},
-    render::{
-        alpha::AlphaMode,
-        render_resource::{
-            AsBindGroup, CompareFunction, RenderPipelineDescriptor, SpecializedMeshPipelineError,
-        },
+    render::render_resource::{
+        AsBindGroup, CompareFunction, RenderPipelineDescriptor, SpecializedMeshPipelineError,
     },
     shader::ShaderRef,
 };
@@ -148,12 +146,12 @@ pub(crate) fn sync_underlay(
             }
 
             if color.is_changed() {
-                if let Some(material) = r_overlay.get_mut(overlay_material) {
+                if let Some(mut material) = r_overlay.get_mut(overlay_material) {
                     material.color = color.base.into();
                     material.alpha_mode = color.alpha_mode;
                 }
 
-                if let Some(material) = r_underlay.get_mut(underlay_material) {
+                if let Some(mut material) = r_underlay.get_mut(underlay_material) {
                     material.color = color
                         .base
                         .with_alpha(color.base.alpha() * color.underlay)

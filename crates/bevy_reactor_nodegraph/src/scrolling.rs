@@ -48,10 +48,10 @@ pub fn node_graph_scrollbar(orientation: ControlOrientation) -> impl Scene {
                 bottom: px(0),
                 right: px(0),
                 border: UiRect::all(px(3)),
+                border_radius: BorderRadius::all(px(6))
             }
             GraphScrollbarThumb
             BackgroundColor(palette::GRAY_2)
-            BorderRadius::all(px(6))
             Hovered::default()
             EntityCursor::System(bevy::window::SystemCursorIcon::Pointer)
             on(on_change_hover)

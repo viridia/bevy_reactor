@@ -232,11 +232,7 @@ mod tests {
         vm::{InvocationContext, StackValue, VMError},
     };
     use bevy::{
-        ecs::{
-            component::{Component, Tick},
-            entity::Entity,
-            world::World,
-        },
+        ecs::{change_detection::Tick, component::Component, entity::Entity, world::World},
         math::Vec3,
         reflect::{Reflect, Typed},
     };

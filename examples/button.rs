@@ -74,12 +74,12 @@ fn button() -> impl Scene {
             border: UiRect::all(Val::Px(5.0)),
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
+            border_radius: BorderRadius::MAX,
         }
         Button
         Hovered::default()
         TabIndex(0)
         BorderColor::all(Color::BLACK)
-        BorderRadius::MAX
         insert_computed(|cx: &Cx| {
             let entity = cx.owner();
             match (
