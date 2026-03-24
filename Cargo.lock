@@ -1228,6 +1228,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_reactor_nodegraph"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_reactor",
+]
+
+[[package]]
 name = "bevy_reflect"
 version = "0.19.0-dev"
 source = "git+https://github.com/cart/bevy.git?branch=next-generation-scenes#fc88caabcb41ebfb1699e4ddaf419db25daaae14"
@@ -2363,6 +2371,7 @@ dependencies = [
  "bevy",
  "bevy_reactor",
  "bevy_reactor_gizmoids",
+ "bevy_reactor_nodegraph",
  "smol_str 0.3.2",
 ]
 
