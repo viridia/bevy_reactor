@@ -18,7 +18,7 @@ use bevy::{
         hover::Hovered,
     },
     reflect::{Reflect, prelude::ReflectDefault},
-    scene2::{Scene, bsn, on},
+    scene2::{Scene, bsn, on, template_value},
     ui::{
         AlignSelf, BackgroundColor, BorderRadius, ComputedNode, ComputedUiRenderTargetInfo,
         JustifySelf, Node, PositionType, UiGlobalTransform, UiRect, UiScale, Val, ZIndex, px,
@@ -37,7 +37,7 @@ pub fn node_graph_scrollbar(orientation: ControlOrientation) -> impl Scene {
         GraphScrollbar {
             orientation: orientation
         }
-        EntityCursor::System(bevy::window::SystemCursorIcon::Default)
+        template_value(EntityCursor::System(bevy::window::SystemCursorIcon::Default))
         ZIndex(10)
         on(scrollbar_on_track_press)
         [
@@ -53,7 +53,7 @@ pub fn node_graph_scrollbar(orientation: ControlOrientation) -> impl Scene {
             GraphScrollbarThumb
             BackgroundColor(palette::GRAY_2)
             Hovered::default()
-            EntityCursor::System(bevy::window::SystemCursorIcon::Pointer)
+            template_value(EntityCursor::System(bevy::window::SystemCursorIcon::Pointer))
             on(on_change_hover)
             // on(on_change_dragging)
             on(scrollbar_thumb_on_thumb_press)
