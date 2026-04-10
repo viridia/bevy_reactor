@@ -7,7 +7,7 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::world::World;
 use bevy::reflect::ReflectRef;
-use bevy::scene2::{SpawnRelatedScenes, bsn_list};
+use bevy::scene::{EntityWorldMutSceneExt, bsn_list};
 use bevy::ui::widget::Text;
 
 #[derive(Default)]
@@ -23,19 +23,21 @@ impl InspectorFactory for DefaultInspectorFactory {
                 "bevy_color::srgba::Srgba" => {
                     world
                         .entity_mut(parent)
-                        .spawn_related_scenes::<Children>(srgba_field(field));
+                        .queue_spawn_related_scenes::<Children>(srgba_field(field));
                     true
                 }
                 "glam::Vec3" => {
                     world
                         .entity_mut(parent)
-                        .spawn_related_scenes::<Children>(vec3_field(field));
+                        .queue_spawn_related_scenes::<Children>(vec3_field(field));
                     true
                 }
                 _ => {
                     world
                         .entity_mut(parent)
-                        .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Struct")));
+                        .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new(
+                            "TODO:Struct"
+                        )));
                     true
                 }
             },
@@ -47,37 +49,39 @@ impl InspectorFactory for DefaultInspectorFactory {
             ReflectRef::TupleStruct(_tuple_struct) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:TupleStruct")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new(
+                        "TODO:TupleStruct"
+                    )));
                 true
             }
             ReflectRef::Tuple(_tuple) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Tuple")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Tuple")));
                 true
             }
             ReflectRef::List(_) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(list_field(field));
+                    .queue_spawn_related_scenes::<Children>(list_field(field));
                 true
             }
             ReflectRef::Array(_array) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Array")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Array")));
                 true
             }
             ReflectRef::Map(_map) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Map")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Map")));
                 true
             }
             ReflectRef::Set(_set) => {
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Set")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Set")));
                 true
             }
             ReflectRef::Enum(_e) => {
@@ -85,9 +89,9 @@ impl InspectorFactory for DefaultInspectorFactory {
                 // core::option::Option<bool>
                 world
                     .entity_mut(parent)
-                    .spawn_related_scenes::<Children>(bsn_list![
+                    .queue_spawn_related_scenes::<Children>(bsn_list![
                         :field_group
-                        [
+                        Children [
                             :field_label(field),
                             Text::new("TODO:Enum")
                         ]
@@ -99,28 +103,30 @@ impl InspectorFactory for DefaultInspectorFactory {
                     "bool" => {
                         world
                             .entity_mut(parent)
-                            .spawn_related_scenes::<Children>(bool_field(field));
+                            .queue_spawn_related_scenes::<Children>(bool_field(field));
                     }
                     "f32" => {
                         if let Some(attrs) = field.attributes {
                             if let Some(range) = attrs.get::<ValueRange<f32>>() {
-                                world.entity_mut(parent).spawn_related_scenes::<Children>(
-                                    f32_range_field(field, range),
-                                );
+                                world
+                                    .entity_mut(parent)
+                                    .queue_spawn_related_scenes::<Children>(f32_range_field(
+                                        field, range,
+                                    ));
                                 return true;
                             }
                         }
 
                         world
                             .entity_mut(parent)
-                            .spawn_related_scenes::<Children>(f32_field(field));
+                            .queue_spawn_related_scenes::<Children>(f32_field(field));
                     }
                     _ => {
                         world
                             .entity_mut(parent)
-                            .spawn_related_scenes::<Children>(bsn_list![
+                            .queue_spawn_related_scenes::<Children>(bsn_list![
                                 :field_group
-                                [
+                                Children [
                                     :field_label(field),
                                     Text::new("TODO:Opaque")
                                 ]

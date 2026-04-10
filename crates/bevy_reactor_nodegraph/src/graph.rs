@@ -12,7 +12,7 @@ use bevy::{
         observer::On,
         query::{Changed, Or, With, Without},
         system::{Commands, Query, Res, ResMut},
-        template::GetTemplate,
+        template::FromTemplate,
     },
     feathers::{
         constants::fonts, cursor::EntityCursor, font_styles::InheritableFont, palette,
@@ -29,8 +29,9 @@ use bevy::{
         },
         hover::Hovered,
     },
-    render::storage::ShaderStorageBuffer,
-    scene2::{Scene, bsn, on, template_value},
+    render::storage::ShaderBuffer,
+    scene::{Scene, bsn, on, template_value},
+    text::FontSize,
     ui::{
         AlignItems, AlignSelf, BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode,
         ComputedUiRenderTargetInfo, Display, FlexDirection, GlobalZIndex, GridPlacement,
@@ -119,7 +120,7 @@ pub fn node_graph() -> impl Scene {
         on(on_graph_drag_end)
         on(on_graph_drag_cancel)
         on(on_graph_scroll)
-        [
+        Children [
             // Vertical scrollbar
             :node_graph_scrollbar(ControlOrientation::Vertical)
             Node {
@@ -145,7 +146,7 @@ pub fn node_graph_document() -> impl Scene {
             left: px(0.0),
             top: px(0.0),
         }
-        [
+        Children [
             :selection_rect()
             Node {
                 width: px(100),
@@ -216,7 +217,7 @@ pub fn node_graph_node_title() -> impl Scene {
         BorderColor::all(palette::GRAY_3)
         InheritableFont {
             font: fonts::REGULAR,
-            font_size: 12.0,
+            font_size: FontSize::Px(12.0),
         }
     }
 }
@@ -241,7 +242,7 @@ pub fn node_graph_node_body() -> impl Scene {
         EntityCursor::System(bevy::window::SystemCursorIcon::Default)
         InheritableFont {
             font: fonts::REGULAR,
-            font_size: 12.0,
+            font_size: FontSize::Px(12.0),
         }
     }
 }
@@ -258,10 +259,10 @@ pub fn input_terminal(color: Color) -> impl Scene {
         }
         InheritableFont {
             font: fonts::REGULAR,
-            font_size: 12.0,
+            font_size: FontSize::Px(12.0),
         }
         EntityCursor::System(bevy::window::SystemCursorIcon::Pointer)
-        [
+        Children [
             Node {
                 position_type: PositionType::Absolute,
                 width: px(12),
@@ -296,10 +297,10 @@ pub fn output_terminal(color: Color) -> impl Scene {
         }
         InheritableFont {
             font: fonts::REGULAR,
-            font_size: 12.0,
+            font_size: FontSize::Px(12.0),
         }
         EntityCursor::System(bevy::window::SystemCursorIcon::Pointer)
-        [
+        Children [
             Node {
                 position_type: PositionType::Absolute,
                 width: px(12),
@@ -371,7 +372,7 @@ impl Default for ConnectionTerminus {
 }
 
 /// Displays a stroked path between two nodes.
-#[derive(Component, GetTemplate, Clone)]
+#[derive(Component, FromTemplate, Clone)]
 #[component(immutable)]
 #[require(Node { ..Default::default() }, Pickable::IGNORE)]
 pub struct Connection {
@@ -408,7 +409,7 @@ pub(crate) fn on_insert_connection(
     q_graph_doc: Query<(&UiTransform, &UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     q_terminals: Query<(&UiGlobalTransform, &ComputedNode)>,
     mut r_materials: ResMut<Assets<DrawPathMaterial>>,
-    mut r_bindings: ResMut<Assets<ShaderStorageBuffer>>,
+    mut r_bindings: ResMut<Assets<ShaderBuffer>>,
     mut commands: Commands,
 ) {
     if let Ok((connection, mut node, material_node, children)) = q_connection.get_mut(insert.entity)
@@ -477,11 +478,11 @@ pub(crate) fn on_insert_connection(
 
         match material_node {
             Some(material_handle) => {
-                let material = r_materials.get_mut(material_handle).unwrap();
+                let mut material = r_materials.get_mut(material_handle).unwrap();
                 material.update(&path, &mut r_bindings);
             }
             None => {
-                let buffer = r_bindings.add(ShaderStorageBuffer::default());
+                let buffer = r_bindings.add(ShaderBuffer::default());
                 let mut material = DrawPathMaterial::new(buffer);
                 material.update(&path, &mut r_bindings);
                 commands
@@ -565,7 +566,7 @@ pub(crate) fn update_connection_shader(
     mut r_materials: ResMut<Assets<DrawPathMaterial>>,
 ) {
     for (render_target, material_node) in q_node.iter_mut() {
-        let material = r_materials.get_mut(material_node).unwrap();
+        let mut material = r_materials.get_mut(material_node).unwrap();
         material.scale = 1.0 / render_target.scale_factor();
     }
 }

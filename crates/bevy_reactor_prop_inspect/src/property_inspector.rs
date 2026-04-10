@@ -11,7 +11,7 @@ use bevy::{
     },
     prelude::*,
     reflect::{OffsetAccess, ParsedPath, ReflectKind, ReflectRef, TypeInfo},
-    scene2::{Scene, SceneList, SpawnRelatedScenes, bsn, bsn_list, on},
+    scene::{Scene, SceneList, bsn, bsn_list, on},
     ui_widgets::Activate,
 };
 use bevy_reactor::*;
@@ -28,41 +28,41 @@ pub fn property_inspector(subject: Arc<dyn InspectableRoot>) -> impl Scene {
             min_height: px(10),
             min_width: px(10)
         }
-        [
+        Children [
             dyn_scene(move |cx: &Cx| {
                 subject.get_reflect_tracked(
                     cx, &ParsedPath(Vec::new())).unwrap().reflect_kind().to_owned()
             }, move |builder, kind| {
                 match kind {
                     ReflectKind::Struct => {
-                        builder.spawn_related_scenes::<Children>(
+                        builder.queue_spawn_related_scenes::<Children>(
                             struct_members(Inspectable::from_root(subject_copy.clone())));
                     },
                     ReflectKind::TupleStruct => {
-                        builder.spawn_related_scenes::<Children>(
+                        builder.queue_spawn_related_scenes::<Children>(
                             tuple_struct_members(Inspectable::from_root(subject_copy.clone())));
                     },
                     ReflectKind::Tuple => {
-                        builder.spawn_related_scenes::<Children>(
+                        builder.queue_spawn_related_scenes::<Children>(
                             tuple_members(Inspectable::from_root(subject_copy.clone())));
                     },
                     ReflectKind::List => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:List")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:List")));
                     },
                     ReflectKind::Array => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Array")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Array")));
                     },
                     ReflectKind::Map => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Map")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Map")));
                     },
                     ReflectKind::Set => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Set")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Set")));
                     },
                     ReflectKind::Enum => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(Text("Root:Enum")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Enum")));
                     },
                     ReflectKind::Opaque => {
-                        builder.spawn_related_scenes::<Children>(bsn_list!(
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(
                             Text("Root:Opaque"))
                         );
                     },
@@ -131,7 +131,7 @@ fn struct_members(inspectable: Arc<Inspectable>) -> impl SceneList {
                 can_move: false,
                 attributes: Some(attrs),
             });
-            parent.spawn_related_scenes::<Children>(bsn_list!(
+            parent.queue_spawn_related_scenes::<Children>(bsn_list!(
                 :field_inspector(field_inspectable.clone())
             ));
         },
@@ -222,11 +222,11 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
         }
         InheritableFont {
             font: fonts::REGULAR,
-            font_size: 14.0,
+            font_size: FontSize::Px(14.0),
         }
         // ThemeFontColor(tokens::TEXT_DIM)
         ThemeFontColor(tokens::CHECKBOX_TEXT_DISABLED)
-        [
+        Children [
             Text({name.clone()})
             ThemedText,
 
@@ -261,7 +261,7 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
         on(move |_: On<Activate>, mut world: DeferredWorld| {
             field.remove(&mut world);
         })
-        [
+        Children [
             :icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")
         ]
     }
@@ -279,7 +279,7 @@ pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
             info!("TODO: Move up")
             // field.remove(&mut world);
         })
-        [
+        Children [
             :icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png")
         ]
     }
@@ -297,7 +297,7 @@ pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
             info!("TODO: Move down")
             // field.remove(&mut world);
         })
-        [
+        Children [
             :icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png")
         ]
     }
@@ -311,7 +311,7 @@ pub fn add_button() -> impl Scene {
             height: px(16),
             padding: UiRect::axes(px(4), px(0)),
         }
-        [
+        Children [
             :icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png")
         ]
     }

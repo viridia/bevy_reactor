@@ -3,7 +3,7 @@
 use bevy::{
     color::palettes::css,
     prelude::*,
-    scene2::{CommandsSpawnScene, bsn, bsn_list},
+    scene::{bsn, bsn_list},
     ui,
 };
 use bevy_reactor::{
@@ -54,7 +54,7 @@ fn setup_view_root(mut commands: Commands) {
                 GameState::Intro => css::BLUE.into(),
             })
         )
-        [
+        Children [
             Text("Game State: "),
             (
                 Text("")

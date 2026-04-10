@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
-use bevy::prelude::Name;
 use bevy::reflect::OffsetAccess;
-use bevy::scene2::SpawnRelatedScenes;
+use bevy::scene::EntityWorldMutSceneExt;
+use bevy::text::FontSize;
 use bevy::ui::{AlignSelf, BackgroundColor, UiRect, Val};
 use bevy::{
     ecs::{observer::On, reflect::AppTypeRegistry, world::DeferredWorld},
@@ -16,7 +16,7 @@ use bevy::{
     },
     log::warn,
     reflect::{ReflectMut, ReflectRef, TypeInfo, prelude::ReflectDefault},
-    scene2::{SceneList, bsn_list, on},
+    scene::{SceneList, bsn_list, on},
     ui::{AlignItems, Display, FlexDirection, JustifyContent, Node, px, widget::Text},
     ui_widgets::{Activate, checkbox_self_update},
 };
@@ -35,7 +35,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy4 = field.clone();
     bsn_list![
         :field_group
-        [
+        Children [
             :field_label(field)
             ,
             Node {
@@ -47,11 +47,11 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
             }
             InheritableFont {
                 font: fonts::REGULAR,
-                font_size: 16.0,
+                font_size: FontSize::Px(16.0),
             }
             // ThemeFontColor(tokens::TEXT_DIM)
             ThemeFontColor(tokens::CHECKBOX_TEXT)
-            [
+            Children [
                 :disclosure_toggle
                 #toggle
                 on(checkbox_self_update),
@@ -125,7 +125,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Row
                     }
-                    [
+                    Children [
                         Node {
                             width: px(2),
                             align_self: AlignSelf::Stretch,
@@ -139,7 +139,8 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                             flex_grow: 1.0,
                             flex_shrink: 1.0,
                             flex_basis: px(0),
-                        } [
+                        }
+                        Children [
                             for_each(move |cx: &Cx| {
                                 let reflect = field.reflect_tracked(cx).unwrap();
                                 if let ReflectRef::List(value) = reflect.reflect_ref() {
@@ -162,7 +163,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                                     can_move: true,
                                     attributes: field2.attributes,
                                 });
-                                parent.spawn_related_scenes::<Children>(bsn_list!(
+                                parent.queue_spawn_related_scenes::<Children>(bsn_list!(
                                     :field_inspector(item_inspectable.clone())
                                 ));
                             }, || ()),

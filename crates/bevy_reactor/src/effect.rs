@@ -6,7 +6,7 @@ use bevy::{
         template::{Template, TemplateContext},
     },
     prelude::{Entity, EntityWorldMut, Result, World},
-    scene2::{PatchContext, Scene},
+    scene::Scene,
 };
 
 use crate::{
@@ -76,7 +76,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, target: &mut TemplateContext) -> Result<Self::Output> {
         let target_id = target.entity.id();
         target.entity.world_scope(|world| {
             // Create the reaction
@@ -104,6 +104,14 @@ impl<
         });
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            deps: self.deps.clone(),
+            effect: self.effect.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -112,12 +120,17 @@ impl<
     EffectFn: Fn(&mut EntityWorldMut, D) + Clone + Send + Sync + 'static,
 > Scene for Effect<D, DepsFn, EffectFn>
 {
-    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
+    fn resolve(
+        &self,
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(Effect {
             deps: self.deps.clone(),
             effect: self.effect.clone(),
             marker: std::marker::PhantomData,
         });
+        Ok(())
     }
 }
 
@@ -202,7 +215,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, target: &mut TemplateContext) -> Result<Self::Output> {
         let target_id = target.entity.id();
         target.entity.world_scope(|world| {
             // Create the reaction
@@ -231,6 +244,14 @@ impl<
         });
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            deps: self.deps.clone(),
+            effect: self.effect.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -239,12 +260,17 @@ impl<
     EffectFn: Fn(&mut EntityWorldMut, &D) + Clone + Send + Sync + 'static,
 > Scene for MemoEffect<D, DepsFn, EffectFn>
 {
-    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
+    fn resolve(
+        &self,
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(MemoEffect {
             deps: self.deps.clone(),
             effect: self.effect.clone(),
             marker: std::marker::PhantomData,
         });
+        Ok(())
     }
 }
 
@@ -339,7 +365,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, target: &mut TemplateContext) -> Result<Self::Output> {
         let target_id = target.entity.id();
         target.entity.world_scope(|world| {
             // Create the reaction
@@ -367,6 +393,14 @@ impl<
         });
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            deps: self.deps.clone(),
+            factory: self.factory.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -376,12 +410,17 @@ impl<
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
 > Scene for InsertComputed<D, DepsFn, C, Factory>
 {
-    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
+    fn resolve(
+        &self,
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(InsertComputed {
             deps: self.deps.clone(),
             factory: self.factory.clone(),
             marker: std::marker::PhantomData,
         });
+        Ok(())
     }
 }
 
@@ -480,7 +519,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, target: &mut TemplateContext) -> Result<Self::Output> {
         let target_id = target.entity.id();
         target.entity.world_scope(|world| {
             // Create the reaction
@@ -508,6 +547,14 @@ impl<
         });
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            deps: self.deps.clone(),
+            factory: self.factory.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -517,12 +564,17 @@ impl<
     Factory: Fn(D) -> C + Clone + Send + Sync + 'static,
 > Scene for InsertComputedWhen<D, DepsFn, C, Factory>
 {
-    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
+    fn resolve(
+        &self,
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(InsertComputedWhen {
             deps: self.deps.clone(),
             factory: self.factory.clone(),
             marker: std::marker::PhantomData,
         });
+        Ok(())
     }
 }
 
@@ -599,7 +651,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, target: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, target: &mut TemplateContext) -> Result<Self::Output> {
         let target_id = target.entity.id();
         target.entity.world_scope(|world| {
             // Create the reaction
@@ -627,6 +679,13 @@ impl<
         });
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            condition: self.condition.clone(),
+            factory: self.factory.clone(),
+        }
+    }
 }
 
 impl<
@@ -635,11 +694,16 @@ impl<
     Factory: Fn() -> C + Clone + Send + Sync + 'static,
 > Scene for InsertWhen<Condition, C, Factory>
 {
-    fn patch(&self, _context: &mut PatchContext, scene: &mut bevy::scene2::ResolvedScene) {
+    fn resolve(
+        &self,
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(InsertWhen {
             condition: self.condition.clone(),
             factory: self.factory.clone(),
         });
+        Ok(())
     }
 }
 

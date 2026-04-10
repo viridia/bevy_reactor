@@ -4,7 +4,7 @@ use std::{marker::PhantomData, ops::Range, sync::Arc};
 use bevy::{
     ecs::template::TemplateContext,
     prelude::*,
-    scene2::{Scene, SceneList},
+    scene::{Scene, SceneList},
     ui::experimental::GhostNode,
 };
 
@@ -285,7 +285,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output> {
         let parent_id = context.entity.id();
         context.entity.world_scope(|world| {
             let ticks = world.change_tick();
@@ -313,6 +313,16 @@ impl<
 
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            item_fn: self.item_fn.clone(),
+            each_fn: self.each_fn.clone(),
+            fallback_fn: self.fallback_fn.clone(),
+            cmp_fn: self.cmp_fn.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -322,11 +332,11 @@ impl<
     EachFn: LoopBodyFn<Item> + Clone + 'static,
 > Scene for ForEach<Item, ItemFn, CmpFn, EachFn>
 {
-    fn patch(
+    fn resolve(
         &self,
-        _context: &mut bevy::scene2::PatchContext,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(ForEach {
             item_fn: self.item_fn.clone(),
             each_fn: self.each_fn.clone(),
@@ -334,6 +344,7 @@ impl<
             fallback_fn: self.fallback_fn.clone(),
             marker: PhantomData,
         });
+        Ok(())
     }
 }
 

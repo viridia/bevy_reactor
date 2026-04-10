@@ -78,8 +78,8 @@ impl Material for OverlayMaterial {
         key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         if let Some(ref mut depth_stencil) = descriptor.depth_stencil {
-            depth_stencil.depth_write_enabled = false;
-            depth_stencil.depth_compare = CompareFunction::GreaterEqual;
+            depth_stencil.depth_write_enabled = Some(false);
+            depth_stencil.depth_compare = Some(CompareFunction::GreaterEqual);
         }
         descriptor.primitive.cull_mode = None;
         Ok(())
@@ -112,8 +112,8 @@ impl Material for UnderlayMaterial {
         key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         if let Some(ref mut depth_stencil) = descriptor.depth_stencil {
-            depth_stencil.depth_write_enabled = false;
-            depth_stencil.depth_compare = CompareFunction::Less;
+            depth_stencil.depth_write_enabled = Some(false);
+            depth_stencil.depth_compare = Some(CompareFunction::Less);
         }
         descriptor.primitive.cull_mode = None;
         Ok(())

@@ -5,9 +5,8 @@ use bevy::{
     input_focus::tab_navigation::TabIndex,
     picking::hover::Hovered,
     prelude::*,
-    scene2::{CommandsSpawnScene, Scene, bsn},
+    scene::{Scene, bsn},
     ui::{self, InteractionDisabled, Pressed},
-    ui_widgets::UiWidgetsPlugins,
 };
 use bevy_reactor::{Cx, ReactorPlugin, effect::insert_computed};
 
@@ -15,7 +14,6 @@ fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.set(ImagePlugin::default_nearest()),
-            UiWidgetsPlugins,
             ReactorPlugin,
         ))
         .add_systems(Startup, setup_view_root)
@@ -48,12 +46,12 @@ fn setup_view_root(mut commands: Commands) {
         //         GameState::Intro => css::BLUE.into(),
         //     })
         // )
-        [
-            (:button()
-            [
-                Text("Foo")
-
-            ])
+        Children [
+            (
+                :button()
+                Children [
+                    Text("Foo")
+                ])
             // switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
             //     cases.case(GameState::Play, bsn_list!(Text("Playing")))
             //         .fallback(bsn_list!(Text("Not Playing")));
@@ -93,7 +91,7 @@ fn button() -> impl Scene {
                 _ => NORMAL_BUTTON
             }
         }, BackgroundColor)
-        [(
+        Children [(
             Text::new("Button")
             TextColor(Color::srgb(0.9, 0.9, 0.9))
             TextShadow::default()

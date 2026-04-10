@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bevy::{color::palettes::css, ecs::component::Tick, prelude::*, reflect::Typed as _};
+use bevy::{color::palettes::css, ecs::change_detection::Tick, prelude::*, reflect::Typed as _};
 use bevy_reactor::{ReactorPlugin, TrackingScope};
 use bevy_reactor_formulae::{
     ExprType, HostState, Param, ScriptModuleAsset, ScriptModuleLoader, VM,
@@ -135,7 +135,7 @@ fn setup(
 
     commands.spawn((
         PointLight {
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             intensity: 10_000_000.,
             range: 100.0,
             shadow_depth_bias: 0.2,
@@ -204,9 +204,10 @@ struct SetMaterialBaseColor {
 }
 
 impl Command for SetMaterialBaseColor {
+    type Out = ();
     fn apply(self, world: &mut World) {
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
-        if let Some(material) = materials.get_mut(&self.material_id) {
+        if let Some(mut material) = materials.get_mut(&self.material_id) {
             material.base_color = self.base_color;
         }
     }

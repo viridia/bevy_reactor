@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bevy::reflect::enums::{DynamicEnum, DynamicVariant};
 use bevy::reflect::{Access, ReflectMut};
 use bevy::{
     ecs::{
@@ -9,8 +10,8 @@ use bevy::{
         world::{DeferredWorld, World},
     },
     reflect::{
-        DynamicEnum, DynamicVariant, GetPath, ParsedPath, PartialReflect, Reflect,
-        ReflectPathError, attributes::CustomAttributes,
+        GetPath, ParsedPath, PartialReflect, Reflect, ReflectPathError,
+        attributes::CustomAttributes,
     },
 };
 use bevy_reactor::Cx;

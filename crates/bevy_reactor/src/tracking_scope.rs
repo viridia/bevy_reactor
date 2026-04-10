@@ -69,7 +69,7 @@ impl TrackingScope {
         self.resource_deps.insert(
             world
                 .components()
-                .resource_id::<T>()
+                .component_id::<T>()
                 .expect("Unknown resource type"),
         );
     }

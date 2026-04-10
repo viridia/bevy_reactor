@@ -9,7 +9,7 @@ use bevy::{
         theme::UiTheme,
     },
     prelude::*,
-    scene2::{CommandsSpawnScene, bsn, on},
+    scene::{bsn, on},
 };
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_nodegraph::{
@@ -71,51 +71,61 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
         BackgroundColor(Srgba::new(0.1, 0.1, 0.13, 1.0))
         on(on_move_nodes)
         on(on_connect)
-        [
+        Children [
             :node_graph_document()
-            [
+            Children [
                 :node_graph_node(Vec2::new(100.0, 200.0))
-                [
-                    :node_graph_node_title() [
+                Children [
+                    :node_graph_node_title()
+                    Children [
                         :label("Node")
                     ]
                     ,
-                    :node_graph_node_body() [
+                    :node_graph_node_body()
+                    Children [
                         #out1
-                        :output_terminal(palettes::css::ALICE_BLUE.into()) [
+                        :output_terminal(palettes::css::ALICE_BLUE.into())
+                        Children [
                             :label("Color")
                         ]
                     ]
                 ],
 
                 :node_graph_node(Vec2::new(700.0, 500.0))
-                [
-                    :node_graph_node_title() [
+                Children [
+                    :node_graph_node_title()
+                    Children [
                         :label("Bevy!")
                     ]
                     ,
-                    :node_graph_node_body() [
+                    :node_graph_node_body()
+                    Children [
                         #out4
-                        :output_terminal(palettes::css::ALICE_BLUE.into()) [
+                        :output_terminal(palettes::css::ALICE_BLUE.into())
+                        Children [
                             :label("Position")
                         ]
                     ]
                 ],
 
                 :node_graph_node(Vec2::new(300.0, 200.0))
-                [
-                    :node_graph_node_title() [
+                Children [
+                    :node_graph_node_title()
+                    Children [
                         :label("Node 2")
                     ]
                     ,
-                    :node_graph_node_body() [
+                    :node_graph_node_body()
+                    Children [
                         #out2
-                        :output_terminal(palettes::css::RED.into()) [
+                        :output_terminal(palettes::css::RED.into())
+                        Children [
                             :label("Color")
                         ]
                         ,
                         #in1
-                        :input_terminal(palettes::css::ALICE_BLUE.into()) [
+                        :input_terminal(palettes::css::ALICE_BLUE.into())
+                        Children [
                             :slider(SliderProps {
                                 value: 0.0,
                                 min: 0.0,
@@ -138,14 +148,17 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                 ],
 
                 :node_graph_node(Vec2::new(500.0, 1000.0))
-                [
-                    :node_graph_node_title() [
+                Children [
+                    :node_graph_node_title()
+                    Children [
                         :label("Node")
                     ]
                     ,
-                    :node_graph_node_body() [
+                    :node_graph_node_body()
+                    Children [
                         #out3
-                        :output_terminal(palettes::css::ALICE_BLUE.into()) [
+                        :output_terminal(palettes::css::ALICE_BLUE.into())
+                        Children [
                             :label("Color")
                         ]
                     ]

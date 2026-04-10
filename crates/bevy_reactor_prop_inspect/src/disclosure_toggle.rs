@@ -3,6 +3,7 @@ use bevy::{
     app::{App, Plugin, PreUpdate},
     ecs::{
         component::Component,
+        hierarchy::Children,
         lifecycle::RemovedComponents,
         query::{Added, Changed, Has, Or, With},
         reflect::ReflectComponent,
@@ -14,7 +15,7 @@ use bevy::{
     math::Rot2,
     picking::{PickingSystems, hover::Hovered},
     reflect::{Reflect, prelude::ReflectDefault},
-    scene2::{Scene, bsn},
+    scene::{Scene, bsn},
     ui::{
         AlignItems, Checked, Display, InteractionDisabled, JustifyContent, Node, UiTransform, px,
     },
@@ -80,7 +81,7 @@ pub fn disclosure_toggle() -> impl Scene {
         // AccessibilityNode(accesskit::Node::new(Role::Switch)),
         EntityCursor::System(bevy::window::SystemCursorIcon::Pointer)
         TabIndex(0)
-        [
+        Children [
             :icon("embedded://bevy_reactor_prop_inspect/assets/icons/chevron-right.png")
         ]
     )

@@ -5,12 +5,19 @@ edition = "2024"
 publish = false
 
 [workspace]
-# members = ["crates/*"]
-members = ["crates/bevy_reactor"]
+members = ["crates/*"]
+exclude = ["crates/bevy_reactor_prop_inspect"]
+# members = ["crates/bevy_reactor", "crates/bevy_reactor_nodegraph"]
 
 [workspace.dependencies]
-# bevy = { version = "0.15.0-dev", features = ["ghost_nodes"] }
-bevy = { git = "https://github.com/cart/bevy.git", version = "0.19.0-dev", branch = "next-generation-scenes", features = [
+# bevy = { version = "0.19.0-dev", features = ["ghost_nodes"] }
+# bevy = { git = "https://github.com/cart/bevy.git", version = "0.19.0-dev", branch = "next-generation-scenes", features = [
+#   "dynamic_linking",
+#   "ghost_nodes",
+#   "experimental_bevy_feathers",
+#   "file_watcher",
+# ] }
+bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.19.0-dev", features = [
   "dynamic_linking",
   "ghost_nodes",
   "experimental_bevy_feathers",
@@ -19,7 +26,7 @@ bevy = { git = "https://github.com/cart/bevy.git", version = "0.19.0-dev", branc
 bevy_reactor = { path = "crates/bevy_reactor" }
 # bevy_reactor_formulae = { path = "crates/bevy_reactor_formulae" }
 bevy_reactor_gizmoids = { path = "crates/bevy_reactor_gizmoids" }
-# bevy_reactor_nodegraph = { path = "crates/bevy_reactor_nodegraph" }
+bevy_reactor_nodegraph = { path = "crates/bevy_reactor_nodegraph" }
 # bevy_reactor_prop_inspect = { path = "crates/bevy_reactor_prop_inspect" }
 smol_str = "0.3.2"
 
@@ -29,7 +36,7 @@ bevy = { workspace = true }
 bevy_reactor = { workspace = true }
 # bevy_reactor_formulae = { workspace = true }
 bevy_reactor_gizmoids = { workspace = true }
-# bevy_reactor_nodegraph = { workspace = true }
+bevy_reactor_nodegraph = { workspace = true }
 # bevy_reactor_prop_inspect = { workspace = true }
 smol_str = { workspace = true }
 

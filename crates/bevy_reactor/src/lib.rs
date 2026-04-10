@@ -13,7 +13,7 @@ mod tracking_scope;
 use bevy::{
     app::{App, Plugin, Update},
     ecs::{hierarchy::Children, system::EntityCommands},
-    scene2::{SceneList, SpawnRelatedScenes as _},
+    scene::{EntityCommandsSceneExt as _, SceneList},
 };
 pub use conditional::*;
 pub use cx::Cx;
@@ -40,7 +40,7 @@ pub trait SceneListFn: Send + Sync {
 }
 
 impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
-    fn spawn(&self, parent: EntityCommands) {
-        parent.spawn_related_scenes::<Children>((self)());
+    fn spawn(&self, mut parent: EntityCommands) {
+        parent.queue_spawn_related_scenes::<Children>((self)());
     }
 }

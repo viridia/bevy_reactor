@@ -3,7 +3,7 @@
 use bevy::{
     color::palettes::css,
     prelude::*,
-    scene2::{CommandsSpawnScene, bsn, bsn_list},
+    scene::{bsn, bsn_list},
     ui,
 };
 use bevy_reactor::{Cx, ReactorPlugin, if_then_else, switch};
@@ -42,7 +42,7 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
-        [
+        Children [
             Text("State: "),
             switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
                 cases

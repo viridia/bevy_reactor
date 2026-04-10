@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use bevy::{
+    ecs::hierarchy::Children,
     feathers::{
         constants::fonts,
         font_styles::InheritableFont,
@@ -8,7 +9,8 @@ use bevy::{
         tokens,
     },
     math::Vec3,
-    scene2::{SceneList, bsn_list},
+    scene::{SceneList, bsn_list},
+    text::FontSize,
     ui::{AlignItems, Display, FlexDirection, JustifyContent, Node, px, widget::Text},
 };
 use bevy_reactor::{Cx, effect};
@@ -24,7 +26,7 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy3 = field.clone();
     bsn_list![
         :field_group
-        [
+        Children [
             :field_label(field)
             ,
             Node {
@@ -36,11 +38,11 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
             }
             InheritableFont {
                 font: fonts::REGULAR,
-                font_size: 16.0,
+                font_size: FontSize::Px(16.0),
             }
             // ThemeFontColor(tokens::TEXT_DIM)
             ThemeFontColor(tokens::CHECKBOX_TEXT)
-            [
+            Children [
                 Text("x:") ThemedText,
                 Text("")
                 ThemedText

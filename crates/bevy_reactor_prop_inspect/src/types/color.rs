@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bevy::{
     color::Srgba,
+    ecs::hierarchy::Children,
     feathers::{
         constants::fonts,
         controls::color_swatch,
@@ -9,7 +10,8 @@ use bevy::{
         theme::{ThemeFontColor, ThemedText},
         tokens,
     },
-    scene2::{SceneList, bsn_list},
+    scene::{SceneList, bsn_list},
+    text::FontSize,
     ui::{AlignItems, Display, FlexDirection, JustifyContent, Node, px, widget::Text},
 };
 use bevy_reactor::{Cx, effect, if_then};
@@ -28,7 +30,7 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
             align_items: AlignItems::Center,
             justify_content: JustifyContent::SpaceBetween,
         }
-        [
+        Children [
             Node {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Row,
@@ -37,10 +39,10 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
             }
             InheritableFont {
                 font: fonts::REGULAR,
-                font_size: 14.0,
+                font_size: FontSize::Px(14.0),
             }
             ThemeFontColor(tokens::CHECKBOX_TEXT)
-            [
+            Children [
                 :color_swatch()
                 effect::memo_effect(move |cx: &Cx| {
                     let reflect = field_copy.reflect_tracked(cx).unwrap();

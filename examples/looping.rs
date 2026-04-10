@@ -3,7 +3,7 @@
 use bevy::{
     color::palettes::css,
     prelude::*,
-    scene2::{CommandsSpawnScene, SpawnRelatedScenes, bsn, bsn_list},
+    scene::{bsn, bsn_list},
     ui,
 };
 use bevy_reactor::{Cx, ReactorPlugin, for_each};
@@ -42,21 +42,21 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
-        [
+        Children [
             for_each(
                 |cx: &Cx| {
                     cx.resource::<List>().items.clone()
                 },
                 move |parent, suit: &String, _index| {
                     let suit = suit.clone();
-                    parent.spawn_related_scenes::<Children>(
+                    parent.queue_spawn_related_scenes::<Children>(
                         bsn_list![
                             (
                                 Node {
                                     border: ui::UiRect::all(ui::Val::Px(3.)),
                                 }
                                 BorderColor::all(css::GREEN)
-                                [
+                                Children [
                                     Text::new(suit.clone()),
                                 ]
                             )

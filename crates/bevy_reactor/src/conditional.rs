@@ -4,9 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bevy::{
-    ecs::template::TemplateContext, prelude::*, scene2::Scene, ui::experimental::GhostNode,
-};
+use bevy::{ecs::template::TemplateContext, prelude::*, scene::Scene, ui::experimental::GhostNode};
 
 use crate::{
     Cx, SceneListFn, TrackingScope,
@@ -97,7 +95,7 @@ impl<ConditionFn: Lens<bool>> IfThenElse<ConditionFn> {
 impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Template for IfThenElse<ConditionFn> {
     type Output = ();
 
-    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output> {
         let parent_id = context.entity.id();
         context.entity.world_scope(|world| {
             let ticks = world.change_tick();
@@ -122,19 +120,28 @@ impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Template for IfThe
 
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            condition_fn: self.condition_fn.clone(),
+            then_branch: self.then_branch.clone(),
+            else_branch: self.else_branch.clone(),
+        }
+    }
 }
 
 impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Scene for IfThenElse<ConditionFn> {
-    fn patch(
+    fn resolve(
         &self,
-        _context: &mut bevy::scene2::PatchContext,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(IfThenElse {
             condition_fn: self.condition_fn.clone(),
             then_branch: self.then_branch.clone(),
             else_branch: self.else_branch.clone(),
         });
+        Ok(())
     }
 }
 
@@ -249,7 +256,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output> {
         let parent_id = context.entity.id();
         context.entity.world_scope(|world| {
             let ticks = world.change_tick();
@@ -273,6 +280,14 @@ impl<
 
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            selector_fn: self.selector_fn.clone(),
+            cases: self.cases.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -280,16 +295,17 @@ impl<
     SelectorFn: Lens<Value> + Clone + Send + Sync + 'static,
 > Scene for Switch<Value, SelectorFn>
 {
-    fn patch(
+    fn resolve(
         &self,
-        _context: &mut bevy::scene2::PatchContext,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(Switch {
             selector_fn: self.selector_fn.clone(),
             cases: self.cases.clone(),
             marker: PhantomData,
         });
+        Ok(())
     }
 }
 
@@ -370,7 +386,7 @@ impl<
 {
     type Output = ();
 
-    fn build(&mut self, context: &mut TemplateContext) -> Result<Self::Output> {
+    fn build_template(&self, context: &mut TemplateContext) -> Result<Self::Output> {
         let parent_id = context.entity.id();
         context.entity.world_scope(|world| {
             let ticks = world.change_tick();
@@ -394,6 +410,14 @@ impl<
 
         Ok(())
     }
+
+    fn clone_template(&self) -> Self {
+        Self {
+            value_fn: self.value_fn.clone(),
+            builder_fn: self.builder_fn.clone(),
+            marker: self.marker,
+        }
+    }
 }
 
 impl<
@@ -402,16 +426,17 @@ impl<
     BuilderFn: Fn(EntityWorldMut, &Value) + Clone + Send + Sync + 'static,
 > Scene for DynScene<Value, ValueFn, BuilderFn>
 {
-    fn patch(
+    fn resolve(
         &self,
-        _context: &mut bevy::scene2::PatchContext,
-        scene: &mut bevy::scene2::ResolvedScene,
-    ) {
+        _context: &mut bevy::scene::ResolveContext,
+        scene: &mut bevy::scene::ResolvedScene,
+    ) -> std::result::Result<(), bevy::scene::ResolveSceneError> {
         scene.push_template(DynScene {
             value_fn: self.value_fn.clone(),
             builder_fn: self.builder_fn.clone(),
             marker: PhantomData,
         });
+        Ok(())
     }
 }
 

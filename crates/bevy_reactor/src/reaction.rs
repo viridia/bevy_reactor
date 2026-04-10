@@ -43,6 +43,7 @@ impl ReactionCell {
 pub struct InitialReactionCommand(pub(crate) Entity);
 
 impl Command for InitialReactionCommand {
+    type Out = ();
     fn apply(self, world: &mut World) {
         let entity = self.0;
         let Some(reaction) = world.get::<ReactionCell>(entity).map(|r| r.0.clone()) else {

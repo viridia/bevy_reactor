@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::reflect::TypePath;
 use bevy::render::render_resource::*;
-use bevy::render::storage::ShaderStorageBuffer;
+use bevy::render::storage::ShaderBuffer;
 use bevy::shader::ShaderRef;
 
 /// An element within a stroked path.
@@ -98,12 +98,12 @@ pub struct DrawPathMaterial {
 
     /// Path command buffer
     #[storage(3, read_only)]
-    pub(crate) path_commands: Handle<ShaderStorageBuffer>,
+    pub(crate) path_commands: Handle<ShaderBuffer>,
     // pub(crate) commands: Vec<PathCommand>,
 }
 
 impl DrawPathMaterial {
-    pub fn new(path_commands: Handle<ShaderStorageBuffer>) -> Self {
+    pub fn new(path_commands: Handle<ShaderBuffer>) -> Self {
         Self {
             color: Default::default(),
             width: 1.0,
@@ -112,7 +112,7 @@ impl DrawPathMaterial {
         }
     }
 
-    pub fn update(&mut self, path: &DrawablePath, buffers: &mut Assets<ShaderStorageBuffer>) {
+    pub fn update(&mut self, path: &DrawablePath, buffers: &mut Assets<ShaderBuffer>) {
         let bounds = path.bounds();
         self.color = path.color.to_vec4();
         self.width = path.width;

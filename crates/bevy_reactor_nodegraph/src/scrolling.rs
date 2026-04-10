@@ -8,7 +8,7 @@ use bevy::{
         query::{With, Without},
         reflect::ReflectComponent,
         system::{Query, Res},
-        template::GetTemplate,
+        template::FromTemplate,
     },
     feathers::{cursor::EntityCursor, palette},
     log::warn_once,
@@ -18,7 +18,7 @@ use bevy::{
         hover::Hovered,
     },
     reflect::{Reflect, prelude::ReflectDefault},
-    scene2::{Scene, bsn, on},
+    scene::{Scene, bsn, on},
     ui::{
         AlignSelf, BackgroundColor, BorderRadius, ComputedNode, ComputedUiRenderTargetInfo,
         JustifySelf, Node, PositionType, UiGlobalTransform, UiRect, UiScale, Val, ZIndex, px,
@@ -40,7 +40,7 @@ pub fn node_graph_scrollbar(orientation: ControlOrientation) -> impl Scene {
         EntityCursor::System(bevy::window::SystemCursorIcon::Default)
         ZIndex(10)
         on(scrollbar_on_track_press)
-        [
+        Children [
             Node {
                 position_type: PositionType::Absolute,
                 left: px(0),
@@ -65,7 +65,7 @@ pub fn node_graph_scrollbar(orientation: ControlOrientation) -> impl Scene {
     }
 }
 
-#[derive(Component, Debug, Reflect, Clone, GetTemplate)]
+#[derive(Component, Debug, Reflect, Clone, FromTemplate)]
 #[reflect(Component)]
 pub struct GraphScrollbar {
     /// Whether the scrollbar is vertical or horizontal.

@@ -3,7 +3,7 @@ use bevy::{
     ecs::template::template,
     light::{NotShadowCaster, NotShadowReceiver},
     prelude::*,
-    scene2::{Scene, bsn},
+    scene::{Scene, bsn},
 };
 use bevy_reactor::{Cx, effect};
 
@@ -51,7 +51,7 @@ pub fn gizmoid<
                     entity.world_scope(|world| {
                         let mut meshes = world.get_resource_mut::<Assets<Mesh>>().unwrap();
                         let mut mesh = meshes.get_mut(mesh_handle.id()).unwrap();
-                        builder.build(&mut *mesh);
+                        builder.build(&mut mesh);
                     });
                 },
                 _ => {
@@ -67,7 +67,7 @@ pub fn gizmoid<
             }
         })
 
-        [
+        Children [
             HasUnderlay
             NotShadowCaster
             template(|_| Ok(NotShadowReceiver))

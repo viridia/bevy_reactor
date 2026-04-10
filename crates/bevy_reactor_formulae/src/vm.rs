@@ -1047,7 +1047,7 @@ fn ret(_vm: &mut VM) -> Result<(), VMError> {
 
 #[cfg(test)]
 mod tests {
-    use bevy::ecs::component::Tick;
+    use bevy::ecs::change_detection::Tick;
 
     use crate::{expr_type::ExprType, instr};
 

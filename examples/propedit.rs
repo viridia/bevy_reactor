@@ -10,7 +10,7 @@ use bevy::{
         tokens,
     },
     prelude::*,
-    scene2::{CommandsSpawnScene, bsn},
+    scene::bsn,
     ui,
 };
 use bevy_reactor::ReactorPlugin;
@@ -100,7 +100,7 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         ThemeBackgroundColor(tokens::WINDOW_BG)
-        [
+        Children [
             :property_inspector(root)
         ]
     ));

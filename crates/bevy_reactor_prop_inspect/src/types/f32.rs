@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use bevy::{
-    ecs::{observer::On, world::DeferredWorld},
+    ecs::{hierarchy::Children, observer::On, world::DeferredWorld},
     feathers::controls::{SliderProps, slider},
     reflect::Reflect,
-    scene2::{SceneList, bsn_list, on},
+    scene::{SceneList, bsn_list, on},
     ui::widget::Text,
     ui_widgets::{SliderPrecision, SliderStep, SliderValue, ValueChange},
 };
@@ -25,7 +25,7 @@ pub fn f32_range_field(field: Arc<Inspectable>, range: &ValueRange<f32>) -> impl
     let field_copy4 = field.clone();
     bsn_list![
         :field_group
-        [
+        Children [
             :field_label(field)
             ,
             :slider(SliderProps {
@@ -67,7 +67,7 @@ pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy = field.clone();
     bsn_list![
         :field_group
-        [
+        Children [
             :field_label(field)
             ,
             :slider(SliderProps {

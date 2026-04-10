@@ -1,9 +1,6 @@
 //! Example which demonstrates drawing of node paths.
 
-use bevy::{
-    prelude::*,
-    scene2::{CommandsSpawnScene, bsn},
-};
+use bevy::{prelude::*, scene::bsn};
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_nodegraph::ReactorNodeGraphPlugin;
 

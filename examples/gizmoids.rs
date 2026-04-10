@@ -5,7 +5,7 @@ use bevy::{
     color::palettes::{basic::SILVER, css},
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
-    scene2::{CommandsSpawnScene, bsn},
+    scene::bsn,
 };
 use bevy_reactor::{Cx, ReactorPlugin, effect};
 use bevy_reactor_gizmoids::{
