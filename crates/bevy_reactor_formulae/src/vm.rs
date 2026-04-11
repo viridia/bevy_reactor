@@ -1031,8 +1031,7 @@ fn branch_if_true(vm: &mut VM) -> Result<(), VMError> {
             Ok(())
         }
 
-        StackValue::Bool(true) => Ok(()),
-
+        // StackValue::Bool(true) => Ok(()),
         _ => Err(VMError::MismatchedTypes(
             vm.value_type(&test),
             ExprType::Boolean,

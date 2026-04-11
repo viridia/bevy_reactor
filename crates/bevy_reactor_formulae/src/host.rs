@@ -289,7 +289,7 @@ impl HostState {
         index
     }
 
-    pub fn add_host_type<T: Typed>(&mut self, name: &'static str) -> HostTypeBuilder {
+    pub fn add_host_type<T: Typed>(&mut self, name: &'static str) -> HostTypeBuilder<'_> {
         let name: SmolStr = name.into();
         if self.decls.contains_key(&name) {
             panic!("Host symbol {name} is already defined.");
@@ -320,7 +320,7 @@ impl HostState {
     }
 
     /// Returns the mutable `HostType` table for a native type.
-    pub fn get_host_type_mut<T: Typed>(&mut self) -> Option<HostTypeBuilder> {
+    pub fn get_host_type_mut<T: Typed>(&mut self) -> Option<HostTypeBuilder<'_>> {
         self.types
             .get_mut(&TypeId::of::<T>())
             .map(|host_type| HostTypeBuilder {

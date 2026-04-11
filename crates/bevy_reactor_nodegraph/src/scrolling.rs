@@ -55,7 +55,7 @@ pub fn node_graph_scrollbar(orientation: ControlOrientation) -> impl Scene {
             Hovered::default()
             EntityCursor::System(bevy::window::SystemCursorIcon::Pointer)
             on(on_change_hover)
-            // on(on_change_dragging)
+            on(on_change_dragging)
             on(scrollbar_thumb_on_thumb_press)
             on(scrollbar_on_drag_start)
             on(scrollbar_on_drag)

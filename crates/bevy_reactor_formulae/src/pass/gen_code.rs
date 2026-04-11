@@ -626,7 +626,7 @@ fn build_instructions(mut builder: BlockBuilder) -> Result<InstructionBuilder, C
     Ok(ibuilder)
 }
 
-fn visit_stack_op<'cu>(op: &StackOp, out: &mut InstructionBuilder) -> Result<(), CompilationError> {
+fn visit_stack_op(op: &StackOp, out: &mut InstructionBuilder) -> Result<(), CompilationError> {
     match op {
         StackOp::ConstVoid => {
             out.push_op(instr::OP_CONST_VOID);
@@ -670,7 +670,7 @@ fn visit_stack_op<'cu>(op: &StackOp, out: &mut InstructionBuilder) -> Result<(),
             out.push_immediate_string(str);
         }
 
-        StackOp::Drop(n) => {
+        StackOp::Drop(_n) => {
             todo!();
         }
 
@@ -743,7 +743,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_ADD_I64),
                 StackOpType::F32 => out.push_op(instr::OP_ADD_F32),
                 StackOpType::F64 => out.push_op(instr::OP_ADD_F64),
-                _ => panic!("Invalid type for binary addition: {typ:?}"),
             };
         }
 
@@ -753,7 +752,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_SUB_I64),
                 StackOpType::F32 => out.push_op(instr::OP_SUB_F32),
                 StackOpType::F64 => out.push_op(instr::OP_SUB_F64),
-                _ => panic!("Invalid type for binary subtraction: {typ:?}"),
             };
         }
 
@@ -763,7 +761,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_MUL_I64),
                 StackOpType::F32 => out.push_op(instr::OP_MUL_F32),
                 StackOpType::F64 => out.push_op(instr::OP_MUL_F64),
-                _ => panic!("Invalid type for binary multiplication: {typ:?}"),
             };
         }
 
@@ -773,7 +770,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_DIV_I64),
                 StackOpType::F32 => out.push_op(instr::OP_DIV_F32),
                 StackOpType::F64 => out.push_op(instr::OP_DIV_F64),
-                _ => panic!("Invalid type for binary division: {typ:?}"),
             };
         }
 
@@ -839,7 +835,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_EQ_I64),
                 StackOpType::F32 => out.push_op(instr::OP_EQ_F32),
                 StackOpType::F64 => out.push_op(instr::OP_EQ_F64),
-                _ => panic!("Invalid type for equality comparison: {typ:?}"),
             };
         }
 
@@ -849,7 +844,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_NE_I64),
                 StackOpType::F32 => out.push_op(instr::OP_NE_F32),
                 StackOpType::F64 => out.push_op(instr::OP_NE_F64),
-                _ => panic!("Invalid type for inequality comparison: {typ:?}"),
             };
         }
 
@@ -859,7 +853,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_LT_I64),
                 StackOpType::F32 => out.push_op(instr::OP_LT_F32),
                 StackOpType::F64 => out.push_op(instr::OP_LT_F64),
-                _ => panic!("Invalid type for less-than comparison: {typ:?}"),
             };
         }
 
@@ -869,7 +862,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_LE_I64),
                 StackOpType::F32 => out.push_op(instr::OP_LE_F32),
                 StackOpType::F64 => out.push_op(instr::OP_LE_F64),
-                _ => panic!("Invalid type for less-than-or-equal comparison: {typ:?}"),
             };
         }
 
@@ -879,7 +871,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_GT_I64),
                 StackOpType::F32 => out.push_op(instr::OP_GT_F32),
                 StackOpType::F64 => out.push_op(instr::OP_GT_F64),
-                _ => panic!("Invalid type for greater-than comparison: {typ:?}"),
             };
         }
 
@@ -889,7 +880,6 @@ fn visit_binop(typ: StackOpType, op: BinaryOp, out: &mut InstructionBuilder) {
                 StackOpType::I64 => out.push_op(instr::OP_GE_I64),
                 StackOpType::F32 => out.push_op(instr::OP_GE_F32),
                 StackOpType::F64 => out.push_op(instr::OP_GE_F64),
-                _ => panic!("Invalid type for greater-than-or-equal comparison: {typ:?}"),
             };
         }
     }
