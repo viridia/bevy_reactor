@@ -24,7 +24,7 @@ bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.19.0-dev",
   "file_watcher",
 ] }
 bevy_reactor = { path = "crates/bevy_reactor" }
-# bevy_reactor_formulae = { path = "crates/bevy_reactor_formulae" }
+bevy_reactor_formulae = { path = "crates/bevy_reactor_formulae" }
 bevy_reactor_gizmoids = { path = "crates/bevy_reactor_gizmoids" }
 bevy_reactor_nodegraph = { path = "crates/bevy_reactor_nodegraph" }
 # bevy_reactor_prop_inspect = { path = "crates/bevy_reactor_prop_inspect" }
@@ -34,7 +34,7 @@ smol_str = "0.3.2"
 bevy = { workspace = true }
 # bevy-inspector-egui = "0.35.0"
 bevy_reactor = { workspace = true }
-# bevy_reactor_formulae = { workspace = true }
+bevy_reactor_formulae = { workspace = true }
 bevy_reactor_gizmoids = { workspace = true }
 bevy_reactor_nodegraph = { workspace = true }
 # bevy_reactor_prop_inspect = { workspace = true }

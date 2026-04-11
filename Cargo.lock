@@ -2377,6 +2377,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_reactor",
+ "bevy_reactor_formulae",
  "bevy_reactor_gizmoids",
  "bevy_reactor_nodegraph",
  "smol_str 0.3.2",
