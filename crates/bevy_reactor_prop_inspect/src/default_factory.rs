@@ -106,15 +106,15 @@ impl InspectorFactory for DefaultInspectorFactory {
                             .queue_spawn_related_scenes::<Children>(bool_field(field));
                     }
                     "f32" => {
-                        if let Some(attrs) = field.attributes {
-                            if let Some(range) = attrs.get::<ValueRange<f32>>() {
-                                world
-                                    .entity_mut(parent)
-                                    .queue_spawn_related_scenes::<Children>(f32_range_field(
-                                        field, range,
-                                    ));
-                                return true;
-                            }
+                        if let Some(attrs) = field.attributes
+                            && let Some(range) = attrs.get::<ValueRange<f32>>()
+                        {
+                            world
+                                .entity_mut(parent)
+                                .queue_spawn_related_scenes::<Children>(f32_range_field(
+                                    field, range,
+                                ));
+                            return true;
                         }
 
                         world
