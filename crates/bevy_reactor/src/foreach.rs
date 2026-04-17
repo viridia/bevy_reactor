@@ -337,7 +337,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(ForEach {
+        scene.push_bundle_template(ForEach {
             item_fn: self.item_fn.clone(),
             each_fn: self.each_fn.clone(),
             cmp_fn: self.cmp_fn.clone(),

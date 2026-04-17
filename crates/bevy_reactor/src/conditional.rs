@@ -136,7 +136,7 @@ impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Scene for IfThenEl
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(IfThenElse {
+        scene.push_bundle_template(IfThenElse {
             condition_fn: self.condition_fn.clone(),
             then_branch: self.then_branch.clone(),
             else_branch: self.else_branch.clone(),
@@ -300,7 +300,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(Switch {
+        scene.push_bundle_template(Switch {
             selector_fn: self.selector_fn.clone(),
             cases: self.cases.clone(),
             marker: PhantomData,
@@ -431,7 +431,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> std::result::Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(DynScene {
+        scene.push_bundle_template(DynScene {
             value_fn: self.value_fn.clone(),
             builder_fn: self.builder_fn.clone(),
             marker: PhantomData,

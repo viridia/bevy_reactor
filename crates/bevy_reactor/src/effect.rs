@@ -125,7 +125,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(Effect {
+        scene.push_bundle_template(Effect {
             deps: self.deps.clone(),
             effect: self.effect.clone(),
             marker: std::marker::PhantomData,
@@ -265,7 +265,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(MemoEffect {
+        scene.push_bundle_template(MemoEffect {
             deps: self.deps.clone(),
             effect: self.effect.clone(),
             marker: std::marker::PhantomData,
@@ -415,7 +415,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(InsertComputed {
+        scene.push_bundle_template(InsertComputed {
             deps: self.deps.clone(),
             factory: self.factory.clone(),
             marker: std::marker::PhantomData,
@@ -569,7 +569,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(InsertComputedWhen {
+        scene.push_bundle_template(InsertComputedWhen {
             deps: self.deps.clone(),
             factory: self.factory.clone(),
             marker: std::marker::PhantomData,
@@ -699,7 +699,7 @@ impl<
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
-        scene.push_template(InsertWhen {
+        scene.push_bundle_template(InsertWhen {
             condition: self.condition.clone(),
             factory: self.factory.clone(),
         });
