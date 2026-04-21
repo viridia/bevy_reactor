@@ -252,13 +252,9 @@ impl<
             if prev_len == 0 {
                 // Transitioning from non-empty to empty, delete fallback.
                 entt.despawn_related::<Children>();
-            } else {
-                // Remove old children but do not despawn, since some row entities will be reused.
-                // Children no longer present will already have been despawned.
-                entt.remove::<Children>();
             }
-            // Add new children
-            entt.add_related::<ChildOf>(&children);
+            // Replace children; old children are either preserved or already despawned.
+            entt.replace_related::<ChildOf>(&children);
         }
     }
 }
