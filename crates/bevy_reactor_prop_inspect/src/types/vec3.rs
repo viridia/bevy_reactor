@@ -5,7 +5,7 @@ use bevy::{
     feathers::{
         constants::fonts,
         font_styles::InheritableFont,
-        theme::{ThemeFontColor, ThemedText},
+        theme::{ThemeTextColor, ThemedText},
         tokens,
     },
     math::Vec3,
@@ -40,8 +40,8 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
                 font: fonts::REGULAR,
                 font_size: FontSize::Px(16.0),
             }
-            // ThemeFontColor(tokens::TEXT_DIM)
-            ThemeFontColor(tokens::CHECKBOX_TEXT)
+            // ThemeTextColor(tokens::TEXT_DIM)
+            ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
                 Text("x:") ThemedText,
                 Text("")

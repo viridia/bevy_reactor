@@ -57,7 +57,7 @@ fn setup_view_root(mut commands: Commands) {
                                 }
                                 BorderColor::all(css::GREEN)
                                 Children [
-                                    Text::new(suit.clone()),
+                                    Text::new(suit),
                                 ]
                             )
                         ]);

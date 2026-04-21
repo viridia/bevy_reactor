@@ -121,7 +121,7 @@ impl<
 > Scene for Effect<D, DepsFn, EffectFn>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
@@ -261,7 +261,7 @@ impl<
 > Scene for MemoEffect<D, DepsFn, EffectFn>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
@@ -411,7 +411,7 @@ impl<
 > Scene for InsertComputed<D, DepsFn, C, Factory>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
@@ -565,7 +565,7 @@ impl<
 > Scene for InsertComputedWhen<D, DepsFn, C, Factory>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
@@ -695,7 +695,7 @@ impl<
 > Scene for InsertWhen<Condition, C, Factory>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {

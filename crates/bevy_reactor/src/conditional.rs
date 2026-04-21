@@ -132,7 +132,7 @@ impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Template for IfThe
 
 impl<ConditionFn: Lens<bool> + Clone + Send + Sync + 'static> Scene for IfThenElse<ConditionFn> {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
@@ -296,7 +296,7 @@ impl<
 > Scene for Switch<Value, SelectorFn>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
@@ -427,7 +427,7 @@ impl<
 > Scene for DynScene<Value, ValueFn, BuilderFn>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> std::result::Result<(), bevy::scene::ResolveSceneError> {

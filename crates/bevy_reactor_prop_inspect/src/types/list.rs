@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
+use bevy::feathers::controls::disclosure_toggle;
 use bevy::reflect::OffsetAccess;
 use bevy::scene::EntityWorldMutSceneExt;
 use bevy::text::FontSize;
@@ -11,7 +12,7 @@ use bevy::{
     feathers::{
         constants::fonts,
         font_styles::InheritableFont,
-        theme::{ThemeFontColor, ThemedText},
+        theme::{ThemeTextColor, ThemedText},
         tokens,
     },
     log::warn,
@@ -24,7 +25,7 @@ use bevy_reactor::{Cx, effect, for_each, if_then};
 
 use crate::property_inspector::field_inspector;
 use crate::{
-    Inspectable, disclosure_toggle,
+    Inspectable,
     property_inspector::{add_button, field_group, field_label, flex_spacer},
 };
 
@@ -49,8 +50,8 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                 font: fonts::REGULAR,
                 font_size: FontSize::Px(16.0),
             }
-            // ThemeFontColor(tokens::TEXT_DIM)
-            ThemeFontColor(tokens::CHECKBOX_TEXT)
+            // ThemeTextColor(tokens::TEXT_DIM)
+            ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
                 :disclosure_toggle
                 #toggle

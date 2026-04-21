@@ -6,7 +6,7 @@ use bevy::{
         constants::fonts,
         controls::{ButtonProps, ButtonVariant, tool_button},
         font_styles::InheritableFont,
-        theme::{ThemeFontColor, ThemedText},
+        theme::{ThemeTextColor, ThemedText},
         tokens,
     },
     prelude::*,
@@ -224,8 +224,8 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
             font: fonts::REGULAR,
             font_size: FontSize::Px(14.0),
         }
-        // ThemeFontColor(tokens::TEXT_DIM)
-        ThemeFontColor(tokens::CHECKBOX_TEXT_DISABLED)
+        // ThemeTextColor(tokens::TEXT_DIM)
+        ThemeTextColor(tokens::CHECKBOX_TEXT_DISABLED)
         Children [
             Text({name.clone()})
             ThemedText,

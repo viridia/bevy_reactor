@@ -7,7 +7,7 @@ use bevy::{
         constants::fonts,
         controls::color_swatch,
         font_styles::InheritableFont,
-        theme::{ThemeFontColor, ThemedText},
+        theme::{ThemeTextColor, ThemedText},
         tokens,
     },
     scene::{SceneList, bsn_list},
@@ -41,7 +41,7 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
                 font: fonts::REGULAR,
                 font_size: FontSize::Px(14.0),
             }
-            ThemeFontColor(tokens::CHECKBOX_TEXT)
+            ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
                 :color_swatch()
                 effect::memo_effect(move |cx: &Cx| {

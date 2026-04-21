@@ -333,7 +333,7 @@ impl<
 > Scene for ForEach<Item, ItemFn, CmpFn, EachFn>
 {
     fn resolve(
-        &self,
+        self,
         _context: &mut bevy::scene::ResolveContext,
         scene: &mut bevy::scene::ResolvedScene,
     ) -> Result<(), bevy::scene::ResolveSceneError> {
