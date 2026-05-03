@@ -99,7 +99,6 @@ Next:
 - We'll need to separate params from locals, at least initially
 - locals is a flat buffer of u8
 - instructions:
-
   - OP_LOAD_LOCAL_BOOL (u16 stack offset)
   - OP_LOAD_LOCAL_I32 (u16)
   - OP_LOAD_LOCAL_I64 (u16)
@@ -161,3 +160,58 @@ Next:
   - resolve
   - backend
 - record max stack size in function
+
+## Widgets
+
+```
+States:
+* disabled
+* pressed
+* hover
+* focused
+* checked
+* dragging
+* overlay
+
+ButtonImage {
+  normal: Some(ImageNode {
+
+  }),
+  disabled: Some(ImageNode {
+
+  }),
+  pressed: Some(ImageNode {
+
+  }),
+  hover: Some(ImageNode {
+
+  }),
+  focused: Some(ImageNode {
+
+  }),
+}
+
+CheckboxImage {
+  normal: Some(ImageNode {
+
+  }),
+  disabled: Some(ImageNode {
+
+  }),
+  disabled_checked: Some(ImageNode {
+
+  }),
+  pressed: Some(ImageNode {
+
+  }),
+  pressed_checked: Some(ImageNode {
+
+  }),
+  hover: Some(ImageNode {
+
+  }),
+  focused: Some(ImageNode {
+
+  }),
+}
+```

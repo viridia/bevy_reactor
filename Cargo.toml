@@ -28,6 +28,7 @@ bevy_reactor_formulae = { path = "crates/bevy_reactor_formulae" }
 bevy_reactor_gizmoids = { path = "crates/bevy_reactor_gizmoids" }
 bevy_reactor_nodegraph = { path = "crates/bevy_reactor_nodegraph" }
 bevy_reactor_prop_inspect = { path = "crates/bevy_reactor_prop_inspect" }
+bitflags = "2.11.1"
 smol_str = "0.3.2"
 
 [dependencies]

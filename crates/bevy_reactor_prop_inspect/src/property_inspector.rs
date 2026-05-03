@@ -4,9 +4,10 @@ use bevy::{
     ecs::{template::template, world::DeferredWorld},
     feathers::{
         constants::fonts,
-        controls::{ButtonProps, ButtonVariant, tool_button},
+        controls::{ButtonVariant, ToolButton},
+        display::label_small,
         font_styles::InheritableFont,
-        theme::{ThemeTextColor, ThemedText},
+        theme::ThemeTextColor,
         tokens,
     },
     prelude::*,
@@ -227,8 +228,7 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
         // ThemeTextColor(tokens::TEXT_DIM)
         ThemeTextColor(tokens::CHECKBOX_TEXT_DISABLED)
         Children [
-            Text({name.clone()})
-            ThemedText,
+            label_small(name.clone())
 
             :flex_spacer,
 
@@ -252,7 +252,9 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
 
 pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        :ToolButton {
+            @variant: ButtonVariant::Normal
+        }
         Node {
             flex_grow: 0.0,
             height: px(16),
@@ -269,7 +271,9 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
 
 pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        :ToolButton {
+            @variant: ButtonVariant::Normal
+        }
         Node {
             flex_grow: 0.0,
             height: px(16),
@@ -287,7 +291,9 @@ pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
 
 pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        :ToolButton {
+            @variant: ButtonVariant::Normal
+        }
         Node {
             flex_grow: 0.0,
             height: px(16),
@@ -305,7 +311,9 @@ pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
 
 pub fn add_button() -> impl Scene {
     bsn! {
-        :tool_button(ButtonProps { variant: ButtonVariant::Normal, ..default() })
+        :ToolButton {
+            @variant: ButtonVariant::Normal
+        }
         Node {
             flex_grow: 0.0,
             height: px(16),

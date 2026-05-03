@@ -3,10 +3,7 @@
 use bevy::{
     color::palettes,
     feathers::{
-        FeathersPlugins,
-        controls::{SliderProps, slider},
-        dark_theme::create_dark_theme,
-        theme::UiTheme,
+        FeathersPlugins, controls::FeathersSlider, dark_theme::create_dark_theme, theme::UiTheme,
     },
     prelude::*,
     scene::{bsn, on},
@@ -126,21 +123,21 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                         #in1
                         :input_terminal(palettes::css::ALICE_BLUE.into())
                         Children [
-                            :slider(SliderProps {
-                                value: 0.0,
-                                min: 0.0,
-                                max: 100.0,
-                            })
+                            :FeathersSlider {
+                                @value: 0.0,
+                                @min: 0.0,
+                                @max: 100.0,
+                            }
                             Node {
                                 align_self: AlignSelf::Stretch
                             }
                         ]
                         ,
-                        :slider(SliderProps {
-                            value: 0.0,
-                            min: 0.0,
-                            max: 100.0,
-                        })
+                        :FeathersSlider {
+                            @value: 0.0,
+                            @min: 0.0,
+                            @max: 100.0,
+                        }
                         Node {
                             align_self: AlignSelf::Stretch
                         }

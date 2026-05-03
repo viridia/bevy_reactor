@@ -2,12 +2,9 @@ use std::sync::Arc;
 
 use bevy::{
     ecs::{hierarchy::Children, observer::On, world::DeferredWorld},
-    feathers::{
-        controls::{CheckboxProps, checkbox},
-        theme::ThemedText,
-    },
+    feathers::{controls::FeathersCheckbox, theme::ThemedText},
     reflect::Reflect,
-    scene::{SceneList, bsn_list, on},
+    scene::{SceneList, bsn, bsn_list, on},
     ui::{AlignItems, Checked, Display, FlexDirection, JustifyContent, Node, widget::Text},
     ui_widgets::ValueChange,
 };
@@ -28,11 +25,11 @@ pub fn bool_field(field: Arc<Inspectable>) -> impl SceneList {
             justify_content: JustifyContent::SpaceBetween,
         }
         Children [
-            :checkbox(CheckboxProps {
-                caption: Box::new(bsn_list!(
-                    (Text::new(field.name.to_owned()) ThemedText),
-                )),
-            })
+            :FeathersCheckbox {
+                @caption: {bsn!(
+                    (Text::new(field.name.to_owned()) ThemedText)
+                )},
+            }
             effect::memo_effect(move |cx: &Cx| {
                 let reflect = field_copy.reflect_tracked(cx).unwrap();
                 if let Some(value) = reflect.try_downcast_ref::<bool>() {

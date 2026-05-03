@@ -148,7 +148,7 @@ impl<'host> HostTypeBuilder<'host> {
 
 type GlobalPropertyAccessor = fn(&VM) -> Result<StackValue, VMError>;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum Global {
     /// A constant value.
     Const(StackValue),

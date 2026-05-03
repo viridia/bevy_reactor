@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bevy::{
     ecs::{hierarchy::Children, observer::On, world::DeferredWorld},
-    feathers::controls::{SliderProps, slider},
+    feathers::controls::FeathersSlider,
     reflect::Reflect,
     scene::{SceneList, bsn_list, on},
     ui::widget::Text,
@@ -28,11 +28,11 @@ pub fn f32_range_field(field: Arc<Inspectable>, range: &ValueRange<f32>) -> impl
         Children [
             :field_label(field)
             ,
-            :slider(SliderProps {
-                min: range.0.start,
-                max: range.0.end,
-                value: 0.,
-            })
+            :FeathersSlider {
+                @min: {range.0.start},
+                @max: {range.0.end},
+                @value: 0.,
+            }
             effect::memo_effect(move |cx: &Cx| {
                 let reflect = field_copy.reflect_tracked(cx).unwrap();
                 if let Some(value) = reflect.try_downcast_ref::<f32>() {
@@ -70,11 +70,12 @@ pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
         Children [
             :field_label(field)
             ,
-            :slider(SliderProps {
-                min: 0.,
-                max: 100.,
-                value: 0.,
-            })
+            // TODO: Replace with number input
+            :FeathersSlider {
+                @min: 0.,
+                @max: 100.,
+                @value: 0.,
+            }
             Text("")
             effect::memo_effect(move |cx: &Cx| {
                 let reflect = field_copy.reflect_tracked(cx).unwrap();

@@ -5,7 +5,7 @@ use bevy::{
     ecs::hierarchy::Children,
     feathers::{
         constants::fonts,
-        controls::color_swatch,
+        controls::FeathersColorSwatch,
         font_styles::InheritableFont,
         theme::{ThemeTextColor, ThemedText},
         tokens,
@@ -43,7 +43,7 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
             }
             ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
-                :color_swatch()
+                :FeathersColorSwatch
                 effect::memo_effect(move |cx: &Cx| {
                     let reflect = field_copy.reflect_tracked(cx).unwrap();
                     if let Some(value) = reflect.try_downcast_ref::<Srgba>() {
