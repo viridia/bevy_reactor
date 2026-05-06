@@ -172,6 +172,9 @@ pub fn update_widget_styles(
                             if image_node.rect != new_image.rect {
                                 image_node.rect = new_image.rect;
                             }
+                            if image_node.visual_box != new_image.visual_box {
+                                image_node.visual_box = new_image.visual_box;
+                            }
                         }
                         (Some(_), None) => {
                             commands.entity(target_ent).remove::<ImageNode>();

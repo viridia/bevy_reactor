@@ -4,7 +4,7 @@ use bevy::{
     ecs::{template::template, world::DeferredWorld},
     feathers::{
         constants::fonts,
-        controls::{ButtonVariant, ToolButton},
+        controls::{ButtonVariant, FeathersToolButton},
         display::label_small,
         font_styles::InheritableFont,
         theme::ThemeTextColor,
@@ -252,7 +252,7 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
 
 pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :ToolButton {
+        :FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -271,7 +271,7 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
 
 pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :ToolButton {
+        :FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -291,7 +291,7 @@ pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
 
 pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :ToolButton {
+        :FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -311,7 +311,7 @@ pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
 
 pub fn add_button() -> impl Scene {
     bsn! {
-        :ToolButton {
+        :FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {

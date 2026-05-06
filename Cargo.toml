@@ -19,8 +19,9 @@ members = ["crates/*"]
 bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.19.0-dev", features = [
   "dynamic_linking",
   "ghost_nodes",
-  "experimental_bevy_feathers",
+  "bevy_feathers",
   "file_watcher",
+  "system_font_discovery",
   "debug",
 ] }
 bevy_reactor = { path = "crates/bevy_reactor" }

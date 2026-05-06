@@ -6,6 +6,7 @@ use bevy::{
     picking::hover::Hovered,
     prelude::*,
     scene::bsn,
+    text::FontSourceTemplate,
     ui::{self, widget::ImageNodeTemplate},
     ui_widgets::Button,
     window::SystemCursorIcon,
@@ -43,33 +44,27 @@ fn setup_view_root(mut commands: Commands) {
         Children [
             (
                 :button()
-                Node {
-                    align_self: AlignSelf::Center,
-                }
                 Children [
-                    Text("Foo")
+                    :button_caption("Retreat")
                 ]
             ),
             (
                 :button()
-                Node {
-                    align_self: AlignSelf::Center,
-                }
                 Children [
-                    Text("Bar")
+                    :button_caption("Attack")
                 ]
             )
         ]
     ));
 }
 
-pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
+fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if input.just_pressed(KeyCode::Escape) {
         exit.write(AppExit::Success);
     }
 }
 
-pub fn button() -> impl Scene {
+fn button() -> impl Scene {
     let slicer = TextureSlicer {
         border: BorderRect::all(16.0),
         center_scale_mode: SliceScaleMode::Stretch,
@@ -81,10 +76,9 @@ pub fn button() -> impl Scene {
             display: Display::Flex,
             flex_direction: FlexDirection::Row,
             min_height: px(32),
-            min_width: px(100),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
-            // padding: px(10),
+            padding: UiRect::axes(px(20), px(0)),
         }
         Button
         Hovered
@@ -100,6 +94,7 @@ pub fn button() -> impl Scene {
                     color: Color::WHITE,
                     image: "button_normal.png".into(),
                     image_mode: NodeImageMode::Sliced(slicer.clone()),
+                    visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
             },
@@ -112,6 +107,7 @@ pub fn button() -> impl Scene {
                     color: palettes::css::RED.into(),
                     image: "button_normal.png".into(),
                     image_mode: NodeImageMode::Sliced(slicer.clone()),
+                    visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
             },
@@ -124,6 +120,7 @@ pub fn button() -> impl Scene {
                     color: palettes::css::ALICE_BLUE.into(),
                     image: "button_normal.png".into(),
                     image_mode: NodeImageMode::Sliced(slicer.clone()),
+                    visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
             },
@@ -136,9 +133,22 @@ pub fn button() -> impl Scene {
                     color: palettes::css::AQUAMARINE.into(),
                     image: "button_normal.png".into(),
                     image_mode: NodeImageMode::Sliced(slicer.clone()),
+                    visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
             },
         ]
+    }
+}
+
+fn button_caption(text: &'static str) -> impl Scene {
+    bsn! {
+        Text(text)
+        TextColor(palettes::css::BLACK)
+        TextFont {
+            font: FontSourceTemplate::SansSerif,
+            font_size: FontSize::Px(20.0)
+            weight: FontWeight::BOLD,
+        }
     }
 }
