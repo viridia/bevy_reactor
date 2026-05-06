@@ -1,27 +1,23 @@
 use bevy::{
-    color::Color,
     ecs::{
         component::Component,
         entity::Entity,
         hierarchy::ChildOf,
         query::Has,
         system::{Commands, Query},
-        template::{FromTemplate, OptionTemplate, VecTemplate},
+        template::{FromTemplate, OptionTemplate},
     },
-    feathers::cursor::EntityCursor,
     picking::hover::Hovered,
-    scene::{Scene, bsn},
     ui::{
-        Checked, InteractionDisabled, Node, Pressed,
-        widget::{Button, ImageNode, ImageNodeTemplate},
+        Checked, InteractionDisabled, Pressed,
+        widget::{ImageNode, ImageNodeTemplate},
     },
-    window::SystemCursorIcon,
 };
 use bitflags::bitflags;
 
 bitflags! {
     /// Bitflags representing the possible states of a widget
-    #[derive(Clone, Copy, Default, PartialEq)]
+    #[derive(Clone, Copy, Default, PartialEq, Debug)]
     #[repr(transparent)]
     pub struct WidgetState: u32 {
         const DISABLED = 1 << 0;
@@ -65,15 +61,6 @@ pub struct StyleRule {
     pub background: Option<ImageNode>, // None = render nothing for this state
 }
 
-/// A component which updates the style of an entity based on the widget states (disabled, pressed,
-/// hovered, and so on)
-#[derive(Component, Clone, Default, FromTemplate)]
-pub struct StatefulStyle {
-    pub source: StateSource,
-    #[template(VecTemplate<StyleRuleTemplate>)]
-    pub rules: Vec<StyleRule>,
-}
-
 /// A relationship component used to define multiple visual states of a widget.
 #[derive(Component, Clone, PartialEq, Eq, Debug)]
 #[relationship(relationship_target = VisualStates)]
@@ -107,13 +94,15 @@ impl core::ops::Deref for VisualStates {
 // TODO: Use change detection to avoid evaluating rules every frame.
 #[allow(clippy::type_complexity)]
 pub fn update_widget_styles(
-    mut q_styled: Query<(
+    mut q_style_target: Query<(
         Entity,
-        &StatefulStyle,
+        &StateSource,
+        &VisualStates,
         Option<&ChildOf>,
         Option<&mut ImageNode>,
     )>,
-    q_states: Query<(
+    q_style_rules: Query<&StyleRule>,
+    q_state_source: Query<(
         &Hovered,
         Has<Pressed>,
         Has<Checked>,
@@ -121,17 +110,17 @@ pub fn update_widget_styles(
     )>,
     mut commands: Commands,
 ) {
-    for (styled_ent, style, parent, image_node) in q_styled.iter_mut() {
-        let source: Entity = match style.source {
-            StateSource::SelfState => styled_ent,
+    for (target_ent, source, states, parent, image_node) in q_style_target.iter_mut() {
+        let source: Entity = match source {
+            StateSource::SelfState => target_ent,
             StateSource::Parent => match parent {
                 Some(p) => p.parent(),
-                None => styled_ent, // Fall back to self if there is no parent.
+                None => target_ent, // Fall back to self if there is no parent.
             },
-            StateSource::Entity(entity) => entity,
+            StateSource::Entity(entity) => *entity,
         };
 
-        if let Ok((hovered, pressed, checked, disabled)) = q_states.get(source) {
+        if let Ok((hovered, pressed, checked, disabled)) = q_state_source.get(source) {
             let bits: WidgetState = WidgetState::default()
                 | (if hovered.get() {
                     WidgetState::HOVERED
@@ -155,9 +144,12 @@ pub fn update_widget_styles(
                 });
 
             // Find first matching rule
-            for rule in &style.rules {
-                if rule.pattern.matches(bits) {
-                    match (image_node, &rule.background) {
+            for state_id in states.0.iter() {
+                let Ok(style_rule) = q_style_rules.get(*state_id) else {
+                    continue;
+                };
+                if style_rule.pattern.matches(bits) {
+                    match (image_node, &style_rule.background) {
                         (Some(mut image_node), Some(new_image)) => {
                             if image_node.color != new_image.color {
                                 image_node.color = new_image.color;
@@ -182,10 +174,10 @@ pub fn update_widget_styles(
                             }
                         }
                         (Some(_), None) => {
-                            commands.entity(styled_ent).remove::<ImageNode>();
+                            commands.entity(target_ent).remove::<ImageNode>();
                         }
                         (None, Some(new_image)) => {
-                            commands.entity(styled_ent).insert(new_image.clone());
+                            commands.entity(target_ent).insert(new_image.clone());
                         }
                         (None, None) => {}
                     }
@@ -193,39 +185,5 @@ pub fn update_widget_styles(
                 }
             }
         }
-    }
-}
-
-pub fn button() -> impl Scene {
-    bsn! {
-        Node {}
-        Button
-        Hovered
-        EntityCursor::System(SystemCursorIcon::Pointer)
-        StateSource::SelfState
-        VisualStates [
-            StyleRule {
-                pattern: StatePattern {
-                    // mask: WidgetState::DISABLED,
-                    // required: WidgetState::DISABLED,
-                },
-                background: {ImageNodeTemplate {
-                    color: Color::WHITE,
-                    // image: ImageTemplate::Handle(""),
-                    ..Default::default()
-                }},
-            },
-            StyleRule {
-                pattern: StatePattern {
-                    // mask: WidgetState::PRESSED,
-                    // required: WidgetState::PRESSED,
-                },
-                background: ImageNode {
-                },
-            },
-        ]
-        // Children [
-        //     {props.caption}
-        // ]
     }
 }
