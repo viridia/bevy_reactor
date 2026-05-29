@@ -43,7 +43,7 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
             }
             ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
-                :FeathersColorSwatch
+                @FeathersColorSwatch
                 effect::memo_effect(move |cx: &Cx| {
                     let reflect = field_copy.reflect_tracked(cx).unwrap();
                     if let Some(value) = reflect.try_downcast_ref::<Srgba>() {
@@ -66,7 +66,7 @@ pub fn srgba_field(field: Arc<Inspectable>) -> impl SceneList {
             ,
             if_then(move |_: &Cx| can_remove, {
                 let field = field_copy3.clone();
-                move || bsn_list![:remove_button(field.clone())]
+                move || bsn_list![remove_button(field.clone())]
             }),
         ]
     ]

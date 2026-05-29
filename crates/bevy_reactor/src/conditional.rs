@@ -42,8 +42,8 @@ impl<ConditionFn: Lens<bool>> Reaction for IfReaction<ConditionFn> {
         if self.state != state {
             self.state = state;
             let mut commands = world.commands();
-            let mut entt = commands.entity(owner);
-            entt.despawn_related::<Children>();
+            let entt = commands.entity(owner);
+            // entt.despawn_related::<Children>();
             match state {
                 IfState::Unset => unreachable!(),
                 IfState::True => self.then_branch.spawn(entt),
@@ -216,8 +216,8 @@ impl<Value: PartialEq + Send + Sync + 'static, SelectorFn: Lens<Value>> Reaction
         if self.switch_index != index {
             self.switch_index = index;
             let mut commands = world.commands();
-            let mut entt = commands.entity(owner);
-            entt.despawn_related::<Children>();
+            let entt = commands.entity(owner);
+            // entt.despawn_related::<Children>();
             if index < cases.cases.len() {
                 cases.cases[index].1.spawn(entt);
             } else if let Some(fallback) = cases.fallback.as_mut() {

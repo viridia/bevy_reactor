@@ -71,7 +71,7 @@ fn setup(
     }
 
     commands.spawn_scene(bsn! {
-        :gizmoid(|cx: &Cx, builder: &mut ShapeBuilder| {
+        gizmoid(|cx: &Cx, builder: &mut ShapeBuilder| {
             let time = cx.resource::<Time>().elapsed_secs().rem_euclid(TAU);
             let size = time.sin() * 2.0 + 4.0;
             let mut vertices: Vec<Vec2> = Vec::with_capacity(14);
@@ -109,7 +109,7 @@ fn setup(
     });
 
     commands.spawn_scene(bsn! {
-        :gizmoid(|cx: &Cx, builder: &mut ShapeBuilder| {
+        gizmoid(|cx: &Cx, builder: &mut ShapeBuilder| {
             let time = cx.resource::<Time>().elapsed_secs().rem_euclid(TAU);
             let size = time.sin() * 2.0 + 4.0;
             builder
@@ -133,7 +133,7 @@ fn setup(
     });
 
     commands.spawn_scene(bsn! {
-        :gizmoid(|cx: &Cx, builder: &mut Line3dBuilder| {
+        gizmoid(|cx: &Cx, builder: &mut Line3dBuilder| {
             let time = cx.resource::<Time>().elapsed_secs().rem_euclid(TAU);
             let size = time.sin() * 2.0 + 4.0;
             builder.draw_cuboid(Vec3::ZERO, Cuboid::new(size, size, size));

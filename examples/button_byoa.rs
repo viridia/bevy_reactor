@@ -43,15 +43,15 @@ fn setup_view_root(mut commands: Commands) {
         BorderColor::all(css::ALICE_BLUE)
         Children [
             (
-                :button()
+                button()
                 Children [
-                    :button_caption("Retreat")
+                    button_caption("Retreat")
                 ]
             ),
             (
-                :button()
+                button()
                 Children [
-                    :button_caption("Attack")
+                    button_caption("Attack")
                 ]
             )
         ]

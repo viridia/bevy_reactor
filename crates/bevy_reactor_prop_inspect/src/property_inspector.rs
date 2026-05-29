@@ -132,9 +132,9 @@ fn struct_members(inspectable: Arc<Inspectable>) -> impl SceneList {
                 can_move: false,
                 attributes: Some(attrs),
             });
-            parent.queue_spawn_related_scenes::<Children>(bsn_list!(
-                :field_inspector(field_inspectable.clone())
-            ));
+            parent.queue_spawn_related_scenes::<Children>(bsn_list!(field_inspector(
+                field_inspectable.clone()
+            )));
         },
         || bsn_list!(),
     )));
@@ -234,17 +234,17 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
 
             if_then(move |_: &Cx| can_move, {
                 let field = field.clone();
-                move || bsn_list![:move_up_button(field.clone())]
+                move || bsn_list![move_up_button(field.clone())]
             }),
 
             if_then(move |_: &Cx| can_move, {
                 let field = field.clone();
-                move || bsn_list![:move_down_button(field.clone())]
+                move || bsn_list![move_down_button(field.clone())]
             }),
 
             if_then(move |_: &Cx| can_remove, {
                 let field = field.clone();
-                move || bsn_list![:remove_button(field.clone())]
+                move || bsn_list![remove_button(field.clone())]
             }),
         ]
     }
@@ -252,7 +252,7 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
 
 pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :FeathersToolButton {
+        @FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -264,14 +264,14 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
             field.remove(&mut world);
         })
         Children [
-            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")
+            icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")
         ]
     }
 }
 
 pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :FeathersToolButton {
+        @FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -284,14 +284,14 @@ pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
             // field.remove(&mut world);
         })
         Children [
-            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png")
+            icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png")
         ]
     }
 }
 
 pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
-        :FeathersToolButton {
+        @FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -304,14 +304,14 @@ pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
             // field.remove(&mut world);
         })
         Children [
-            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png")
+            icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png")
         ]
     }
 }
 
 pub fn add_button() -> impl Scene {
     bsn! {
-        :FeathersToolButton {
+        @FeathersToolButton {
             @variant: ButtonVariant::Normal
         }
         Node {
@@ -320,7 +320,7 @@ pub fn add_button() -> impl Scene {
             padding: UiRect::axes(px(4), px(0)),
         }
         Children [
-            :icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png")
+            icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png")
         ]
     }
 }

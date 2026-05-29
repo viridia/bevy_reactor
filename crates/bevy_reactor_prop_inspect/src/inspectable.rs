@@ -63,7 +63,7 @@ impl<T: Resource + Reflect> Default for InspectableResource<T> {
     }
 }
 
-impl<T: Resource + Reflect> InspectableRoot for InspectableResource<T> {
+impl<T: Resource<Mutability = Mutable> + Reflect> InspectableRoot for InspectableResource<T> {
     fn name(&self, cx: &Cx) -> String {
         let res = cx.resource::<T>();
         res.reflect_short_type_path().to_string()

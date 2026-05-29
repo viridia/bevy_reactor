@@ -92,7 +92,7 @@ impl InspectorFactory for DefaultInspectorFactory {
                     .queue_spawn_related_scenes::<Children>(bsn_list![
                         :field_group
                         Children [
-                            :field_label(field),
+                            field_label(field),
                             Text::new("TODO:Enum")
                         ]
                     ]);
@@ -127,7 +127,7 @@ impl InspectorFactory for DefaultInspectorFactory {
                             .queue_spawn_related_scenes::<Children>(bsn_list![
                                 :field_group
                                 Children [
-                                    :field_label(field),
+                                    field_label(field),
                                     Text::new("TODO:Opaque")
                                 ]
                             ]);

@@ -48,7 +48,7 @@ fn setup_view_root(mut commands: Commands) {
         // )
         Children [
             (
-                :button()
+                button()
                 Children [
                     Text("Foo")
                 ])

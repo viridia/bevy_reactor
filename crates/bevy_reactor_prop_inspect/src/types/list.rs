@@ -37,7 +37,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
     bsn_list![
         :field_group
         Children [
-            :field_label(field)
+            field_label(field)
             ,
             Node {
                 display: Display::Flex,
@@ -53,8 +53,8 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
             // ThemeTextColor(tokens::TEXT_DIM)
             ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
-                :FeathersDisclosureToggle
                 #toggle
+                @FeathersDisclosureToggle
                 on(checkbox_self_update),
 
                 Text("")
@@ -84,7 +84,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
 
                 :flex_spacer,
 
-                :add_button()
+                add_button()
                 on(move |_: On<Activate>, mut world: DeferredWorld| {
                     if let Some(list) = field_copy3.reflect(&world) {
                         if let TypeInfo::List(list_type) = list.get_represented_type_info().unwrap() {
@@ -165,7 +165,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                                     attributes: field2.attributes,
                                 });
                                 parent.queue_spawn_related_scenes::<Children>(bsn_list!(
-                                    :field_inspector(item_inspectable.clone())
+                                    field_inspector(item_inspectable.clone())
                                 ));
                             }, || ()),
                         ]

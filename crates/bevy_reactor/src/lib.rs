@@ -12,8 +12,14 @@ mod tracking_scope;
 
 use bevy::{
     app::{App, Plugin, Update},
-    ecs::{hierarchy::Children, system::EntityCommands},
-    scene::{EntityCommandsSceneExt as _, SceneList},
+    ecs::{
+        bundle::Bundle,
+        error::BevyError,
+        hierarchy::Children,
+        system::EntityCommands,
+        template::{TemplateContext, template},
+    },
+    scene::{EntityCommandsSceneExt as _, Scene, SceneFunction, SceneList, bsn, template_value},
 };
 pub use conditional::*;
 pub use cx::Cx;
@@ -33,6 +39,17 @@ impl Plugin for ReactorPlugin {
     }
 }
 
+fn bundle_template<
+    F: Fn(&mut TemplateContext) -> Result<B, BevyError> + Clone + Send + Sync + 'static,
+    B: Bundle,
+>(
+    func: F,
+) -> impl Scene {
+    SceneFunction(move |_context, resolved| {
+        resolved.push_bundle_template(template(func));
+    })
+}
+
 /// Trait that represents a function that can produce a [`SceneList`]. Used for conditional
 /// blocks in control-flow templates.
 pub trait SceneListFn: Send + Sync {
@@ -41,6 +58,15 @@ pub trait SceneListFn: Send + Sync {
 
 impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
     fn spawn(&self, mut parent: EntityCommands) {
-        parent.queue_spawn_related_scenes::<Children>((self)());
+        parent.queue_apply_scene(bsn! {
+            bundle_template(|context| {
+                context.entity.despawn_children();
+                Ok(())
+            })
+            Children [
+                {(self)()}
+            ]
+        });
+        // parent.queue_spawn_related_scenes::<Children>((self)());
     }
 }

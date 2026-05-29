@@ -25,7 +25,7 @@ pub fn bool_field(field: Arc<Inspectable>) -> impl SceneList {
             justify_content: JustifyContent::SpaceBetween,
         }
         Children [
-            :FeathersCheckbox {
+            @FeathersCheckbox {
                 @caption: {bsn!(
                     (Text::new(field.name.to_owned()) ThemedText)
                 )},
@@ -48,7 +48,7 @@ pub fn bool_field(field: Arc<Inspectable>) -> impl SceneList {
             })
             if_then(move |_: &Cx| can_remove, {
                 let field = field_copy3.clone();
-                move || bsn_list![:remove_button(field.clone())]
+                move || bsn_list![remove_button(field.clone())]
             }),
         ]
     ]

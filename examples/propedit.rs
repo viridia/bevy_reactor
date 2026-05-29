@@ -101,7 +101,7 @@ fn setup_view_root(mut commands: Commands) {
         }
         ThemeBackgroundColor(tokens::WINDOW_BG)
         Children [
-            :property_inspector(root)
+            property_inspector(root)
         ]
     ));
 }

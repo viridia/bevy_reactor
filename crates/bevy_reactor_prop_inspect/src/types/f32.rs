@@ -26,9 +26,9 @@ pub fn f32_range_field(field: Arc<Inspectable>, range: &ValueRange<f32>) -> impl
     bsn_list![
         :field_group
         Children [
-            :field_label(field)
+            field_label(field)
             ,
-            :FeathersSlider {
+            @FeathersSlider {
                 @min: {range.0.start},
                 @max: {range.0.end},
                 @value: 0.,
@@ -68,10 +68,10 @@ pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
     bsn_list![
         :field_group
         Children [
-            :field_label(field)
+            field_label(field)
             ,
             // TODO: Replace with number input
-            :FeathersSlider {
+            @FeathersSlider {
                 @min: 0.,
                 @max: 100.,
                 @value: 0.,

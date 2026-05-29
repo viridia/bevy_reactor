@@ -27,7 +27,7 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
     bsn_list![
         :field_group
         Children [
-            :field_label(field)
+            field_label(field)
             ,
             Node {
                 display: Display::Flex,

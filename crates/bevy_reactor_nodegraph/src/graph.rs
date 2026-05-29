@@ -122,14 +122,14 @@ pub fn node_graph() -> impl Scene {
         on(on_graph_scroll)
         Children [
             // Vertical scrollbar
-            :node_graph_scrollbar(ControlOrientation::Vertical)
+            node_graph_scrollbar(ControlOrientation::Vertical)
             Node {
                 grid_column: GridPlacement::start_span(2, 1),
                 grid_row: GridPlacement::start_span(1, 1),
             }
             ,
             // Horizontal scrollbar
-            :node_graph_scrollbar(ControlOrientation::Horizontal)
+            node_graph_scrollbar(ControlOrientation::Horizontal)
             Node {
                 grid_column: GridPlacement::start_span(1, 1),
                 grid_row: GridPlacement::start_span(2, 1),
@@ -147,7 +147,7 @@ pub fn node_graph_document() -> impl Scene {
             top: px(0.0),
         }
         Children [
-            :selection_rect()
+            selection_rect()
             Node {
                 width: px(100),
                 height: px(100),
