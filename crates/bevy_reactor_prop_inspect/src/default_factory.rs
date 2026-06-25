@@ -90,7 +90,7 @@ impl InspectorFactory for DefaultInspectorFactory {
                 world
                     .entity_mut(parent)
                     .queue_spawn_related_scenes::<Children>(bsn_list![
-                        :field_group
+                        field_group()
                         Children [
                             field_label(field),
                             Text::new("TODO:Enum")
@@ -125,7 +125,7 @@ impl InspectorFactory for DefaultInspectorFactory {
                         world
                             .entity_mut(parent)
                             .queue_spawn_related_scenes::<Children>(bsn_list![
-                                :field_group
+                                field_group()
                                 Children [
                                     field_label(field),
                                     Text::new("TODO:Opaque")

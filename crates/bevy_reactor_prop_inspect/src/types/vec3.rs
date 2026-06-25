@@ -1,17 +1,20 @@
 use std::sync::Arc;
 
 use bevy::{
-    ecs::hierarchy::Children,
+    ecs::{hierarchy::Children, observer::On, world::DeferredWorld},
     feathers::{
         constants::fonts,
+        controls::{FeathersNumberInput, NumberInputPrecision, NumberInputValue},
         font_styles::InheritableFont,
-        theme::{ThemeTextColor, ThemedText},
+        palette,
+        theme::ThemeTextColor,
         tokens,
     },
     math::Vec3,
-    scene::{SceneList, bsn_list},
+    scene::{SceneList, bsn_list, on},
     text::FontSize,
-    ui::{AlignItems, Display, FlexDirection, JustifyContent, Node, px, widget::Text},
+    ui::{AlignItems, BorderColor, Display, FlexDirection, JustifyContent, Node, px},
+    ui_widgets::ValueChange,
 };
 use bevy_reactor::{Cx, effect};
 
@@ -22,10 +25,8 @@ use crate::{
 
 pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy = field.clone();
-    let field_copy2 = field.clone();
-    let field_copy3 = field.clone();
     bsn_list![
-        :field_group
+        field_group()
         Children [
             field_label(field)
             ,
@@ -43,50 +44,107 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
             // ThemeTextColor(tokens::TEXT_DIM)
             ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
-                Text("x:") ThemedText,
-                Text("")
-                ThemedText
-                effect::memo_effect(move |cx: &Cx| {
-                    let reflect = field_copy.reflect_tracked(cx).unwrap();
-                    if let Some(value) = reflect.try_downcast_ref::<Vec3>() {
-                        return value.x;
+                (
+                    @FeathersNumberInput {
+                        @sigil_color: tokens::TEXT_INPUT_X_AXIS,
+                        @label_text: "X",
                     }
-                    0.0
-                }, |entity, x| {
-                    if let Some(mut text) = entity.get_mut::<Text>() {
-                        text.0 = format!("{x}");
+                    NumberInputPrecision(2)
+                    Node {
+                        flex_grow: 1.0,
                     }
-                }),
+                    BorderColor::all(palette::X_AXIS)
+                    on({
+                        let field = field_copy.clone();
+                        move |value_change: On<ValueChange<f32>>, mut world: DeferredWorld| {
+                            field.update_value(&mut world, &|reflect| {
+                                if let Some(value) = reflect.try_downcast_mut::<Vec3>() {
+                                    value.x = value_change.value;
+                                }
+                            });
+                        }
+                    })
+                    effect::memo_effect({
+                        let field = field_copy.clone();
+                        move |cx: &Cx| {
+                            let reflect = field.reflect_tracked(cx).unwrap();
+                            if let Some(value) = reflect.try_downcast_ref::<Vec3>() {
+                                return value.x;
+                            }
+                            0.0
+                        }
+                    }, |entity, x| {
+                        entity.insert(NumberInputValue::F32(*x));
+                    })
+                ),
 
-                Text("y:") ThemedText,
-                Text("")
-                ThemedText
-                effect::memo_effect(move |cx: &Cx| {
-                    let reflect = field_copy2.reflect_tracked(cx).unwrap();
-                    if let Some(value) = reflect.try_downcast_ref::<Vec3>() {
-                        return value.y;
+                (
+                    @FeathersNumberInput {
+                        @sigil_color: tokens::TEXT_INPUT_Y_AXIS,
+                        @label_text: "X",
                     }
-                    0.0
-                }, |entity, y| {
-                    if let Some(mut text) = entity.get_mut::<Text>() {
-                        text.0 = format!("{y}");
+                    NumberInputPrecision(2)
+                    Node {
+                        flex_grow: 1.0,
                     }
-                }),
+                    BorderColor::all(palette::Y_AXIS)
+                    on({
+                        let field = field_copy.clone();
+                        move |value_change: On<ValueChange<f32>>, mut world: DeferredWorld| {
+                            field.update_value(&mut world, &|reflect| {
+                                if let Some(value) = reflect.try_downcast_mut::<Vec3>() {
+                                    value.y = value_change.value;
+                                }
+                            });
+                        }
+                    })
+                    effect::memo_effect({
+                        let field = field_copy.clone();
+                        move |cx: &Cx| {
+                            let reflect = field.reflect_tracked(cx).unwrap();
+                            if let Some(value) = reflect.try_downcast_ref::<Vec3>() {
+                                return value.y;
+                            }
+                            0.0
+                        }
+                    }, |entity, y| {
+                        entity.insert(NumberInputValue::F32(*y));
+                    })
+                ),
 
-                Text("z:") ThemedText,
-                Text("")
-                ThemedText
-                effect::memo_effect(move |cx: &Cx| {
-                    let reflect = field_copy3.reflect_tracked(cx).unwrap();
-                    if let Some(value) = reflect.try_downcast_ref::<Vec3>() {
-                        return value.z;
+                (
+                    @FeathersNumberInput {
+                        @sigil_color: tokens::TEXT_INPUT_Z_AXIS,
+                        @label_text: "Z",
                     }
-                    0.0
-                }, |entity, z| {
-                    if let Some(mut text) = entity.get_mut::<Text>() {
-                        text.0 = format!("{z}");
+                    NumberInputPrecision(2)
+                    Node {
+                        flex_grow: 1.0,
                     }
-                }),
+                    BorderColor::all(palette::Z_AXIS)
+                    on({
+                        let field = field_copy.clone();
+                        move |value_change: On<ValueChange<f32>>, mut world: DeferredWorld| {
+                            field.update_value(&mut world, &|reflect| {
+                                if let Some(value) = reflect.try_downcast_mut::<Vec3>() {
+                                    value.z = value_change.value;
+                                }
+                            });
+                        }
+                    })
+                    effect::memo_effect({
+                        let field = field_copy.clone();
+                        move |cx: &Cx| {
+                            let reflect = field.reflect_tracked(cx).unwrap();
+                            if let Some(value) = reflect.try_downcast_ref::<Vec3>() {
+                                return value.z;
+                            }
+                            0.0
+                        }
+                    }, |entity, z| {
+                        entity.insert(NumberInputValue::F32(*z));
+                    })
+                ),
             ]
         ]
     ]

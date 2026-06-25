@@ -17,7 +17,7 @@ members = ["crates/*"]
 #   "experimental_bevy_feathers",
 #   "file_watcher",
 # ] }
-bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.19.0-dev", rev = "3b3e42c7991df1b067549908be295d6fc35f00fe", features = [
+bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.20.0-dev", features = [
   "dynamic_linking",
   "ghost_nodes",
   "bevy_feathers",

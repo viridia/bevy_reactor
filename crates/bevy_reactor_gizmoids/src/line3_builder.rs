@@ -421,6 +421,6 @@ impl MeshBuilder for Line3dBuilder {
     fn build(self, mesh: &mut Mesh) {
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, self.vertices);
         mesh.insert_indices(Indices::U32(self.indices));
-        mesh.compute_aabb();
+        mesh.get_aabb();
     }
 }

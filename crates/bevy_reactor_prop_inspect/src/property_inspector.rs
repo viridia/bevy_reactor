@@ -230,7 +230,7 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
         Children [
             label_small(name.clone())
 
-            :flex_spacer,
+            flex_spacer(),
 
             if_then(move |_: &Cx| can_move, {
                 let field = field.clone();

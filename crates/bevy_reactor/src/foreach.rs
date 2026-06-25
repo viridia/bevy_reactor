@@ -243,7 +243,6 @@ impl<
             if prev_len > 0 || self.first {
                 self.first = false;
                 // Transitioning from non-empty to empty, generate fallback.
-                entt.despawn_related::<Children>();
                 if let Some(fallback) = self.fallback_fn.as_ref() {
                     fallback.spawn(entt);
                 }

@@ -35,7 +35,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy3 = field.clone();
     let field_copy4 = field.clone();
     bsn_list![
-        :field_group
+        field_group()
         Children [
             field_label(field)
             ,
@@ -82,7 +82,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                     }
                 }),
 
-                :flex_spacer,
+                flex_spacer(),
 
                 add_button()
                 on(move |_: On<Activate>, mut world: DeferredWorld| {

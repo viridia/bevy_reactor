@@ -24,7 +24,7 @@ pub fn f32_range_field(field: Arc<Inspectable>, range: &ValueRange<f32>) -> impl
     let field_copy3 = field.clone();
     let field_copy4 = field.clone();
     bsn_list![
-        :field_group
+        field_group()
         Children [
             field_label(field)
             ,
@@ -66,7 +66,7 @@ pub fn f32_range_field(field: Arc<Inspectable>, range: &ValueRange<f32>) -> impl
 pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy = field.clone();
     bsn_list![
-        :field_group
+        field_group()
         Children [
             field_label(field)
             ,

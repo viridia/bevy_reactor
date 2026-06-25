@@ -19,7 +19,7 @@ use bevy::{
         system::EntityCommands,
         template::{TemplateContext, template},
     },
-    scene::{EntityCommandsSceneExt as _, Scene, SceneFunction, SceneList, bsn, template_value},
+    scene::{EntityCommandsSceneExt as _, Scene, SceneFunction, SceneList, bsn},
 };
 pub use conditional::*;
 pub use cx::Cx;
@@ -67,6 +67,5 @@ impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
                 {(self)()}
             ]
         });
-        // parent.queue_spawn_related_scenes::<Children>((self)());
     }
 }
