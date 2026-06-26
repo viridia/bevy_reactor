@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
+use bevy::feathers::containers::flex_spacer;
 use bevy::feathers::controls::FeathersDisclosureToggle;
 use bevy::reflect::OffsetAccess;
 use bevy::scene::EntityWorldMutSceneExt;
@@ -26,7 +27,7 @@ use bevy_reactor::{Cx, effect, for_each, if_then};
 use crate::property_inspector::field_inspector;
 use crate::{
     Inspectable,
-    property_inspector::{add_button, field_group, field_label, flex_spacer},
+    property_inspector::{add_button, field_group, field_label},
 };
 
 pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {

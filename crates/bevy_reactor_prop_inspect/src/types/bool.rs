@@ -8,7 +8,7 @@ use bevy::{
     ui::{AlignItems, Checked, Display, FlexDirection, JustifyContent, Node, widget::Text},
     ui_widgets::ValueChange,
 };
-use bevy_reactor::{Cx, effect, if_then};
+use bevy_reactor::{Cx, effect};
 
 use crate::{Inspectable, property_inspector::remove_button};
 
@@ -46,10 +46,7 @@ pub fn bool_field(field: Arc<Inspectable>) -> impl SceneList {
             on(move |value_change: On<ValueChange<bool>>, mut world: DeferredWorld| {
                 field_copy2.set_value(&mut world, value_change.value.as_reflect());
             })
-            if_then(move |_: &Cx| can_remove, {
-                let field = field_copy3.clone();
-                move || bsn_list![remove_button(field.clone())]
-            }),
+            {can_remove.then_some(()).map(|_| bsn![remove_button(field_copy3.clone())])}
         ]
     ]
 }

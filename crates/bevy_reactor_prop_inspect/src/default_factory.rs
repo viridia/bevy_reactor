@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::property_inspector::{field_group, field_label};
-use crate::types::{bool_field, f32_field, f32_range_field, list_field, srgba_field, vec3_field};
-use crate::{Inspectable, InspectorFactory, ValueRange};
+use crate::types::{bool_field, f32_field, list_field, srgba_field, vec3_field};
+use crate::{Inspectable, InspectorFactory};
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::world::World;
@@ -106,17 +106,6 @@ impl InspectorFactory for DefaultInspectorFactory {
                             .queue_spawn_related_scenes::<Children>(bool_field(field));
                     }
                     "f32" => {
-                        if let Some(attrs) = field.attributes
-                            && let Some(range) = attrs.get::<ValueRange<f32>>()
-                        {
-                            world
-                                .entity_mut(parent)
-                                .queue_spawn_related_scenes::<Children>(f32_range_field(
-                                    field, range,
-                                ));
-                            return true;
-                        }
-
                         world
                             .entity_mut(parent)
                             .queue_spawn_related_scenes::<Children>(f32_field(field));

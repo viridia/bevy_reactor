@@ -44,6 +44,7 @@ bevy_reactor_nodegraph = { workspace = true }
 bevy_reactor_prop_inspect = { workspace = true }
 bevy_keratin = { workspace = true }
 smol_str = { workspace = true }
+# bevy-inspector-egui = "0.37.0"
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

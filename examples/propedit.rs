@@ -13,6 +13,7 @@ use bevy::{
     scene::bsn,
     ui,
 };
+// use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_prop_inspect::{
     InspectableResource, Precision, PropertyInspectorPlugin, ValueRange, property_inspector,
@@ -26,8 +27,15 @@ fn main() {
             ReactorPlugin,
             PropertyInspectorPlugin,
         ))
+        // .add_plugins(EguiPlugin::default())
+        // .add_plugins(WorldInspectorPlugin::new())
         .insert_resource(UiTheme(create_dark_theme()))
         .insert_resource(TestStruct {
+            position: Vec3 {
+                x: 0.1,
+                y: 1.234,
+                z: 0.0,
+            },
             unlit: Some(true),
             ..default()
         })

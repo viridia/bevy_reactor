@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use bevy::{
-    ecs::{template::template, world::DeferredWorld},
+    ecs::world::DeferredWorld,
     feathers::{
         constants::fonts,
+        containers::flex_spacer,
         controls::{ButtonVariant, FeathersToolButton},
-        display::label_small,
+        display::{icon, label_small},
         font_styles::InheritableFont,
         theme::ThemeTextColor,
         tokens,
@@ -253,7 +254,8 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
 pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
     bsn! {
         @FeathersToolButton {
-            @variant: ButtonVariant::Normal
+            @variant: ButtonVariant::Normal,
+            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png"))},
         }
         Node {
             flex_grow: 0.0,
@@ -263,16 +265,14 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
         on(move |_: On<Activate>, mut world: DeferredWorld| {
             field.remove(&mut world);
         })
-        Children [
-            icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")
-        ]
     }
 }
 
 pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
         @FeathersToolButton {
-            @variant: ButtonVariant::Normal
+            @variant: ButtonVariant::Normal,
+            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png"))},
         }
         Node {
             flex_grow: 0.0,
@@ -283,16 +283,14 @@ pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
             info!("TODO: Move up")
             // field.remove(&mut world);
         })
-        Children [
-            icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png")
-        ]
     }
 }
 
 pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
         @FeathersToolButton {
-            @variant: ButtonVariant::Normal
+            @variant: ButtonVariant::Normal,
+            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png"))},
         }
         Node {
             flex_grow: 0.0,
@@ -303,45 +301,19 @@ pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
             info!("TODO: Move down")
             // field.remove(&mut world);
         })
-        Children [
-            icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png")
-        ]
     }
 }
 
 pub fn add_button() -> impl Scene {
     bsn! {
         @FeathersToolButton {
-            @variant: ButtonVariant::Normal
+            @variant: ButtonVariant::Normal,
+            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png"))},
         }
         Node {
             flex_grow: 0.0,
             height: px(16),
             padding: UiRect::axes(px(4), px(0)),
         }
-        Children [
-            icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png")
-        ]
-    }
-}
-
-pub fn flex_spacer() -> impl Scene {
-    bsn! {
-        Node {
-            flex_grow: 1.0,
-        }
-    }
-}
-
-/// Template which displays an icon.
-pub fn icon(image: &'static str) -> impl Scene {
-    bsn! {
-        Node {
-            height: Val::Px(14.0),
-        }
-        template(move |entity| {
-            let handle = entity.resource::<AssetServer>().load(image);
-            Ok(ImageNode::new(handle))
-        })
     }
 }
