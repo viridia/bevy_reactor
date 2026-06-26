@@ -3,16 +3,11 @@ use std::sync::Arc;
 use bevy::{
     ecs::{hierarchy::Children, observer::On, world::DeferredWorld},
     feathers::{
-        constants::fonts,
         controls::{FeathersNumberInput, NumberInputPrecision, NumberInputValue},
-        font_styles::InheritableFont,
-        palette,
-        theme::ThemeTextColor,
-        tokens,
+        palette, tokens,
     },
     math::Vec3,
     scene::{SceneList, bsn_list, on},
-    text::FontSize,
     ui::{AlignItems, BorderColor, Display, FlexDirection, JustifyContent, Node, px},
     ui_widgets::ValueChange,
 };
@@ -37,12 +32,6 @@ pub fn vec3_field(field: Arc<Inspectable>) -> impl SceneList {
                 justify_content: JustifyContent::Start,
                 column_gap: px(6),
             }
-            InheritableFont {
-                font: fonts::REGULAR,
-                font_size: FontSize::Px(16.0),
-            }
-            // ThemeTextColor(tokens::TEXT_DIM)
-            ThemeTextColor(tokens::CHECKBOX_TEXT)
             Children [
                 (
                     @FeathersNumberInput {
