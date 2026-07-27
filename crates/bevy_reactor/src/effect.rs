@@ -16,6 +16,17 @@ use crate::{
     reaction::{InitialReactionCommand, Reaction, ReactionCell},
 };
 
+/// Marker trait that is deliberately never implemented. It is used to give the
+/// template types below a conditional `Unpin` impl whose `where` bound can never
+/// be satisfied, which makes those types `!Unpin`. Bevy provides a blanket
+/// `impl<T: Clone + Unpin> Template for T`, so opting out of `Unpin` is what lets
+/// us keep our own hand-written `Template` impls without a conflicting-impl error.
+/// This mirrors the trick Bevy itself uses for `EntityTemplate`. The `Sized`
+/// bound is what makes the `where for<'a> [()]: NotUnpin` clauses below
+/// unsatisfiable (a `[()]` slice is never `Sized`) while still being accepted
+/// by the compiler as a deferred, higher-ranked bound.
+trait NotUnpin: Sized {}
+
 /// A reaction which runs an arbitrary computation. There are two phases: the deps phase, which
 /// gathers reactive inputs, and the effect phase, which applies the computed deps value to
 /// the target entity.
@@ -51,6 +62,17 @@ pub struct Effect<
     deps: DepsFn,
     effect: EffectFn,
     marker: std::marker::PhantomData<D>,
+}
+
+// Opt out of Bevy's blanket `Template` impl by making this type `!Unpin`.
+impl<
+    D,
+    DepsFn: Lens<D> + Send + Sync + 'static,
+    EffectFn: Fn(&mut EntityWorldMut, D) + Send + Sync + 'static,
+> Unpin for Effect<D, DepsFn, EffectFn>
+where
+    for<'a> [()]: NotUnpin,
+{
 }
 
 impl<
@@ -190,6 +212,17 @@ pub struct MemoEffect<
     deps: DepsFn,
     effect: EffectFn,
     marker: std::marker::PhantomData<D>,
+}
+
+// Opt out of Bevy's blanket `Template` impl by making this type `!Unpin`.
+impl<
+    D,
+    DepsFn: Lens<D> + Send + Sync + 'static,
+    EffectFn: Fn(&mut EntityWorldMut, &D) + Send + Sync + 'static,
+> Unpin for MemoEffect<D, DepsFn, EffectFn>
+where
+    for<'a> [()]: NotUnpin,
+{
 }
 
 impl<
@@ -338,6 +371,18 @@ pub struct InsertComputed<
     deps: DepsFn,
     factory: Factory,
     marker: std::marker::PhantomData<D>,
+}
+
+// Opt out of Bevy's blanket `Template` impl by making this type `!Unpin`.
+impl<
+    D,
+    DepsFn: Lens<D> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> Unpin for InsertComputed<D, DepsFn, C, Factory>
+where
+    for<'a> [()]: NotUnpin,
+{
 }
 
 impl<
@@ -494,6 +539,18 @@ pub struct InsertComputedWhen<
     marker: std::marker::PhantomData<D>,
 }
 
+// Opt out of Bevy's blanket `Template` impl by making this type `!Unpin`.
+impl<
+    D,
+    DepsFn: Lens<Option<D>> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn(D) -> C + Send + Sync + 'static,
+> Unpin for InsertComputedWhen<D, DepsFn, C, Factory>
+where
+    for<'a> [()]: NotUnpin,
+{
+}
+
 impl<
     D,
     DepsFn: Lens<Option<D>> + Send + Sync + 'static,
@@ -630,6 +687,17 @@ pub struct InsertWhen<
 > {
     condition: Condition,
     factory: Factory,
+}
+
+// Opt out of Bevy's blanket `Template` impl by making this type `!Unpin`.
+impl<
+    Condition: Lens<bool> + Send + Sync + 'static,
+    C: Component,
+    Factory: Fn() -> C + Send + Sync + 'static,
+> Unpin for InsertWhen<Condition, C, Factory>
+where
+    for<'a> [()]: NotUnpin,
+{
 }
 
 impl<

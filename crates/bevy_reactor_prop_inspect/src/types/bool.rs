@@ -45,8 +45,8 @@ pub fn bool_field(field: Arc<Inspectable>) -> impl SceneList {
             })
             on(move |value_change: On<ValueChange<bool>>, mut world: DeferredWorld| {
                 field_copy2.set_value(&mut world, value_change.value.as_reflect());
-            })
-            {can_remove.then_some(()).map(|_| bsn![remove_button(field_copy3.clone())])}
+            }),
+            {can_remove.then(|| bsn![remove_button(field_copy3.clone())])}
         ]
     ]
 }

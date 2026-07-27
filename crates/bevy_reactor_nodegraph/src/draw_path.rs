@@ -76,7 +76,10 @@ enum PathCommandType {
     Quad2 = 3,
 }
 
-#[derive(ShaderType, Debug, Clone)]
+/// CPU-side representation of a path command. Serialized by hand into the
+/// `std430` layout that the shader's `array<PathCommand>` expects (see
+/// [`DrawPathMaterial::update`]).
+#[derive(Debug, Clone, Copy)]
 pub struct PathCommand {
     op: u32,
     point: Vec2,
@@ -143,10 +146,19 @@ impl DrawPathMaterial {
                 }
             }
         }
-        buffers
-            .get_mut(self.path_commands.id())
-            .unwrap()
-            .set_data(commands);
+        // Serialize into the `std430` layout the shader expects: each element is
+        // 16 bytes — `op` (u32) at offset 0, four bytes of padding, then `pos`
+        // (vec2<f32>, aligned to 8) at offset 8.
+        let mut bytes: Vec<u8> = Vec::with_capacity(commands.len() * 16);
+        for cmd in &commands {
+            bytes.extend_from_slice(&cmd.op.to_le_bytes());
+            bytes.extend_from_slice(&[0u8; 4]);
+            bytes.extend_from_slice(&cmd.point.x.to_le_bytes());
+            bytes.extend_from_slice(&cmd.point.y.to_le_bytes());
+        }
+        let mut buffer = buffers.get_mut(self.path_commands.id()).unwrap();
+        buffer.clear();
+        buffer.extend_from_slice(&bytes);
     }
 }
 
