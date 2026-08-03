@@ -5,7 +5,7 @@ use bevy::{
     ecs::template::TemplateContext,
     prelude::*,
     scene::{Scene, SceneList},
-    ui::experimental::GhostNode,
+    ui::GhostNode,
 };
 
 use crate::{

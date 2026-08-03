@@ -17,14 +17,21 @@ members = ["crates/*"]
 #   "experimental_bevy_feathers",
 #   "file_watcher",
 # ] }
-bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.20.0-dev", features = [
+bevy = { git = "https://github.com/ickshonpe/bevy.git", branch = "ghostnode-node", version = "0.20.0-dev", features = [
   "dynamic_linking",
-  "ghost_nodes",
   "bevy_feathers",
   "file_watcher",
   "system_font_discovery",
   "debug",
 ] }
+# bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.20.0-dev", features = [
+#   "dynamic_linking",
+#   "ghost_nodes",
+#   "bevy_feathers",
+#   "file_watcher",
+#   "system_font_discovery",
+#   "debug",
+# ] }
 bevy_reactor = { path = "crates/bevy_reactor" }
 bevy_reactor_formulae = { path = "crates/bevy_reactor_formulae" }
 bevy_reactor_gizmoids = { path = "crates/bevy_reactor_gizmoids" }

@@ -7,6 +7,7 @@ use bevy::{
     },
     prelude::*,
     scene::{bsn, on},
+    ui_widgets::SliderValue,
 };
 use bevy_reactor::ReactorPlugin;
 use bevy_reactor_nodegraph::{
@@ -124,20 +125,20 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
                         input_terminal(palettes::css::ALICE_BLUE.into())
                         Children [
                             @FeathersSlider {
-                                @value: 0.0,
                                 @min: 0.0,
                                 @max: 100.0,
                             }
+                            SliderValue(0.0)
                             Node {
                                 align_self: AlignSelf::Stretch
                             }
                         ]
                         ,
                         @FeathersSlider {
-                            @value: 0.0,
                             @min: 0.0,
                             @max: 100.0,
                         }
+                        SliderValue(0.0)
                         Node {
                             align_self: AlignSelf::Stretch
                         }
