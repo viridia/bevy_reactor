@@ -6,7 +6,7 @@ use bevy::{
     picking::hover::Hovered,
     prelude::*,
     scene::bsn,
-    text::FontSourceTemplate,
+    text::{FontSourceTemplate, GenericFontFamilyTemplate},
     ui::{self, widget::ImageNodeTemplate},
     ui_widgets::Button,
     window::SystemCursorIcon,
@@ -146,7 +146,7 @@ fn button_caption(text: &'static str) -> impl Scene {
         Text(text)
         TextColor(palettes::css::BLACK)
         TextFont {
-            font: FontSourceTemplate::SansSerif,
+            font: FontSourceTemplate::Generic(GenericFontFamilyTemplate::SansSerif),
             font_size: FontSize::Px(20.0)
             weight: FontWeight::BOLD,
         }
