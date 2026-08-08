@@ -169,17 +169,17 @@ impl<'p, 'w> ReadDerived for Cx<'p, 'w> {
 ///
 /// This trait allows us to abstract both anonymous functions and signals as reactive data sources.
 pub trait Lens<D> {
-    fn call(&self, cx: &Cx) -> D;
+    fn read(&self, cx: &Cx) -> D;
 }
 
 impl<D, F: Fn(&Cx) -> D> Lens<D> for F {
-    fn call(&self, cx: &Cx) -> D {
+    fn read(&self, cx: &Cx) -> D {
         (self)(cx)
     }
 }
 
 impl<D: Copy + Send + Sync + 'static> Lens<D> for Signal<D> {
-    fn call(&self, cx: &Cx) -> D {
+    fn read(&self, cx: &Cx) -> D {
         self.get(cx)
     }
 }

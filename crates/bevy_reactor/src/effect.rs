@@ -45,7 +45,7 @@ impl<
 {
     fn react(&mut self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
-        let val = self.deps.call(&cx);
+        let val = self.deps.read(&cx);
 
         let mut target = world.entity_mut(self.target);
         (self.effect)(&mut target, val);
@@ -190,7 +190,7 @@ impl<
 {
     fn react(&mut self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
-        let val = self.deps.call(&cx);
+        let val = self.deps.read(&cx);
         if let Some(ref memo) = self.memo
             && *memo == val
         {
@@ -341,7 +341,7 @@ impl<
 {
     fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
-        let val = self.deps.call(&cx);
+        let val = self.deps.read(&cx);
 
         let mut target = world.entity_mut(self.target);
         target.insert((self.factory)(val));
@@ -503,7 +503,7 @@ impl<
 {
     fn apply(&self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
-        let val = self.deps.call(&cx);
+        let val = self.deps.read(&cx);
 
         let mut target = world.entity_mut(self.target);
         if let Some(v) = val {
@@ -667,7 +667,7 @@ impl<
 {
     fn react(&mut self, _owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         let cx = Cx::new(world, self.target, tracking);
-        let cond = self.condition.call(&cx);
+        let cond = self.condition.read(&cx);
 
         let mut target = world.entity_mut(self.target);
         if cond {

@@ -220,7 +220,7 @@ impl<
     fn react(&mut self, parent: Entity, world: &mut World, tracking: &mut TrackingScope) {
         // Run the condition and see if the result changed.
         let cx = Cx::new(world, parent, tracking);
-        let items: Vec<Item> = self.item_fn.call(&cx);
+        let items: Vec<Item> = self.item_fn.read(&cx);
         let next_len = items.len();
         let prev_len = self.state.len();
         let mut next_state: Vec<ChildRow<Item>> = Vec::with_capacity(items.len());

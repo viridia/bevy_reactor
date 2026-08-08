@@ -38,7 +38,7 @@ impl<ConditionFn: Lens<bool>> Reaction for IfReaction<ConditionFn> {
     fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         // Run the condition and see if the result changed.
         let cx = Cx::new(world, owner, tracking);
-        let state: IfState = self.condition_fn.call(&cx).into();
+        let state: IfState = self.condition_fn.read(&cx).into();
         if self.state != state {
             self.state = state;
             let mut commands = world.commands();
@@ -203,7 +203,7 @@ impl<Value: PartialEq + Send + Sync + 'static, SelectorFn: Lens<Value>> Reaction
     fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         // Run the condition and see if the result changed.
         let cx = Cx::new(world, owner, tracking);
-        let value: Value = self.selector_fn.call(&cx);
+        let value: Value = self.selector_fn.read(&cx);
         let mut cases = self.cases.lock().unwrap();
         let index = cases
             .cases
@@ -338,7 +338,7 @@ impl<
     fn react(&mut self, owner: Entity, world: &mut World, tracking: &mut TrackingScope) {
         // Run the condition and see if the result changed.
         let cx = Cx::new(world, owner, tracking);
-        let value: Value = self.value_fn.call(&cx);
+        let value: Value = self.value_fn.read(&cx);
         if let Some(ref prev_value) = self.value
             && *prev_value == value
         {
