@@ -2,8 +2,7 @@
 
 use bevy::{
     color::palettes::{self, css},
-    feathers::cursor::EntityCursor,
-    picking::hover::Hovered,
+    picking::{cursor::EntityCursor, hover::Hovered},
     prelude::*,
     scene::bsn,
     text::{FontSourceTemplate, GenericFontFamilyTemplate},

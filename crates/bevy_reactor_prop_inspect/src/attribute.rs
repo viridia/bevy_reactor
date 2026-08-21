@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 use bevy::reflect::Reflect;
 
@@ -8,7 +8,7 @@ use bevy::reflect::Reflect;
 /// This attribute can be applied to numeric fields. It can also be applied to aggregate types
 /// that have a numeric type parameter, such as an `Option<f32>` or `Vec<i8>`.
 #[derive(Debug, Clone, Reflect)]
-pub struct ValueRange<T>(pub Range<T>);
+pub struct ValueRange<T>(pub RangeInclusive<T>);
 
 /// An attribute that specifies how many decimal digits of precision should be allowed.
 /// If the field is an integer, this will be ignored. If present, field values will be

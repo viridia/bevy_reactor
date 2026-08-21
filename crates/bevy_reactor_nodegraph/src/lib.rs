@@ -21,7 +21,7 @@ pub struct ReactorNodeGraphPlugin;
 
 impl Plugin for ReactorNodeGraphPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        embedded_asset!(app, "assets/draw_path.wgsl");
+        embedded_asset!(app, "assets/draw_path.wesl");
         embedded_asset!(app, "assets/dot.png");
 
         app.init_resource::<GestureState>();

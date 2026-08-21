@@ -175,6 +175,6 @@ impl Default for DrawPathMaterial {
 
 impl UiMaterial for DrawPathMaterial {
     fn fragment_shader() -> ShaderRef {
-        "embedded://bevy_reactor_nodegraph/assets/draw_path.wgsl".into()
+        "embedded://bevy_reactor_nodegraph/assets/draw_path.wesl".into()
     }
 }

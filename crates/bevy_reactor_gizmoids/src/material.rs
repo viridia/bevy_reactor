@@ -64,7 +64,7 @@ pub(crate) struct HasUnderlay;
 #[allow(unused_variables)]
 impl Material for OverlayMaterial {
     fn fragment_shader() -> ShaderRef {
-        "embedded://bevy_reactor_gizmoids/assets/overlay.wgsl".into()
+        "embedded://bevy_reactor_gizmoids/assets/overlay.wesl".into()
     }
 
     fn alpha_mode(&self) -> AlphaMode {
@@ -98,7 +98,7 @@ pub struct UnderlayMaterial {
 #[allow(unused_variables)]
 impl Material for UnderlayMaterial {
     fn fragment_shader() -> ShaderRef {
-        "embedded://bevy_reactor_gizmoids/assets/overlay.wgsl".into()
+        "embedded://bevy_reactor_gizmoids/assets/overlay.wesl".into()
     }
 
     fn alpha_mode(&self) -> AlphaMode {

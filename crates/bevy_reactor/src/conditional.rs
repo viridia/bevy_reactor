@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use bevy::{ecs::template::TemplateContext, prelude::*, scene::Scene, ui::GhostNode};
+use bevy::{ecs::template::TemplateContext, prelude::*, scene::Scene, ui::experimental::GhostNode};
 
 use crate::{
     Cx, SceneListFn, TrackingScope,

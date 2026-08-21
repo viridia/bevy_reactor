@@ -1,4 +1,4 @@
-#import bevy_ui::ui_vertex_output::UiVertexOutput;
+import bevy_ui_render::ui_vertex_output::UiVertexOutput;
 
 const OP_MOVE_TO: u32 = 0u;
 const OP_LINE_TO: u32 = 1u;

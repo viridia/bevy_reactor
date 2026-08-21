@@ -14,18 +14,16 @@ use bevy::{
         system::{Commands, Query, Res, ResMut},
         template::FromTemplate,
     },
-    feathers::{
-        constants::fonts, cursor::EntityCursor, font_styles::InheritableFont, palette,
-        theme::ThemedText,
-    },
+    feathers::{constants::fonts, font_styles::InheritableFont, palette, theme::ThemedText},
     input::{ButtonInput, keyboard::KeyCode, mouse::MouseScrollUnit},
     log::{debug, warn_once},
     math::{Rect, Vec2},
     picking::{
         Pickable,
+        cursor::EntityCursor,
         events::{
-            Cancel, Drag, DragDrop, DragEnd, DragEnter, DragLeave, DragStart, Pointer, Press,
-            Scroll,
+            Pointer, PointerCancel, PointerDrag, PointerDragDrop, PointerDragEnd, PointerDragEnter,
+            PointerDragLeave, PointerDragStart, PointerPress, PointerScroll,
         },
         hover::Hovered,
     },
@@ -397,7 +395,7 @@ pub enum ConnectionHitBox {
 #[allow(clippy::type_complexity)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn on_insert_connection(
-    insert: On<Insert, Connection>,
+    insert: On<Insert<Connection>>,
     mut q_connection: Query<(
         &Connection,
         &mut Node,
@@ -572,7 +570,7 @@ pub(crate) fn update_connection_shader(
 }
 
 fn on_graph_press(
-    mut press: On<Pointer<Press>>,
+    mut press: On<PointerPress>,
     mut q_nodes: Query<&mut GraphNodeSelection, With<GraphNode>>,
     r_button: Res<ButtonInput<KeyCode>>,
 ) {
@@ -588,7 +586,7 @@ fn on_graph_press(
 }
 
 fn on_graph_drag_start(
-    mut drag_start: On<Pointer<DragStart>>,
+    mut drag_start: On<PointerDragStart>,
     q_children: Query<&Children>,
     mut q_selection: Query<(&mut Node, &mut Visibility), With<SelectionRect>>,
     q_graph_doc: Query<&UiTransform, With<GraphDocument>>,
@@ -605,7 +603,7 @@ fn on_graph_drag_start(
         return;
     };
     let doc_transform = q_graph_doc.get(doc_ent).unwrap();
-    r_gesture.selection_anchor = drag_start.pointer_location.position / doc_transform.scale;
+    r_gesture.selection_anchor = drag_start.pointer.position / doc_transform.scale;
 
     if let Ok(children) = q_children.get(doc_ent) {
         for child in children.iter() {
@@ -622,7 +620,7 @@ fn on_graph_drag_start(
 
 #[allow(clippy::type_complexity)]
 fn on_graph_drag(
-    mut drag: On<Pointer<Drag>>,
+    mut drag: On<PointerDrag>,
     q_children: Query<&Children>,
     mut q_selection: Query<&mut Node, With<SelectionRect>>,
     q_graph_doc: Query<&UiTransform, With<GraphDocument>>,
@@ -647,7 +645,7 @@ fn on_graph_drag(
 
     let rect = Rect::from_corners(
         r_gesture.selection_anchor,
-        drag.pointer_location.position / doc_transform.scale,
+        drag.pointer.position / doc_transform.scale,
     );
 
     // Update the selection rect position
@@ -688,7 +686,7 @@ fn rect_overlaps(a: &Rect, b: &Rect) -> bool {
 }
 
 fn on_graph_drag_end(
-    mut drag_end: On<Pointer<DragEnd>>,
+    mut drag_end: On<PointerDragEnd>,
     q_children: Query<&Children>,
     q_graph_doc: Query<(), With<GraphDocument>>,
     mut q_selection: Query<&mut Visibility, With<SelectionRect>>,
@@ -724,7 +722,7 @@ fn on_graph_drag_end(
 }
 
 fn on_graph_drag_cancel(
-    mut cancel: On<Pointer<Cancel>>,
+    mut cancel: On<PointerCancel>,
     q_children: Query<&Children>,
     q_graph_doc: Query<(), With<GraphDocument>>,
     mut q_selection: Query<&mut Visibility, With<SelectionRect>>,
@@ -759,7 +757,7 @@ fn on_graph_drag_cancel(
 }
 
 fn on_graph_scroll(
-    mut scroll: On<Pointer<Scroll>>,
+    mut scroll: On<PointerScroll>,
     q_graph: Query<(&ComputedNode, &GraphBounds, &Children), With<Graph>>,
     mut q_doc: Query<&mut Node, (With<GraphDocument>, Without<Graph>)>,
 ) {
@@ -809,7 +807,7 @@ fn on_graph_scroll(
 }
 
 fn on_graph_node_press(
-    mut press: On<Pointer<Press>>,
+    mut press: On<PointerPress>,
     mut q_nodes: Query<(Entity, &mut GraphNodeSelection), With<GraphNode>>,
     r_button: Res<ButtonInput<KeyCode>>,
 ) {
@@ -845,7 +843,7 @@ fn on_graph_node_press(
 }
 
 fn on_graph_node_drag_start(
-    mut drag_start: On<Pointer<DragStart>>,
+    mut drag_start: On<PointerDragStart>,
     mut q_node: Query<
         (&ChildOf, &Node, &GraphNodeSelection, &mut GraphNodeOffset),
         With<GraphNode>,
@@ -896,7 +894,7 @@ fn on_graph_node_drag_start(
 }
 
 fn on_graph_node_drag(
-    mut drag: On<Pointer<Drag>>,
+    mut drag: On<PointerDrag>,
     q_children: Query<&Children>,
     q_graph_doc: Query<&UiTransform, With<GraphDocument>>,
     r_gesture: ResMut<GestureState>,
@@ -923,7 +921,7 @@ fn on_graph_node_drag(
     }
 }
 
-fn on_graph_node_drag_end(mut drag_end: On<Pointer<DragEnd>>, mut r_gesture: ResMut<GestureState>) {
+fn on_graph_node_drag_end(mut drag_end: On<PointerDragEnd>, mut r_gesture: ResMut<GestureState>) {
     drag_end.propagate(false);
     if matches!(r_gesture.gesture, Gesture::Move) {
         r_gesture.graph = None;
@@ -932,7 +930,7 @@ fn on_graph_node_drag_end(mut drag_end: On<Pointer<DragEnd>>, mut r_gesture: Res
 }
 
 // Not used because BSN limits
-fn on_graph_node_drag_cancel(mut cancel: On<Pointer<Cancel>>, mut r_gesture: ResMut<GestureState>) {
+fn on_graph_node_drag_cancel(mut cancel: On<PointerCancel>, mut r_gesture: ResMut<GestureState>) {
     cancel.propagate(false);
     if matches!(r_gesture.gesture, Gesture::Move) {
         r_gesture.graph = None;
@@ -942,7 +940,7 @@ fn on_graph_node_drag_cancel(mut cancel: On<Pointer<Cancel>>, mut r_gesture: Res
 
 #[allow(clippy::type_complexity)]
 fn on_terminal_drag_start(
-    mut drag_start: On<Pointer<DragStart>>,
+    mut drag_start: On<PointerDragStart>,
     q_parent: Query<&ChildOf>,
     mut q_terminal: Query<&Terminal>,
     q_graph: Query<&Children, With<Graph>>,
@@ -975,7 +973,7 @@ fn on_terminal_drag_start(
             ConnectionAnchor::OutputTerminal(drag_start.entity)
         };
         let target = ConnectionTarget::Location(
-            drag_start.pointer_location.position
+            drag_start.pointer.position
                 - (container_transform.translation - container_computed_node.size() * 0.5)
                     * container_computed_node.inverse_scale_factor(),
         );
@@ -1000,7 +998,7 @@ fn on_terminal_drag_start(
 }
 
 fn on_terminal_drag(
-    mut drag: On<Pointer<Drag>>,
+    mut drag: On<PointerDrag>,
     mut r_gesture: ResMut<GestureState>,
     q_graph_doc: Query<(&UiGlobalTransform, &ComputedNode), With<GraphDocument>>,
     mut commands: Commands,
@@ -1021,7 +1019,7 @@ fn on_terminal_drag(
             };
 
             *target = connection_target.unwrap_or(ConnectionTarget::Location(
-                drag.pointer_location.position
+                drag.pointer.position
                     - (container_transform.translation - container_computed_node.size() * 0.5)
                         * container_computed_node.inverse_scale_factor(),
             ));
@@ -1037,7 +1035,7 @@ fn on_terminal_drag(
 }
 
 fn on_terminal_drag_end(
-    mut drag_end: On<Pointer<DragEnd>>,
+    mut drag_end: On<PointerDragEnd>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
@@ -1066,7 +1064,7 @@ fn on_terminal_drag_end(
 }
 
 fn on_terminal_drag_cancel(
-    mut cancel: On<Pointer<Cancel>>,
+    mut cancel: On<PointerCancel>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
@@ -1096,7 +1094,7 @@ fn on_terminal_drag_cancel(
 
 #[allow(clippy::type_complexity)]
 fn on_terminal_drag_enter(
-    mut drag_enter: On<Pointer<DragEnter>>,
+    mut drag_enter: On<PointerDragEnter>,
     mut q_terminal: Query<&Terminal>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
@@ -1151,10 +1149,7 @@ fn on_terminal_drag_enter(
     }
 }
 
-fn on_terminal_drag_leave(
-    mut drag_end: On<Pointer<DragLeave>>,
-    mut r_gesture: ResMut<GestureState>,
-) {
+fn on_terminal_drag_leave(mut drag_end: On<PointerDragLeave>, mut r_gesture: ResMut<GestureState>) {
     drag_end.propagate(false);
     if let Gesture::Connect { .. } = r_gesture.gesture {
         r_gesture.connection_target = None;
@@ -1162,7 +1157,7 @@ fn on_terminal_drag_leave(
 }
 
 fn on_terminal_drop(
-    mut drag_end: On<Pointer<DragDrop>>,
+    mut drag_end: On<PointerDragDrop>,
     mut r_gesture: ResMut<GestureState>,
     mut commands: Commands,
 ) {
@@ -1193,7 +1188,7 @@ fn on_terminal_drop(
 
 #[allow(clippy::type_complexity)]
 fn on_connection_drag_start(
-    mut drag_start: On<Pointer<DragStart>>,
+    mut drag_start: On<PointerDragStart>,
     q_parent: Query<&ChildOf>,
     mut q_connection_hitbox: Query<&ConnectionHitBox>,
     q_connection: Query<&Connection>,

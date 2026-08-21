@@ -1,11 +1,11 @@
-// #import bevy_core_pipeline::tonemapping::tone_mapping
-// #import bevy_pbr::{
+// import bevy_core_pipeline::tonemapping::tone_mapping;
+// import bevy_pbr::{
 //     mesh_view_bindings::view,
 //     mesh_functions as mfns,
 //     mesh_bindings::mesh,
-// }
+// };
 
-@group(#{MATERIAL_BIND_GROUP}) @binding(0)
+@group(constants::MATERIAL_BIND_GROUP) @binding(0)
 var<uniform> color: vec4<f32>;
 
 struct Vertex {

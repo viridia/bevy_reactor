@@ -23,7 +23,7 @@ pub struct GizmoidsPlugin;
 
 impl Plugin for GizmoidsPlugin {
     fn build(&self, app: &mut bevy::app::App) {
-        embedded_asset!(app, "assets/overlay.wgsl");
+        embedded_asset!(app, "assets/overlay.wesl");
         app.add_plugins((
             MaterialPlugin::<OverlayMaterial>::default(),
             MaterialPlugin::<UnderlayMaterial>::default(),

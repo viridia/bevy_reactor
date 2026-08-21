@@ -10,11 +10,12 @@ use bevy::{
         system::{Query, Res},
         template::FromTemplate,
     },
-    feathers::{cursor::EntityCursor, palette},
+    feathers::palette,
     log::warn_once,
     math::{Rect, Vec2},
     picking::{
-        events::{Cancel, Drag, DragEnd, DragStart, Pointer, Press},
+        cursor::EntityCursor,
+        events::{PointerCancel, PointerDrag, PointerDragEnd, PointerDragStart, PointerPress},
         hover::Hovered,
     },
     reflect::{Reflect, prelude::ReflectDefault},
@@ -92,7 +93,7 @@ struct ScrollbarDragState {
 }
 
 fn on_change_hover(
-    change: On<Insert, Hovered>,
+    change: On<Insert<Hovered>>,
     mut q_thumb: Query<(&Hovered, &ScrollbarDragState, &mut BackgroundColor)>,
 ) {
     if let Ok((hovered, drag_state, mut bg_color)) = q_thumb.get_mut(change.entity) {
@@ -101,7 +102,7 @@ fn on_change_hover(
 }
 
 fn on_change_dragging(
-    change: On<Insert, ScrollbarDragState>,
+    change: On<Insert<ScrollbarDragState>>,
     mut q_thumb: Query<(&Hovered, &ScrollbarDragState, &mut BackgroundColor)>,
 ) {
     if let Ok((hovered, drag_state, mut bg_color)) = q_thumb.get_mut(change.entity) {
@@ -122,7 +123,7 @@ fn update_thumb_colors(
 }
 
 fn scrollbar_on_track_press(
-    mut ev: On<Pointer<Press>>,
+    mut ev: On<PointerPress>,
     mut q_scrollbar: Query<(
         &GraphScrollbar,
         &ComputedNode,
@@ -156,7 +157,7 @@ fn scrollbar_on_track_press(
 
         // Convert to widget-local coordinates.
         let local_pos = transform.try_inverse().unwrap().transform_point2(
-            ev.event().pointer_location.position * node_target.scale_factor() / ui_scale.0,
+            ev.event().pointer.position * node_target.scale_factor() / ui_scale.0,
         ) + node.size() * 0.5;
 
         // Current scroll position relative to document bounds.
@@ -208,13 +209,13 @@ fn scrollbar_on_track_press(
     }
 }
 
-fn scrollbar_thumb_on_thumb_press(mut ev: On<Pointer<Press>>) {
+fn scrollbar_thumb_on_thumb_press(mut ev: On<PointerPress>) {
     // If they click on the thumb, do nothing. This will be handled by the drag event.
     ev.propagate(false);
 }
 
 fn scrollbar_on_drag_start(
-    mut ev: On<Pointer<DragStart>>,
+    mut ev: On<PointerDragStart>,
     mut q_thumb: Query<(&ChildOf, &mut ScrollbarDragState), With<GraphScrollbarThumb>>,
     q_scrollbar: Query<(&GraphScrollbar, &ChildOf)>,
     q_graph: Query<(&GraphBounds, &Children), With<Graph>>,
@@ -243,7 +244,7 @@ fn scrollbar_on_drag_start(
 }
 
 fn scrollbar_on_drag(
-    mut ev: On<Pointer<Drag>>,
+    mut ev: On<PointerDrag>,
     mut q_thumb: Query<(&ChildOf, &mut ScrollbarDragState), With<GraphScrollbarThumb>>,
     mut q_scrollbar: Query<(&ComputedNode, &GraphScrollbar, &ChildOf)>,
     q_graph: Query<(&ComputedNode, &GraphBounds, &Children), With<Graph>>,
@@ -303,7 +304,7 @@ fn scrollbar_on_drag(
 }
 
 fn scrollbar_on_drag_end(
-    mut drag_end: On<Pointer<DragEnd>>,
+    mut drag_end: On<PointerDragEnd>,
     mut q_thumb: Query<&mut ScrollbarDragState, With<GraphScrollbarThumb>>,
 ) {
     if let Ok(mut drag) = q_thumb.get_mut(drag_end.entity) {
@@ -315,7 +316,7 @@ fn scrollbar_on_drag_end(
 }
 
 fn scrollbar_on_drag_cancel(
-    mut cancel: On<Pointer<Cancel>>,
+    mut cancel: On<PointerCancel>,
     mut q_thumb: Query<&mut ScrollbarDragState, With<GraphScrollbarThumb>>,
 ) {
     if let Ok(mut drag) = q_thumb.get_mut(cancel.entity) {

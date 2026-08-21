@@ -65,20 +65,20 @@ pub enum TestEnum {
 pub struct TestStruct {
     pub selected: bool,
 
-    #[reflect(@ValueRange::<f32>(0.0..1.0), @Precision(2))]
+    #[reflect(@ValueRange::<f32>(0.0..=1.0), @Precision(2))]
     pub scale: f32,
 
     pub color: Srgba,
     pub position: Vec3,
     pub unlit: Option<bool>,
 
-    #[reflect(@ValueRange::<f32>(0.0..10.0))]
+    #[reflect(@ValueRange::<f32>(0.0..=10.0))]
     pub roughness: Option<f32>,
 
     #[reflect(@Precision(2))]
     pub metalness: Option<f32>,
 
-    #[reflect(@ValueRange::<f32>(0.0..1000.0))]
+    #[reflect(@ValueRange::<f32>(0.0..=1000.0))]
     pub factors: Vec<f32>,
 }
 
