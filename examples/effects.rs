@@ -35,7 +35,7 @@ fn main() {
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
 
-    commands.spawn_scene(bsn!(
+    commands.spawn_scene(bsn!{
         Node {
             left: ui::Val::Px(0.),
             top: ui::Val::Px(0.),
@@ -46,7 +46,7 @@ fn setup_view_root(mut commands: Commands) {
             border: ui::UiRect::all(ui::Val::Px(3.)),
         }
         BorderColor::all(css::ALICE_BLUE)
-        insert_computed(
+        @insert_computed(
             |cx: &Cx| *cx.resource::<State<GameState>>().get(),
             |state| BackgroundColor(match state {
                 GameState::Play => css::DARK_GREEN.into(),
@@ -55,28 +55,28 @@ fn setup_view_root(mut commands: Commands) {
             })
         )
         Children [
-            Text("Game State: "),
-            (
-                Text("")
-                effect(
-                    |cx: &Cx| *cx.resource::<State<GameState>>().get(),
-                    |entity, state| {
-                        if let Some(mut text) = entity.get_mut::<Text>() {
-                            text.0 = match state {
-                                GameState::Play => "Play",
-                                GameState::Pause => "Pause",
-                                GameState::Intro => "Intro",
-                            }.into()
-                        }
-                    })
-            ),
-            switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
+            Text("Game State: ")
+            --
+            Text("")
+            @effect(
+                |cx: &Cx| *cx.resource::<State<GameState>>().get(),
+                |entity, state| {
+                    if let Some(mut text) = entity.get_mut::<Text>() {
+                        text.0 = match state {
+                            GameState::Play => "Play",
+                            GameState::Pause => "Pause",
+                            GameState::Intro => "Intro",
+                        }.into()
+                    }
+                })
+            --
+            @switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
                 cases
-                    .case(GameState::Play, || bsn_list!(Text("Playing")))
-                    .fallback(|| bsn_list!(Text("Not Playing")));
+                    .case(GameState::Play, || bsn_list!{Text("Playing")})
+                    .fallback(|| bsn_list!{Text("Not Playing")});
             })
         ]
-    ));
+    });
 }
 
 fn handle_key_input(

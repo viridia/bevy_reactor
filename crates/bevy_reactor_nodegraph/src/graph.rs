@@ -22,13 +22,13 @@ use bevy::{
         Pickable,
         cursor::EntityCursor,
         events::{
-            Pointer, PointerCancel, PointerDrag, PointerDragDrop, PointerDragEnd, PointerDragEnter,
+            PointerCancel, PointerDrag, PointerDragDrop, PointerDragEnd, PointerDragEnter,
             PointerDragLeave, PointerDragStart, PointerPress, PointerScroll,
         },
         hover::Hovered,
     },
     render::storage::ShaderBuffer,
-    scene::{Scene, bsn, on, template_value},
+    scene::{Scene, bsn, on},
     text::FontSize,
     ui::{
         AlignItems, AlignSelf, BackgroundColor, BorderColor, BorderRadius, BoxShadow, ComputedNode,
@@ -120,14 +120,14 @@ pub fn node_graph() -> impl Scene {
         on(on_graph_scroll)
         Children [
             // Vertical scrollbar
-            node_graph_scrollbar(ControlOrientation::Vertical)
+            @node_graph_scrollbar(ControlOrientation::Vertical)
             Node {
                 grid_column: GridPlacement::start_span(2, 1),
                 grid_row: GridPlacement::start_span(1, 1),
             }
-            ,
+            --
             // Horizontal scrollbar
-            node_graph_scrollbar(ControlOrientation::Horizontal)
+            @node_graph_scrollbar(ControlOrientation::Horizontal)
             Node {
                 grid_column: GridPlacement::start_span(1, 1),
                 grid_row: GridPlacement::start_span(2, 1),
@@ -145,7 +145,7 @@ pub fn node_graph_document() -> impl Scene {
             top: px(0.0),
         }
         Children [
-            selection_rect()
+            @selection_rect()
             Node {
                 width: px(100),
                 height: px(100),
@@ -270,7 +270,7 @@ pub fn input_terminal(color: Color) -> impl Scene {
                 border_radius: BorderRadius::MAX,
 
             }
-            template_value(Terminal::Input)
+            Terminal::Input
             BackgroundColor(color)
             on(on_terminal_drag_start)
             on(on_terminal_drag)
@@ -307,7 +307,7 @@ pub fn output_terminal(color: Color) -> impl Scene {
                 border: UiRect::all(px(3)), // Invisible border increases picking area
                 border_radius: BorderRadius::MAX,
             }
-            template_value(Terminal::Output)
+            Terminal::Output
             BackgroundColor(color)
             on(on_terminal_drag_start)
             on(on_terminal_drag)
@@ -331,7 +331,7 @@ pub fn selection_rect() -> impl Scene {
         SelectionRect
         BorderColor::all(palette::ACCENT.with_alpha(0.2))
         BackgroundColor({palette::ACCENT.with_alpha(0.03)})
-        template_value(Visibility::Hidden)
+        Visibility::Hidden
         Pickable::IGNORE
     }
 }

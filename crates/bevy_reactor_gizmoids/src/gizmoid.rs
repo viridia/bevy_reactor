@@ -15,7 +15,7 @@ pub fn gizmoid<
 >(
     draw: F,
 ) -> impl Scene {
-    bsn! {(
+    bsn! {
         HasOverlay
         template(|context| {
             Ok(MeshMaterial3d::<OverlayMaterial>(
@@ -37,7 +37,7 @@ pub fn gizmoid<
         template(|_| Ok(NotShadowReceiver))
 
         // Mesh geometry reaction
-        effect::effect(move |cx: &Cx| {
+        @effect::effect(move |cx: &Cx| {
             let mut mb = MB::default();
             draw(cx, &mut mb);
             mb
@@ -79,5 +79,5 @@ pub fn gizmoid<
                 ))
             })
         ]
-    )}
+    }
 }

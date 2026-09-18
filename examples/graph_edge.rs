@@ -22,8 +22,8 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
     let image = asset_server.load("embedded://bevy_reactor_nodegraph/assets/dot.png");
 
     commands.spawn((Camera::default(), Camera2d));
-    commands.spawn_scene(bsn!(
-        (Node {
+    commands.spawn_scene(bsn!{
+        Node {
             position_type: PositionType::Absolute,
             left: px(0),
             right: px(0),
@@ -45,8 +45,7 @@ fn setup_view_root(asset_server: Res<AssetServer>, mut commands: Commands) {
         //     dst_pos: Vec2::new(180.0, 135.0),
         //     color: Color::srgb(1.0, 0.0, 0.0),
         // }]
-        )
-    ));
+    });
 }
 
 pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {

@@ -31,7 +31,7 @@ pub struct List {
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
 
-    commands.spawn_scene(bsn!(
+    commands.spawn_scene(bsn!{
         Node {
             left: ui::Val::Px(0.),
             top: ui::Val::Px(0.),
@@ -43,29 +43,27 @@ fn setup_view_root(mut commands: Commands) {
         }
         BorderColor::all(css::ALICE_BLUE)
         Children [
-            for_each(
+            @for_each(
                 |cx: &Cx| {
                     cx.resource::<List>().items.clone()
                 },
                 move |parent, suit: &String, _index| {
                     let suit = suit.clone();
                     parent.queue_spawn_related_scenes::<Children>(
-                        bsn_list![
-                            (
-                                Node {
-                                    border: ui::UiRect::all(ui::Val::Px(3.)),
-                                }
-                                BorderColor::all(css::GREEN)
-                                Children [
-                                    Text::new(suit),
-                                ]
-                            )
-                        ]);
+                        bsn_list!{
+                            Node {
+                                border: ui::UiRect::all(ui::Val::Px(3.)),
+                            }
+                            BorderColor::all(css::GREEN)
+                            Children [
+                                Text::new(suit)
+                            ]
+                        });
                 },
-                || bsn_list![Text::new("No items")]
+                || bsn_list!{Text::new("No items")}
             )
         ]
-    ));
+    });
 }
 
 fn handle_key_input(

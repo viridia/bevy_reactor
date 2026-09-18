@@ -44,11 +44,13 @@ pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
     };
 
     let field_copy = field.clone();
-    bsn_list![
-        field_group()
+    let field_copy2 = field_copy.clone();
+    let field_copy3 = field_copy.clone();
+    bsn_list!{
+        @field_group()
         Children [
-            field_label(field)
-            ,
+            @field_label(field)
+            --
             @FeathersNumberInput
             Node {
                 flex_grow: 1.0,
@@ -59,8 +61,8 @@ pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
                     field.set_value(&mut world, value_change.value.as_reflect());
                 }
             })
-            effect::memo_effect({
-                let field = field_copy.clone();
+            @effect::memo_effect({
+                let field = field_copy2.clone();
                 move |cx: &Cx| {
                     let reflect = field.reflect_tracked(cx).unwrap();
                     if let Some(value) = reflect.try_downcast_ref::<f32>() {
@@ -71,20 +73,20 @@ pub fn f32_field(field: Arc<Inspectable>) -> impl SceneList {
             }, |entity, value| {
                 entity.insert(NumberInputValue::F32(*value));
             })
-            effect::insert_computed_when(
+            @effect::insert_computed_when(
                 { let r = range.clone(); move |_: &Cx| r.clone() },
                 |range| HardLimit(NumberInputRange::F32(range.clone())))
-            effect::insert_computed_when(
+            @effect::insert_computed_when(
                 { let r = range.clone(); move |_: &Cx| r.clone() },
                 |range| SoftLimit(NumberInputRange::F32(range.clone())))
-            effect::insert_computed_when(move |_: &Cx| precision, NumberInputPrecision)
-            effect::insert_computed_when(move |_: &Cx| step, NumberInputStep)
+            @effect::insert_computed_when(move |_: &Cx| precision, NumberInputPrecision)
+            @effect::insert_computed_when(move |_: &Cx| step, NumberInputStep)
             on({
-                let field = field_copy.clone();
+                let field = field_copy3.clone();
                 move |value_change: On<ValueChange<f32>>, mut world: DeferredWorld| {
                     field.set_value(&mut world, value_change.value.as_reflect());
                 }
             })
         ]
-    ]
+    }
 }

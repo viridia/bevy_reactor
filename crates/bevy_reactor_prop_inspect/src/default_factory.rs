@@ -35,9 +35,9 @@ impl InspectorFactory for DefaultInspectorFactory {
                 _ => {
                     world
                         .entity_mut(parent)
-                        .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new(
+                        .queue_spawn_related_scenes::<Children>(bsn_list!{Text::new(
                             "TODO:Struct"
-                        )));
+                        )});
                     true
                 }
             },
@@ -49,15 +49,15 @@ impl InspectorFactory for DefaultInspectorFactory {
             ReflectRef::TupleStruct(_tuple_struct) => {
                 world
                     .entity_mut(parent)
-                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new(
+                    .queue_spawn_related_scenes::<Children>(bsn_list!{Text::new(
                         "TODO:TupleStruct"
-                    )));
+                    )});
                 true
             }
             ReflectRef::Tuple(_tuple) => {
                 world
                     .entity_mut(parent)
-                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Tuple")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!{Text::new("TODO:Tuple")});
                 true
             }
             ReflectRef::List(_) => {
@@ -69,19 +69,19 @@ impl InspectorFactory for DefaultInspectorFactory {
             ReflectRef::Array(_array) => {
                 world
                     .entity_mut(parent)
-                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Array")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!{Text::new("TODO:Array")});
                 true
             }
             ReflectRef::Map(_map) => {
                 world
                     .entity_mut(parent)
-                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Map")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!{Text::new("TODO:Map")});
                 true
             }
             ReflectRef::Set(_set) => {
                 world
                     .entity_mut(parent)
-                    .queue_spawn_related_scenes::<Children>(bsn_list!(Text::new("TODO:Set")));
+                    .queue_spawn_related_scenes::<Children>(bsn_list!{Text::new("TODO:Set")});
                 true
             }
             ReflectRef::Enum(_e) => {
@@ -89,13 +89,14 @@ impl InspectorFactory for DefaultInspectorFactory {
                 // core::option::Option<bool>
                 world
                     .entity_mut(parent)
-                    .queue_spawn_related_scenes::<Children>(bsn_list![
-                        field_group()
+                    .queue_spawn_related_scenes::<Children>(bsn_list!{
+                        @field_group()
                         Children [
-                            field_label(field),
+                            @field_label(field)
+                            --
                             Text::new("TODO:Enum")
                         ]
-                    ]);
+                    });
                 true
             }
             ReflectRef::Opaque(partial_reflect) => {
@@ -113,13 +114,14 @@ impl InspectorFactory for DefaultInspectorFactory {
                     _ => {
                         world
                             .entity_mut(parent)
-                            .queue_spawn_related_scenes::<Children>(bsn_list![
-                                field_group()
+                            .queue_spawn_related_scenes::<Children>(bsn_list!{
+                                @field_group()
                                 Children [
-                                    field_label(field),
+                                    @field_label(field)
+                                    --
                                     Text::new("TODO:Opaque")
                                 ]
-                            ]);
+                            });
                     }
                 }
                 true

@@ -5,7 +5,7 @@ use bevy::{
     picking::{cursor::EntityCursor, hover::Hovered},
     prelude::*,
     scene::bsn,
-    text::{FontSourceTemplate, GenericFontFamilyTemplate},
+    text::{FontSourceTemplate, GenericFontFamily},
     ui::{self, widget::ImageNodeTemplate},
     ui_widgets::Button,
     window::SystemCursorIcon,
@@ -25,7 +25,7 @@ fn main() {
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
 
-    commands.spawn_scene(bsn!(
+    commands.spawn_scene(bsn! {
         Node {
             left: px(0),
             top: px(0),
@@ -41,20 +41,17 @@ fn setup_view_root(mut commands: Commands) {
         }
         BorderColor::all(css::ALICE_BLUE)
         Children [
-            (
-                button()
-                Children [
-                    button_caption("Retreat")
-                ]
-            ),
-            (
-                button()
-                Children [
-                    button_caption("Attack")
-                ]
-            )
+            @button()
+            Children [
+                @button_caption("Retreat")
+            ]
+            --
+            @button()
+            Children [
+                @button_caption("Attack")
+            ]
         ]
-    ));
+    });
 }
 
 fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
@@ -96,7 +93,8 @@ fn button() -> impl Scene {
                     visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
-            },
+            }
+            --
             StyleRule {
                 pattern: StatePattern {
                     mask: WidgetState::PRESSED,
@@ -109,7 +107,8 @@ fn button() -> impl Scene {
                     visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
-            },
+            }
+            --
             StyleRule {
                 pattern: StatePattern {
                     mask: WidgetState::HOVERED,
@@ -122,7 +121,8 @@ fn button() -> impl Scene {
                     visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
-            },
+            }
+            --
             StyleRule {
                 pattern: StatePattern {
                     mask: WidgetState::empty(),
@@ -135,7 +135,7 @@ fn button() -> impl Scene {
                     visual_box: VisualBox::BorderBox,
                     ..default()
                 }},
-            },
+            }
         ]
     }
 }
@@ -145,7 +145,7 @@ fn button_caption(text: &'static str) -> impl Scene {
         Text(text)
         TextColor(palettes::css::BLACK)
         TextFont {
-            font: FontSourceTemplate::Generic(GenericFontFamilyTemplate::SansSerif),
+            font: FontSourceTemplate::Generic(GenericFontFamily::SansSerif),
             font_size: FontSize::Px(20.0)
             weight: FontWeight::BOLD,
         }

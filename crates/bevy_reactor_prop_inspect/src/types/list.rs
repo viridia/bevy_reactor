@@ -35,11 +35,11 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
     let field_copy2 = field.clone();
     let field_copy3 = field.clone();
     let field_copy4 = field.clone();
-    bsn_list![
-        field_group()
+    bsn_list!{
+        @field_group()
         Children [
-            field_label(field)
-            ,
+            @field_label(field)
+            --
             Node {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Row,
@@ -56,22 +56,22 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
             Children [
                 #toggle
                 @FeathersDisclosureToggle
-                on(checkbox_self_update),
-
+                on(checkbox_self_update)
+                --
                 Text("")
                 ThemedText
-                effect::memo_effect(move |cx: &Cx| {
+                @effect::memo_effect(move |cx: &Cx| {
                     let reflect = field_copy.reflect_tracked(cx).unwrap();
                     reflect.reflect_short_type_path().to_owned()
                 }, |entity, path| {
                     if let Some(mut text) = entity.get_mut::<Text>() {
                         text.0.clone_from(path);
                     }
-                }),
-
+                })
+                --
                 Text("[]")
                 ThemedText
-                effect::memo_effect(move |cx: &Cx| {
+                @effect::memo_effect(move |cx: &Cx| {
                     let reflect = field_copy2.reflect_tracked(cx).unwrap();
                     if let ReflectRef::List(value) = reflect.reflect_ref() {
                         return value.len();
@@ -81,11 +81,11 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                     if let Some(mut text) = entity.get_mut::<Text>() {
                         text.0 = format!("[{x}]");
                     }
-                }),
-
-                flex_spacer(),
-
-                add_button()
+                })
+                --
+                @flex_spacer()
+                --
+                @add_button()
                 on(move |_: On<Activate>, mut world: DeferredWorld| {
                     if let Some(list) = field_copy3.reflect(&world) {
                         if let TypeInfo::List(list_type) = list.get_represented_type_info().unwrap() {
@@ -113,16 +113,16 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                         unreachable!("Cannot push to non-list");
                     }
                 })
-            ],
-
-            if_then(|_cx: &Cx| {
+            ]
+            --
+            @if_then(|_cx: &Cx| {
                 // TODO: Return true if list is expanded.
                 // cx.entity(#toggle).contains::<Checked>();
                 true
             }, move || {
                 let field = field_copy4.clone();
                 let field2 = field_copy4.clone();
-                bsn_list!(
+                bsn_list!{
                     Node {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Row
@@ -133,8 +133,8 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                             align_self: AlignSelf::Stretch,
                             margin: UiRect::axes(px(4), Val::ZERO),
                         }
-                        BackgroundColor(Color::WHITE),
-
+                        BackgroundColor(Color::WHITE)
+                        --
                         Node {
                             display: Display::Flex,
                             flex_direction: FlexDirection::Column,
@@ -143,7 +143,7 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                             flex_basis: px(0),
                         }
                         Children [
-                            for_each(move |cx: &Cx| {
+                            @for_each(move |cx: &Cx| {
                                 let reflect = field.reflect_tracked(cx).unwrap();
                                 if let ReflectRef::List(value) = reflect.reflect_ref() {
                                     return (0..value.len()).collect();
@@ -165,14 +165,14 @@ pub fn list_field(field: Arc<Inspectable>) -> impl SceneList {
                                     can_move: true,
                                     attributes: field2.attributes,
                                 });
-                                parent.queue_spawn_related_scenes::<Children>(bsn_list!(
-                                    field_inspector(item_inspectable.clone())
-                                ));
-                            }, || ()),
+                                parent.queue_spawn_related_scenes::<Children>(bsn_list!{
+                                    @field_inspector(item_inspectable.clone())
+                                });
+                            }, || ())
                         ]
                     ]
-                )}
+                }}
             )
         ]
-    ]
+    }
 }

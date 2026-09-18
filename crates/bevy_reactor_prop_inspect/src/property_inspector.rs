@@ -31,7 +31,7 @@ pub fn property_inspector(subject: Arc<dyn InspectableRoot>) -> impl Scene {
             min_width: px(10)
         }
         Children [
-            dyn_scene(move |cx: &Cx| {
+            @dyn_scene(move |cx: &Cx| {
                 subject.get_reflect_tracked(
                     cx, &ParsedPath(Vec::new())).unwrap().reflect_kind().to_owned()
             }, move |builder, kind| {
@@ -49,23 +49,23 @@ pub fn property_inspector(subject: Arc<dyn InspectableRoot>) -> impl Scene {
                             tuple_members(Inspectable::from_root(subject_copy.clone())));
                     },
                     ReflectKind::List => {
-                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:List")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!{Text("Root:List")});
                     },
                     ReflectKind::Array => {
-                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Array")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!{Text("Root:Array")});
                     },
                     ReflectKind::Map => {
-                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Map")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!{Text("Root:Map")});
                     },
                     ReflectKind::Set => {
-                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Set")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!{Text("Root:Set")});
                     },
                     ReflectKind::Enum => {
-                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(Text("Root:Enum")));
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!{Text("Root:Enum")});
                     },
                     ReflectKind::Opaque => {
-                        builder.queue_spawn_related_scenes::<Children>(bsn_list!(
-                            Text("Root:Opaque"))
+                        builder.queue_spawn_related_scenes::<Children>(bsn_list!{
+                            Text("Root:Opaque")}
                         );
                     },
                 }
@@ -133,21 +133,21 @@ fn struct_members(inspectable: Arc<Inspectable>) -> impl SceneList {
                 can_move: false,
                 attributes: Some(attrs),
             });
-            parent.queue_spawn_related_scenes::<Children>(bsn_list!(field_inspector(
+            parent.queue_spawn_related_scenes::<Children>(bsn_list!{@field_inspector(
                 field_inspectable.clone()
-            )));
+            )});
         },
-        || bsn_list!(),
+        || bsn_list!{},
     )));
     fields
 }
 
 fn tuple_struct_members(_inspectable: Arc<Inspectable>) -> impl SceneList {
-    bsn_list!(Text("TupleStruct"))
+    bsn_list!{Text("TupleStruct")}
 }
 
 fn tuple_members(_inspectable: Arc<Inspectable>) -> impl SceneList {
-    bsn_list!(Text("Tuple"))
+    bsn_list!{Text("Tuple")}
 }
 
 pub fn field_inspector(field: Arc<Inspectable>) -> impl Scene {
@@ -229,24 +229,24 @@ pub fn field_label(field: Arc<Inspectable>) -> impl Scene {
         // ThemeTextColor(tokens::TEXT_DIM)
         ThemeTextColor(tokens::CHECKBOX_TEXT_DISABLED)
         Children [
-            label_small(name.clone())
-
-            flex_spacer(),
-
-            if_then(move |_: &Cx| can_move, {
+            @label_small(name.clone())
+            --
+            @flex_spacer()
+            --
+            @if_then(move |_: &Cx| can_move, {
                 let field = field.clone();
-                move || bsn_list![move_up_button(field.clone())]
-            }),
-
-            if_then(move |_: &Cx| can_move, {
+                move || bsn_list!{@move_up_button(field.clone())}
+            })
+            --
+            @if_then(move |_: &Cx| can_move, {
                 let field = field.clone();
-                move || bsn_list![move_down_button(field.clone())]
-            }),
-
-            if_then(move |_: &Cx| can_remove, {
+                move || bsn_list!{@move_down_button(field.clone())}
+            })
+            --
+            @if_then(move |_: &Cx| can_remove, {
                 let field = field.clone();
-                move || bsn_list![remove_button(field.clone())]
-            }),
+                move || bsn_list!{@remove_button(field.clone())}
+            })
         ]
     }
 }
@@ -255,7 +255,7 @@ pub fn remove_button(field: Arc<Inspectable>) -> impl Scene {
     bsn! {
         @FeathersToolButton {
             @variant: ButtonVariant::Normal,
-            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png"))},
+            @caption: {bsn!{@icon("embedded://bevy_reactor_prop_inspect/assets/icons/x.png")}},
         }
         Node {
             flex_grow: 0.0,
@@ -272,7 +272,7 @@ pub fn move_up_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
         @FeathersToolButton {
             @variant: ButtonVariant::Normal,
-            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png"))},
+            @caption: {bsn!{@icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_up.png")}},
         }
         Node {
             flex_grow: 0.0,
@@ -290,7 +290,7 @@ pub fn move_down_button(_field: Arc<Inspectable>) -> impl Scene {
     bsn! {
         @FeathersToolButton {
             @variant: ButtonVariant::Normal,
-            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png"))},
+            @caption: {bsn!{@icon("embedded://bevy_reactor_prop_inspect/assets/icons/arrow_down.png")}},
         }
         Node {
             flex_grow: 0.0,
@@ -308,7 +308,7 @@ pub fn add_button() -> impl Scene {
     bsn! {
         @FeathersToolButton {
             @variant: ButtonVariant::Normal,
-            @caption: {bsn!(icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png"))},
+            @caption: {bsn!{@icon("embedded://bevy_reactor_prop_inspect/assets/icons/add_box.png")}},
         }
         Node {
             flex_grow: 0.0,

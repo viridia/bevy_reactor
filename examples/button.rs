@@ -25,7 +25,7 @@ fn main() {
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
 
-    commands.spawn_scene(bsn!(
+    commands.spawn_scene(bsn!{
         Node {
             left: ui::Val::Px(0.),
             top: ui::Val::Px(0.),
@@ -48,17 +48,16 @@ fn setup_view_root(mut commands: Commands) {
         //     })
         // )
         Children [
-            (
-                button()
-                Children [
-                    Text("Foo")
-                ])
+            @button()
+            Children [
+                Text("Foo")
+            ]
             // switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
-            //     cases.case(GameState::Play, bsn_list!(Text("Playing")))
-            //         .fallback(bsn_list!(Text("Not Playing")));
+            //     cases.case(GameState::Play, bsn_list!{Text("Playing")})
+            //         .fallback(bsn_list!{Text("Not Playing")});
             // })
         ]
-    ));
+    });
 }
 
 const NORMAL_BUTTON: Color = Color::srgb(0.15, 0.15, 0.15);
@@ -79,7 +78,7 @@ fn button() -> impl Scene {
         Hovered::default()
         TabIndex(0)
         BorderColor::all(Color::BLACK)
-        insert_computed(|cx: &Cx| {
+        @insert_computed(|cx: &Cx| {
             let entity = cx.owner();
             match (
                 entity.contains::<InteractionDisabled>(),
@@ -92,11 +91,11 @@ fn button() -> impl Scene {
                 _ => NORMAL_BUTTON
             }
         }, BackgroundColor)
-        Children [(
+        Children [
             Text::new("Button")
             TextColor(Color::srgb(0.9, 0.9, 0.9))
             TextShadow::default()
-        )]
+        ]
     }
 }
 

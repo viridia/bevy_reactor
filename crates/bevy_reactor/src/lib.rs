@@ -59,7 +59,7 @@ pub trait SceneListFn: Send + Sync {
 impl<S: SceneList, F: Fn() -> S + Send + Sync + 'static> SceneListFn for F {
     fn spawn(&self, mut parent: EntityCommands) {
         parent.queue_apply_scene(bsn! {
-            bundle_template(|context| {
+            @bundle_template(|context| {
                 context.entity.despawn_children();
                 Ok(())
             })

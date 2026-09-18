@@ -24,7 +24,16 @@ members = ["crates/*"]
 #   "system_font_discovery",
 #   "debug",
 # ] }
-bevy = { git = "https://github.com/bevyengine/bevy.git", version = "0.20.0-dev", features = [
+# https://github.com/bevyengine/bevy/pull/25653
+# NOTE: "ghost_nodes" feature temporarily removed; not present on this fork/branch.
+# bevy = { git = "https://github.com/ickshonpe/bevy.git", branch = "incremental-ui-updates", version = "0.20.0-dev", features = [
+#   "dynamic_linking",
+#   "bevy_feathers",
+#   "file_watcher",
+#   "system_font_discovery",
+#   "debug",
+# ] }
+bevy = { version = "0.20.0-rc.1", features = [
   "dynamic_linking",
   "ghost_nodes",
   "bevy_feathers",

@@ -95,7 +95,7 @@ fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
     let root = Arc::new(InspectableResource::<TestStruct>::default());
 
-    commands.spawn_scene(bsn!(
+    commands.spawn_scene(bsn!{
         Node {
             left: px(0),
             top: px(0),
@@ -109,9 +109,9 @@ fn setup_view_root(mut commands: Commands) {
         }
         ThemeBackgroundColor(tokens::WINDOW_BG)
         Children [
-            property_inspector(root)
+            @property_inspector(root)
         ]
-    ));
+    });
 }
 
 pub fn close_on_esc(input: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {

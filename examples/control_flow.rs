@@ -31,7 +31,7 @@ fn main() {
 fn setup_view_root(mut commands: Commands) {
     commands.spawn((Camera::default(), Camera2d));
 
-    commands.spawn_scene(bsn!(
+    commands.spawn_scene(bsn!{
         Node {
             left: ui::Val::Px(0.),
             top: ui::Val::Px(0.),
@@ -43,20 +43,23 @@ fn setup_view_root(mut commands: Commands) {
         }
         BorderColor::all(css::ALICE_BLUE)
         Children [
-            Text("State: "),
-            switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
+            Text("State: ")
+            --
+            @switch(|cx: &Cx| *cx.resource::<State<GameState>>().get(), |cases| {
                 cases
-                    .case(GameState::Play, || bsn_list![Text("Playing")])
-                    .fallback(|| bsn_list![Text("Not Playing")]);
-            }),
-            Text(" - "),
-            if_then_else(
+                    .case(GameState::Play, || bsn_list!{Text("Playing")})
+                    .fallback(|| bsn_list!{Text("Not Playing")});
+            })
+            --
+            Text(" - ")
+            --
+            @if_then_else(
                 |cx: &Cx| *cx.resource::<State<GameState>>().get() == GameState::Play,
-                || bsn_list![Text("Yes: Playing")],
-                || bsn_list![Text("No: Not Playing")]
+                || bsn_list!{Text("Yes: Playing")},
+                || bsn_list!{Text("No: Not Playing")}
             )
         ]
-    ));
+    });
 }
 
 fn handle_key_input(
